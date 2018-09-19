@@ -1,3 +1,5 @@
+import javafx.beans.property.SimpleStringProperty
+import javafx.collections.FXCollections
 import javafx.scene.Scene
 import javafx.scene.control.TableRow
 import javafx.scene.control.TreeItem
@@ -7,7 +9,7 @@ import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
 import javafx.stage.Stage
 import javafx.util.Callback
-import store.ServerEntry
+import store.Server
 import store.Store
 import store.Sync
 import store.TtvThing
@@ -60,7 +62,8 @@ class BookmarksView : View() {
         column("name", TtvThing::name)
         column("status", TtvThing::status)
         // TODO add buttons for "sync"
-        root = TreeItem<TtvThing>(TtvThing("root", "rootn", "", Store.servers))
+        root = TreeItem<TtvThing>(TtvThing(SimpleStringProperty("root"),
+                SimpleStringProperty("rootn"), SimpleStringProperty(""), FXCollections.emptyObservableList()))
         populate { it.value.children }
         root.isExpanded = true
         isShowRoot = false
@@ -100,7 +103,7 @@ class BookmarksView : View() {
 //                mapper.enableDefaultTyping()
 //                val json = mapper.writeValueAsString(Store.servers)
 //                println("XXXX " + json)
-//                val res = mapper.readValue(json, Array<ServerEntry>::class.java)
+//                val res = mapper.readValue(json, Array<Server>::class.java)
 //                println("YYY: " + res)
 
             } }
@@ -110,11 +113,11 @@ class BookmarksView : View() {
     init {
         ttv.onUserSelect(1) { it ->
             println("click: name=${it.name} ${it::class} sv.par=${settingsview}")
-            if (it::class == ServerEntry::class) {
-                val sp = ServerSettingsPane(it.name)
+            if (it::class == Server::class) {
+                val sp = ServerSettingsPane(it.name.value)
                 settingsview.children.setAll(sp)
             } else if (it::class == Sync::class) {
-                val sp = SyncSettingsPane(it.name)
+                val sp = SyncSettingsPane(it.name.value)
                 settingsview.children.setAll(sp)
             }
         }
@@ -208,5 +211,5 @@ class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace o
 
 fun initit() {
     Checks.checkComparedFile()
-//    Store.dumpConfig()
+    Store
 }

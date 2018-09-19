@@ -4,8 +4,10 @@ package store
 
 import Helpers
 import Helpers.filecharset
-import javafx.beans.property.SimpleStringProperty
+import javafx.beans.property.*
 import javafx.collections.FXCollections
+import javafx.collections.ObservableList
+import javafx.scene.control.TreeItem
 import mu.KotlinLogging
 import synchro.Actions.ALLACTIONS
 import synchro.Actions.A_CACHEONLY
@@ -72,32 +74,56 @@ object DBSettings {
 
 ///////////////////////// settings
 
-open class TtvThing(var type: String, var name: String, var status: String, var children: List<TtvThing>)
+// TODO all observable/jfxprops?
 
-class Sync(type: String, name: String, status: String, var localfolder: String, var remotefolder: String): TtvThing(type, name, status, emptyList())
 
-class ServerEntry(type: String, name: String, status: String, var proto: String,
-                  children: List<Sync> = emptyList()): TtvThing(type, name, status, children)
+
+open class TtvThing(val type: StringProperty, val name: StringProperty, val status: StringProperty,
+                    val children: ObservableList<out TtvThing>)
+
+class Sync(type: StringProperty, name: StringProperty, status: StringProperty, val localfolder: StringProperty,
+           val subsets: ObservableList<SubSet> = FXCollections.emptyObservableList()):
+        TtvThing(type, name, status, FXCollections.emptyObservableList()) {
+    var cacheid = "TODO" // one cache db per sync thing:
+}
+
+class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty, val cantSetDate: BooleanProperty)
+
+class SubSet(val name: StringProperty, val excludeFilter: StringProperty, val remotefolders: ObservableList<String> = FXCollections.emptyObservableList())
+
+class Server(type: StringProperty, name: StringProperty, status: StringProperty, val proto: ObjectProperty<Protocol>,
+             children: ObservableList<Sync> = FXCollections.emptyObservableList()): TtvThing(type, name, status, children)
 
 object Store {
-
-    val servers = FXCollections.observableArrayList<ServerEntry>()!!
+    val servers = FXCollections.observableArrayList<Server>()!!
 
     fun saveSettings() {
         val props = Properties()
         props["settingsversion"] = "1"
         props["servers"] = servers.size.toString()
-        servers.forEachIndexed { idx, s ->
-            props["se $idx type"] = s.type
-            props["se $idx name"] = s.name
-            props["se $idx proto"] = s.proto
-            props["se $idx childs"] = s.children.size.toString()
-            s.children.forEachIndexed { idx2, s2 ->
-                if (s2 is Sync) {
-                    props["sy $idx $idx2 type"] = s2.type
-                    props["sy $idx $idx2 name"] = s2.name
-                    props["sy $idx $idx2 localfolder"] = s2.localfolder
-                    props["sy $idx $idx2 remotefolder"] = s2.remotefolder
+        servers.forEachIndexed { idx, server ->
+            props["se $idx type"] = server.type
+            props["se $idx name"] = server.name
+            props["se $idx proto"] = server.proto
+            props["se $idx protocoluri"] = server.proto.value.protocoluri.value
+            props["se $idx cantSetDate"] = server.proto.value.cantSetDate.value
+            props["se $idx doSetPermissions"] = server.proto.value.doSetPermissions.value
+            props["se $idx perms"] = server.proto.value.perms.value
+            props["se $idx childs"] = server.children.size.toString()
+            server.children.forEachIndexed { idx2, sync ->
+                if (sync is Sync) {
+                    props["sy $idx $idx2 type"] = sync.type
+                    props["sy $idx $idx2 name"] = sync.name
+                    props["sy $idx $idx2 localfolder"] = sync.localfolder
+                    props["sy $idx $idx2 subsets"] = sync.subsets.size.toString()
+                    sync.subsets.forEachIndexed { iss, subSet ->
+                        props["ss $idx $idx2 $iss name"] = subSet.name.value
+                        props["ss $idx $idx2 $iss excludeFilter"] = subSet.excludeFilter.value
+                        props["ss $idx $idx2 $iss remotefolders"] = subSet.remotefolders.size.toString()
+                        subSet.remotefolders.forEachIndexed { irf, s ->
+                            props["ssrf $idx $idx2 $iss $irf"] = s
+                        }
+                    }
                 }
             }
         }
@@ -107,21 +133,35 @@ object Store {
     }
 
     fun loadSettings() {
+        logger.info("load settings ${DBSettings.getSettingPath()}")
         servers.clear()
         val propsx = Properties()
         val fr = FileReader(DBSettings.getSettingPath())
         propsx.load(fr)
         val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
         if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
+        fun p2sp(key: String) = SimpleStringProperty(props.getOrDefault(key, ""))
+        fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
         try {
-            for (idx in 0 until props["servers"]!!.toInt()) {
-                val s = ServerEntry(props["se $idx type"]!!, props["se $idx name"]!!, "", props["se $idx proto"]!!)
-                for (idx2 in 0 until props["se $idx childs"]!!.toInt()) {
-                    val s2 = Sync(props["sy $idx $idx2 type"]!!, props["sy $idx $idx2 name"]!!, "",
-                            props["sy $idx $idx2 localfolder"]!!, props["sy $idx $idx2 remotefolder"]!!)
-                    s.children += s2
+            for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
+
+                val proto = Protocol(p2sp("se $idx protocoluri"), p2bp("se $idx doSetPermissions"),
+                        p2sp("se $idx perms"), p2bp("se $idx cantSetDate"))
+
+                val server = Server(p2sp("se $idx type"), p2sp("se $idx name"),
+                        SimpleStringProperty(""), SimpleObjectProperty(proto))
+
+                for (idx2 in 0 until props.getOrDefault("se $idx childs", "").toInt()) {
+                    val sync = Sync(p2sp("sy $idx $idx2 type"), p2sp("sy $idx $idx2 name"),
+                            SimpleStringProperty(""), p2sp("sy $idx $idx2 localfolder"))
+                    for (iss in 0 until props.getOrDefault("sy $idx $idx2 subsets", "0").toInt()) {
+                        val subSet = SubSet(p2sp("ss $idx $idx2 $iss name"), p2sp("ss $idx $idx2 $iss excludeFilter"))
+                        for (irf in 0 until props["ss $idx $idx2 $iss remotefolders"]!!.toInt()) subSet.remotefolders += props["ssrf $idx $idx2 $iss $irf"]!!
+                        sync.subsets += subSet
+                    }
+                    server.children.add(sync)
                 }
-                servers += s
+                servers += server
             }
         } catch (e: Exception) {
             logger.error("error loading settings: ${e.message}")

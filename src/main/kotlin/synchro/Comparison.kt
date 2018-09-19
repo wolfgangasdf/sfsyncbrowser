@@ -40,7 +40,7 @@ object Comparison {
         // to avoid first full sync: mark all folders that are subfolders of already synced folder
         // update hasCachedParent for all folders not in cache and check if it has parent folder that has been synced before in current set
         Cache.cache.iterate { _, path, se ->
-            logger.debug("cache it: $path")
+            //logger.debug("cache it: $path")
             if (se.relevant && se.isDir) {
                 var tmpf = path
                 var haveCachedParentDir = false
