@@ -1,5 +1,4 @@
 import javafx.beans.property.SimpleStringProperty
-import javafx.collections.FXCollections
 import javafx.scene.Scene
 import javafx.scene.control.TableRow
 import javafx.scene.control.TreeItem
@@ -9,18 +8,11 @@ import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
 import javafx.stage.Stage
 import javafx.util.Callback
-import store.Server
-import store.Store
-import store.Sync
-import store.TtvThing
+import store.*
 import tornadofx.*
 import java.io.File
 import java.util.*
 
-
-object Global {
-    var string = ""
-}
 
 class Styles : Stylesheet() {
 
@@ -48,11 +40,18 @@ class BookmarksView : View() {
 
     open class SettingsPane(val name: String): Pane()
 
-    class ServerSettingsPane(name: String): SettingsPane(name)  {
-        init { this += label("settserv $name")}
+    class ServerSettingsPane(server: Server): SettingsPane(server.name.value)  {
+        init {
+            this += hbox { label("Server name: ") ; textfield(server.name) }
+            this += hbox { label("Server name: ") ; textfield(server.name) }
+            // class Server(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val proto: ObjectProperty<Protocol>,
+            //             override val children: ObservableList<Sync>): TtvThing
+        }
     }
-    class SyncSettingsPane(name: String): SettingsPane(name)  {
-        init { this += label("settsync $name")}
+    class SyncSettingsPane(sync: Sync): SettingsPane(sync.name.value)  {
+        init {
+            this += label("settsync $name")
+        }
     }
 
     var settingsview = SettingsPane("asdf")
@@ -62,8 +61,8 @@ class BookmarksView : View() {
         column("name", TtvThing::name)
         column("status", TtvThing::status)
         // TODO add buttons for "sync"
-        root = TreeItem<TtvThing>(TtvThing(SimpleStringProperty("root"),
-                SimpleStringProperty("rootn"), SimpleStringProperty(""), FXCollections.emptyObservableList()))
+        root = TreeItem<TtvThing>(RootThing(SimpleStringProperty("root"),
+                SimpleStringProperty("rootn"), SimpleStringProperty("roots"), Store.servers))
         populate { it.value.children }
         root.isExpanded = true
         isShowRoot = false
@@ -111,17 +110,20 @@ class BookmarksView : View() {
     }
 
     init {
-        ttv.onUserSelect(1) { it ->
-            println("click: name=${it.name} ${it::class} sv.par=${settingsview}")
-            if (it::class == Server::class) {
-                val sp = ServerSettingsPane(it.name.value)
-                settingsview.children.setAll(sp)
-            } else if (it::class == Sync::class) {
-                val sp = SyncSettingsPane(it.name.value)
-                settingsview.children.setAll(sp)
+        ttv.selectionModel.selectedItemProperty().onChange {
+            println("selch: name=${it?.value?.name?.value} sv.par=${settingsview}")
+            if (it != null) {
+                val ti = it.value
+                if (ti::class == Server::class) {
+                    val sp = ServerSettingsPane(ti as Server)
+                    settingsview.children.setAll(sp)
+                } else if (ti::class == Sync::class) {
+                    val sp = SyncSettingsPane(ti as Sync)
+                    settingsview.children.setAll(sp)
+                }
             }
-        }
 
+        }
     }
 }
 

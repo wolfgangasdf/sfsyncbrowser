@@ -7,7 +7,6 @@ import Helpers.filecharset
 import javafx.beans.property.*
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
-import javafx.scene.control.TreeItem
 import mu.KotlinLogging
 import synchro.Actions.ALLACTIONS
 import synchro.Actions.A_CACHEONLY
@@ -78,21 +77,32 @@ object DBSettings {
 
 
 
-open class TtvThing(val type: StringProperty, val name: StringProperty, val status: StringProperty,
-                    val children: ObservableList<out TtvThing>)
+//open class TtvThing(val type: StringProperty, val name: StringProperty, val status: StringProperty,
+//                    val children: ObservableList<out TtvThing>)
 
-class Sync(type: StringProperty, name: StringProperty, status: StringProperty, val localfolder: StringProperty,
+interface TtvThing {
+    val type: StringProperty
+    val name: StringProperty
+    val status: StringProperty
+    val children: ObservableList<out TtvThing>
+}
+
+class RootThing(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty,
+             override val children: ObservableList<Server> = FXCollections.emptyObservableList()): TtvThing
+
+class Sync(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val localfolder: StringProperty,
            val subsets: ObservableList<SubSet> = FXCollections.emptyObservableList()):
-        TtvThing(type, name, status, FXCollections.emptyObservableList()) {
+        TtvThing {
     var cacheid = "TODO" // one cache db per sync thing:
+    override val children: ObservableList<Sync> = FXCollections.emptyObservableList()
 }
 
 class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty, val cantSetDate: BooleanProperty)
 
 class SubSet(val name: StringProperty, val excludeFilter: StringProperty, val remotefolders: ObservableList<String> = FXCollections.emptyObservableList())
 
-class Server(type: StringProperty, name: StringProperty, status: StringProperty, val proto: ObjectProperty<Protocol>,
-             children: ObservableList<Sync> = FXCollections.emptyObservableList()): TtvThing(type, name, status, children)
+class Server(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val proto: ObjectProperty<Protocol>,
+             override val children: ObservableList<Sync>): TtvThing
 
 object Store {
     val servers = FXCollections.observableArrayList<Server>()!!
@@ -149,7 +159,7 @@ object Store {
                         p2sp("se $idx perms"), p2bp("se $idx cantSetDate"))
 
                 val server = Server(p2sp("se $idx type"), p2sp("se $idx name"),
-                        SimpleStringProperty(""), SimpleObjectProperty(proto))
+                        SimpleStringProperty(""), SimpleObjectProperty(proto), FXCollections.observableArrayList())
 
                 for (idx2 in 0 until props.getOrDefault("se $idx childs", "").toInt()) {
                     val sync = Sync(p2sp("sy $idx $idx2 type"), p2sp("sy $idx $idx2 name"),
@@ -159,7 +169,8 @@ object Store {
                         for (irf in 0 until props["ss $idx $idx2 $iss remotefolders"]!!.toInt()) subSet.remotefolders += props["ssrf $idx $idx2 $iss $irf"]!!
                         sync.subsets += subSet
                     }
-                    server.children.add(sync)
+                    println("server=${server.children} ${server.children::class.java}")
+                    server.children += sync
                 }
                 servers += server
             }
