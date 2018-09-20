@@ -4,6 +4,7 @@ import javafx.scene.Scene
 import javafx.scene.control.TableRow
 import javafx.scene.control.TreeItem
 import javafx.scene.control.TreeTableView
+import javafx.scene.control.cell.TextFieldListCell
 import javafx.scene.image.Image
 import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
@@ -51,9 +52,14 @@ class BookmarksView : View() {
                 this += checkbox("Protocol set permissions", server.proto.doSetPermissions)
                 this += hbox { label("Protocol permissions: ") ; textfield(server.proto.perms) }
                 this += checkbox("Protocol don't set date", server.proto.cantSetDate)
+                this += button("Add new sync") { action {
+                    server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
+                            SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"))
+                } }
             }
         }
     }
+
     class SyncSettingsPane(sync: Sync): SettingsPane()  {
         init {
             this += vbox {
@@ -76,10 +82,15 @@ class BookmarksView : View() {
             this += vbox {
                 this += hbox { label("Subset name: "); textfield(subset.name) }
                 this += hbox { label("Exclude filter: "); textfield(subset.excludeFilter) }
-                this += listview(subset.remotefolders)
+                this += button("Add new remote folder") { action {
+                    subset.remotefolders += "newrf"
+                } }
+                this += listview(subset.remotefolders).apply {
+                    isEditable = true
+                    cellFactory = TextFieldListCell.forListView()
+                }
             }
         }
-        // class SubSet(val name: StringProperty, val excludeFilter: StringProperty, val remotefolders: ObservableList<String> = FXCollections.emptyObservableList())
     }
 
     var settingsview = SettingsPane()
@@ -88,7 +99,6 @@ class BookmarksView : View() {
         column("type", TtvThing::type)
         column("name", TtvThing::name)
         column("status", TtvThing::status)
-        // TODO add buttons for "sync"
         root = TreeItem<TtvThing>(RootThing(SimpleStringProperty("root"),
                 SimpleStringProperty("rootn"), SimpleStringProperty("roots"), Store.servers))
         populate { it.value.children }

@@ -1,4 +1,3 @@
-@file:Suppress("unused", "MemberVisibilityCanBePrivate") // TODO
 
 package store
 
@@ -73,8 +72,6 @@ object DBSettings {
 
 ///////////////////////// settings
 
-// TODO all observable/jfxprops?
-
 
 
 //open class TtvThing(val type: StringProperty, val name: StringProperty, val status: StringProperty,
@@ -98,7 +95,7 @@ class Sync(override val type: StringProperty, override val name: StringProperty,
 class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty, val cantSetDate: BooleanProperty)
 
 class SubSet(override val name: StringProperty, override val status: StringProperty, val excludeFilter: StringProperty,
-             val remotefolders: ObservableList<String> = FXCollections.emptyObservableList(),
+             val remotefolders: ObservableList<String> = FXCollections.observableArrayList<String>(),
              override val type: StringProperty = SimpleStringProperty("subset")): TtvThing {
     override val children: ObservableList<SubSet> = FXCollections.emptyObservableList()
 }
@@ -109,7 +106,6 @@ class Server(override val type: StringProperty, override val name: StringPropert
 object Store {
     val servers = FXCollections.observableArrayList<Server>()!!
 
-    // TODO replace spaces by dot in property keys, ugly in file!
     fun saveSettings() {
         val props = Properties()
         props["settingsversion"] = "1"

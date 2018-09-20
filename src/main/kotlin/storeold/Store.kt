@@ -1,4 +1,3 @@
-@file:Suppress("unused") // TODO
 
 package storeold
 
@@ -90,8 +89,6 @@ object Tools {
 //  val crypto = JavaCryptoEncryption("DES")
 }
 
-// TODO removed JavaCryptoEncryption do plain text in settings file (dont show in UI)
-
 class Config {
     var servers = FXCollections.observableArrayList<Server>()
     val width = SimpleIntegerProperty(800)
@@ -182,7 +179,7 @@ object Store {
     }
 
     fun load() {
-        var lastserver = Server() // TODO was null...
+        var lastserver = Server()
         var lastprotocol = Protocol()
         var lastsubfolder = SubFolder()
         logger.info("----------load")
