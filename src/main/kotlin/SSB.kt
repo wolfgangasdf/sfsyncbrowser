@@ -1,4 +1,5 @@
 import javafx.beans.property.SimpleStringProperty
+import javafx.collections.FXCollections
 import javafx.scene.Scene
 import javafx.scene.control.TableRow
 import javafx.scene.control.TreeItem
@@ -38,23 +39,50 @@ fun openNewWindow(view: UIComponent) {
 
 class BookmarksView : View() {
 
-    open class SettingsPane(val name: String): Pane()
+    open class SettingsPane: Pane()
 
-    class ServerSettingsPane(server: Server): SettingsPane(server.name.value)  {
+    class ServerSettingsPane(server: Server): SettingsPane() {
         init {
-            this += hbox { label("Server name: ") ; textfield(server.name) }
-            this += hbox { label("Server name: ") ; textfield(server.name) }
-            // class Server(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val proto: ObjectProperty<Protocol>,
-            //             override val children: ObservableList<Sync>): TtvThing
+            this += vbox {
+                this += hbox { label("Server name: ") ; textfield(server.name) }
+                this += hbox { label("Server type: ") ; textfield(server.type) }
+                this += hbox { label("Status: ") ; label(server.status) }
+                this += hbox { label("Protocol URI: ") ; textfield(server.proto.protocoluri) }
+                this += checkbox("Protocol set permissions", server.proto.doSetPermissions)
+                this += hbox { label("Protocol permissions: ") ; textfield(server.proto.perms) }
+                this += checkbox("Protocol don't set date", server.proto.cantSetDate)
+            }
         }
     }
-    class SyncSettingsPane(sync: Sync): SettingsPane(sync.name.value)  {
+    class SyncSettingsPane(sync: Sync): SettingsPane()  {
         init {
-            this += label("settsync $name")
+            this += vbox {
+                this += hbox { label("Sync name: "); textfield(sync.name) }
+                this += hbox { label("Sync cacheid: "); label(sync.cacheid) }
+                this += hbox { label("type: "); textfield(sync.type) }
+                this += hbox { label("Status: "); label(sync.status) }
+                this += hbox { label("Local folder: "); textfield(sync.localfolder) }
+                this += button("Add new subset") { action {
+                    println("syncchilds=${sync.children} ${sync.children::class.java}")
+                    sync.children += SubSet(SimpleStringProperty("ssname"),
+                    SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), FXCollections.observableArrayList<String>())
+                } }
+            }
         }
     }
 
-    var settingsview = SettingsPane("asdf")
+    class SubsetSettingsPane(subset: SubSet): SettingsPane() {
+        init {
+            this += vbox {
+                this += hbox { label("Subset name: "); textfield(subset.name) }
+                this += hbox { label("Exclude filter: "); textfield(subset.excludeFilter) }
+                this += listview(subset.remotefolders)
+            }
+        }
+        // class SubSet(val name: StringProperty, val excludeFilter: StringProperty, val remotefolders: ObservableList<String> = FXCollections.emptyObservableList())
+    }
+
+    var settingsview = SettingsPane()
 
     val ttv = TreeTableView<TtvThing>().apply {
         column("type", TtvThing::type)
@@ -66,7 +94,7 @@ class BookmarksView : View() {
         populate { it.value.children }
         root.isExpanded = true
         isShowRoot = false
-        root.children.forEach { it.isExpanded = true }
+        root.children.forEach { it.isExpanded = true ; it.children.forEach { it.isExpanded = true }}
         resizeColumnsToFitContent()
         useMaxHeight = true
         useMaxWidth = true
@@ -119,6 +147,9 @@ class BookmarksView : View() {
                     settingsview.children.setAll(sp)
                 } else if (ti::class == Sync::class) {
                     val sp = SyncSettingsPane(ti as Sync)
+                    settingsview.children.setAll(sp)
+                } else if (ti::class == SubSet::class) {
+                    val sp = SubsetSettingsPane(ti as SubSet)
                     settingsview.children.setAll(sp)
                 }
             }
