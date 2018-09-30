@@ -147,6 +147,25 @@ class BookmarksView : View() {
 //                println("YYY: " + res)
 
             } }
+
+            button("testmytask") { action {
+                println("gui: ${Thread.currentThread().id}")
+                val taskIni = MyTask<Unit> {
+                    println("taskini: !!!!!!! ${Thread.currentThread().id}")
+                    updateTit("Initialize connections...${Thread.currentThread().id}")
+                    updateProgr(0.0, 100.0, "execute 'before'...")
+                    //        throw Exception("error executing 'before' command!")
+                    Thread.sleep(1000)
+                    updateProgr(50.0, 100.0, "initialize remote connection...")
+                    Thread.sleep(1000)
+                    updateProgr(50.0, 100.0, "initialize remote connection...2")
+                    Thread.sleep(1000)
+                    updateProgr(100.0, 100.0, "done!")
+                }
+
+                taskIni.setOnSucceeded { println("back here: succ!") }
+                MyWorker.runTask(taskIni)
+            } }
         }
     }
 
@@ -206,25 +225,6 @@ class BrowserView : View("Browser view") {
             }
         } }
 
-
-        button("testmytask") { action {
-            println("gui: ${Thread.currentThread().id}")
-            val taskIni = MyTask<Unit> {
-                println("taskini: !!!!!!! ${Thread.currentThread().id}")
-                updateTit("Initialize connections...${Thread.currentThread().id}")
-                updateProgr(0.0, 100.0, "execute 'before'...")
-                //        throw Exception("error executing 'before' command!")
-                Thread.sleep(1000)
-                updateProgr(50.0, 100.0, "initialize remote connection...")
-                Thread.sleep(1000)
-                updateProgr(50.0, 100.0, "initialize remote connection...2")
-                Thread.sleep(1000)
-                updateProgr(100.0, 100.0, "done!")
-            }
-
-            taskIni.setOnSucceeded { println("back here: succ!") }
-            MyWorker.runTask(taskIni)
-        } }
 
         label("Files:")
         // TODO need cellfactory to color rows!

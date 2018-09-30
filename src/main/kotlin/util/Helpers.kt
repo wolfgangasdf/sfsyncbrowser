@@ -1,4 +1,6 @@
 import javafx.application.Platform
+import javafx.beans.property.ObjectProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
 import javafx.geometry.Rectangle2D
@@ -119,6 +121,9 @@ typealias Triple<A, B, C> = Tuple3<A, B, C>
 
 // all other solutions didn't work well...
 open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
+
+    val myTitleProperty = SimpleStringProperty("huhu")
+
     override fun call(): T {
         return callfun()
     }
@@ -127,6 +132,7 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
         runLater {
             println("updatetit: before")
             updateTitle(title)
+            myTitleProperty.set(title)
             println("updatetit: after")
         }
     }
@@ -136,53 +142,91 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
             updateMessage(msg)
             updateProgress(workDone, max)
             println("updateprogr [${this.title}] done=$workDone msg=$msg")
+            myTitleProperty.set(msg)
         }
     }
 }
 
-object MyWorker {
+object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     val taskList = FXCollections.observableArrayList<MyTask<*>>()
-    private val taskListView = ListView<MyTask<*>>().apply {
-        items = taskList
-        setCellFactory { lv ->
-            ListCell<MyTask<*>>().apply {
-                itemProperty().onChange {
-                    println("itemonch: $item")
-                    if (item?.value != null) {
-                        val title = label {
-                            isWrapText = true
-                            textProperty().bind(item.titleProperty())
-                            prefWidthProperty().bind(lv.widthProperty() - 180)
-                            hgrow = Priority.ALWAYS
-                        }
-                        val message = label {
-                            isWrapText = true
-                            prefWidthProperty().bind(lv.widthProperty() - 30)
-                            textProperty().bind(item.messageProperty())
-                            style = "-fx-font-size: 10"
-                        }
-                        val progress = progressbar {
-                            prefWidth = 150.0
-                            progressProperty().bind(item.progressProperty())
-                        }
-                        val hb = hbox {
-                            this += title
-                            this += progress
-                        }
-                        val vb = vbox {
-                            this += hb
-                            this += message
-                            isFillWidth = true
-                        }
-                        graphic = vb
-                    } else {
-                        graphic = null
-                    }
-                }
-            }
-        }
+
+    class TodoItemModel(property: ObjectProperty<MyTask<*>>) : ItemViewModel<MyTask<*>>(itemProperty = property) {
+        val text = bind(autocommit = true) {
+            item?.myTitleProperty }
     }
-    private val al = Dialog<javafx.scene.control.ButtonType>().apply {
+
+    class TaskListFragment : ListCellFragment<MyTask<*>>() {
+        val todoitem = TodoItemModel(itemProperty)
+        override val root = vbox {
+            println("xxxxxxx item=$item $itemProperty ${itemProperty.get()}")
+            label(todoitem.text)
+//            label(itemProperty.getProperty(MyTask::titleProperty))
+        }
+//            hbox {
+//                label(item.titleProperty()) {
+//                    isWrapText = true
+////                    prefWidthProperty().bind(lv.widthProperty() - 180)
+//                    hgrow = Priority.ALWAYS
+//                }
+//                progressbar(item.progressProperty()) {
+//                    prefWidth = 150.0
+//                }
+//            }
+//            label(item.messageProperty()) {
+//                isWrapText = true
+////                    prefWidthProperty().bind(lv.widthProperty() - 30)
+//                style = "-fx-font-size: 10"
+//            }
+//        }
+    }
+
+    val taskListView = listview(taskList) {
+        cellFragment(DefaultScope, TaskListFragment::class)
+    }
+
+//    private val taskListView = ListView<MyTask<*>>().apply {
+//        items = taskList
+//
+//
+//        setCellFactory { lv ->
+//            ListCell<MyTask<*>>().apply {
+//                itemProperty().onChange {
+//                    println("itemonch: $item")
+//                    if (item?.value != null) {
+//                        val title = label {
+//                            isWrapText = true
+//                            textProperty().bind(item.titleProperty())
+//                            prefWidthProperty().bind(lv.widthProperty() - 180)
+//                            hgrow = Priority.ALWAYS
+//                        }
+//                        val message = label {
+//                            isWrapText = true
+//                            prefWidthProperty().bind(lv.widthProperty() - 30)
+//                            textProperty().bind(item.messageProperty())
+//                            style = "-fx-font-size: 10"
+//                        }
+//                        val progress = progressbar {
+//                            prefWidth = 150.0
+//                            progressProperty().bind(item.progressProperty())
+//                        }
+//                        val hb = hbox {
+//                            this += title
+//                            this += progress
+//                        }
+//                        val vb = vbox {
+//                            this += hb
+//                            this += message
+//                            isFillWidth = true
+//                        }
+//                        graphic = vb
+//                    } else {
+//                        graphic = null
+//                    }
+//                }
+//            }
+//        }
+//    }
+    init {
         // not needed? initOwner(Main.stage)
         title = "Progress"
         isResizable = true
@@ -200,24 +244,24 @@ object MyWorker {
                 println("cancelled all tasks!")
             }
         }
-
     }
+
     var backgroundTimer: java.util.Timer? = null // just to clean up finished tasks
     init {
-        al.showingProperty().onChange { newv ->
+        showingProperty().onChange { newv ->
             if (newv) {
                 val ttask = timerTask {
                     if (taskList.isNotEmpty()) runLater {
                         var iii = 0
                         while (iii < taskList.size) {
                             if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
-                                logger.debug("remove task ${taskList[iii].title}")
+                                println("remove task ${taskList[iii].title}")
                                 taskList.remove(iii, iii + 1)
                             } else
                                 iii += 1
                         }
                         if (taskList.isEmpty()) {
-                            al.close()
+                            this@MyWorker.close()
                         }
                     }
                 }
@@ -230,11 +274,12 @@ object MyWorker {
     }
 
     fun runTask(atask: MyTask<*>) {
-        if (!al.isShowing) al.show()
         taskList.add(atask)
+        if (!this.isShowing) this.show()
         println("added task " + atask)
         val th = Thread(atask) // doesn't work
         th.isDaemon = true
         th.start()
+        this.taskListView.refresh()
     }
 }
