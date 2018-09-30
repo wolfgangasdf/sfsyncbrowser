@@ -1,26 +1,23 @@
-import javafx.application.Platform
-import javafx.beans.property.ObjectProperty
-import javafx.beans.property.SimpleStringProperty
+package util
+
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
-import javafx.event.EventType
 import javafx.geometry.Rectangle2D
 import javafx.scene.control.ButtonType
 import javafx.scene.control.Dialog
-import javafx.scene.control.ListCell
-import javafx.scene.control.ListView
 import javafx.scene.layout.Priority
+import javafx.stage.Modality
 import javafx.stage.Screen
 import mu.KotlinLogging
-import java.io.File
-import java.net.URI
+import tornadofx.*
 import java.awt.Desktop
+import java.io.File
 import java.io.IOException
-import java.util.jar.JarFile
+import java.net.URI
 import java.net.URISyntaxException
 import java.nio.charset.Charset
 import java.util.*
-import tornadofx.*
+import java.util.jar.JarFile
 import kotlin.concurrent.timerTask
 
 private val logger = KotlinLogging.logger {}
@@ -127,19 +124,13 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
         return callfun()
     }
 
-    fun updateTit(title: String?) {
-        runLater {
-            println("updatetit: before")
-            updateTitle(title)
-            println("updatetit: after")
-        }
-    }
+    fun updateTit(title: String?) { runLater { updateTitle(title) } }
+    fun updateMsg(msg: String?) { runLater { updateMessage(msg) } }
 
-    fun updateProgr(workDone: Double, max: Double, msg: String) {
+    fun updateProgr(workDone: Int, max: Int, msg: String) {
         runLater {
             updateMessage(msg)
-            updateProgress(workDone, max)
-            println("updateprogr [${this.title}] done=$workDone msg=$msg")
+            updateProgress(workDone.toDouble(), max.toDouble())
         }
     }
 }
@@ -149,26 +140,26 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     private var backgroundTimer: java.util.Timer? = null // just to clean up finished tasks
 
     private val taskListView = listview(taskList) {
-        cellFormat {
-            graphic = /*cache {*/
+        cellFormat { // https://www.youtube.com/watch?v=mlDT1Y1b09M
+            graphic = cache {
                 vbox {
                     hbox {
-                        label(it.titleProperty()) {
+                        label(itemProperty().select(MyTask<*>::titleProperty)) {
                             isWrapText = true
                             //                    prefWidthProperty().bind(lv.widthProperty() - 180)
                             hgrow = Priority.ALWAYS
                         }
-                        progressbar(it.progressProperty()) {
+                        progressbar(itemProperty().select(MyTask<*>::progressProperty)) {
                             prefWidth = 150.0
                         }
                     }
-                    label(it.messageProperty()) {
+                    label(itemProperty().select(MyTask<*>::messageProperty)) {
                         isWrapText = true
                         //                    prefWidthProperty().bind(lv.widthProperty() - 30)
                         style = "-fx-font-size: 10"
                     }
                 }
-            /*}*/
+            }
 
         }
     }
@@ -185,6 +176,8 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         val sb: Rectangle2D = Screen.getPrimary().visualBounds
         dialogPane.setPrefSize(sb.width/2.5, sb.height/3)
 
+        initModality(Modality.NONE)
+
         setOnCloseRequest {
             if (taskList.isNotEmpty()) {
                 taskList.forEach { t -> if (t.isRunning) t.cancel() }
@@ -193,18 +186,14 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         }
 
         setOnShown {
-            println("onshown: taskList=${taskList.joinToString { it.title + ";" }}")
             val ttask = timerTask {
                 if (taskList.isNotEmpty()) runLater {
                     var iii = 0
                     while (iii < taskList.size) {
                         if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
-                            println("remove task ${taskList[iii].title}")
                             taskList.remove(iii, iii + 1)
                         } else {
                             iii += 1
-                            println("timer: taskList=${taskList.joinToString { it.title + ";" }}")
-                            taskListView.refresh()
                         }
                     }
                     if (taskList.isEmpty()) {
@@ -218,7 +207,6 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         }
 
         setOnHidden {
-            println("kill timer!")
             backgroundTimer!!.cancel()
         }
 
@@ -226,9 +214,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
 
     fun runTask(atask: MyTask<*>) {
         taskList += atask
-//        taskListView.items = taskList
         if (!this.isShowing) this.show()
-        println("added task " + atask)
         val th = Thread(atask) // doesn't work
         th.isDaemon = true
         th.start()
