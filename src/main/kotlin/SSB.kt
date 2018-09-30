@@ -13,6 +13,8 @@ import javafx.util.Callback
 import mu.KotlinLogging
 import store.*
 import tornadofx.*
+import util.MyTask
+import util.MyWorker
 import java.io.File
 import java.util.*
 
@@ -153,14 +155,14 @@ class BookmarksView : View() {
                 val taskIni = MyTask<Unit> {
                     println("taskini: !!!!!!! ${Thread.currentThread().id}")
                     updateTit("Initialize connections...${Thread.currentThread().id}")
-                    updateProgr(0.0, 100.0, "execute 'before'...")
+                    updateProgr(0, 100, "execute 'before'...")
                     //        throw Exception("error executing 'before' command!")
                     Thread.sleep(1000)
-                    updateProgr(50.0, 100.0, "initialize remote connection...")
+                    updateProgr(50, 100, "initialize remote connection...")
                     Thread.sleep(1000)
-                    updateProgr(50.0, 100.0, "initialize remote connection...2")
+                    updateProgr(50, 100, "initialize remote connection...2")
                     Thread.sleep(1000)
-                    updateProgr(100.0, 100.0, "done!")
+                    updateProgr(100, 100, "done!")
                 }
 
                 taskIni.setOnSucceeded { println("back here: succ!") }

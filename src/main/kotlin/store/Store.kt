@@ -1,8 +1,6 @@
 
 package store
 
-import Helpers
-import Helpers.filecharset
 import javafx.beans.property.*
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -16,6 +14,8 @@ import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import tornadofx.onChange
+import util.Helpers
+import util.Helpers.filecharset
 import java.io.FileReader
 import java.io.FileWriter
 import java.nio.file.Files
@@ -89,13 +89,13 @@ class RootThing(override val type: StringProperty, override val name: StringProp
 
 class Sync(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val localfolder: StringProperty,
            override val children: ObservableList<SubSet> = FXCollections.observableArrayList<SubSet>()): TtvThing {
-    var cacheid = "TODO" // one cache db per sync thing:
+    var cacheid = "TODO" // TODO: Property??? one cache db per sync thing:
 }
 
 class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty, val cantSetDate: BooleanProperty)
 
 class SubSet(override val name: StringProperty, override val status: StringProperty, val excludeFilter: StringProperty,
-             val remotefolders: ObservableList<String> = FXCollections.observableArrayList<String>(),
+             val remotefolders: ObservableList<String> = FXCollections.observableArrayList<String>(),// TODO rename to subfolders
              override val type: StringProperty = SimpleStringProperty("subset")): TtvThing {
     override val children: ObservableList<SubSet> = FXCollections.emptyObservableList()
 }
