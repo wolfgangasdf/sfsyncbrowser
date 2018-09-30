@@ -13,6 +13,8 @@ import javafx.util.Callback
 import mu.KotlinLogging
 import store.*
 import tornadofx.*
+import util.Helpers
+import util.Helpers.runUIwait
 import util.MyTask
 import util.MyWorker
 import java.io.File
@@ -162,12 +164,18 @@ class BookmarksView : View() {
                     Thread.sleep(1000)
                     updateProgr(50, 100, "initialize remote connection...2")
                     Thread.sleep(1000)
+
+                    println("hereAAAA")
+                    val res = runUIwait{ Helpers.dialogOkCancel("Warning", "Directory ", "content") }
+                    println("hereBBBB $res")
+
                     updateProgr(100, 100, "done!")
                 }
 
                 taskIni.setOnSucceeded { println("back here: succ!") }
                 MyWorker.runTask(taskIni)
             } }
+
         }
     }
 
@@ -277,7 +285,6 @@ class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace o
         }
 //        setStageIcon()
         initit()
-
 
     }
 

@@ -82,6 +82,7 @@ repositories {
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     compile 'io.github.microutils:kotlin-logging:1.6.10'
+    compile "com.hierynomus:sshj:0.26.0"
     compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25' // no colors, everything stderr
     compile 'no.tornado:tornadofx:1.7.17'
 //    implementation 'com.beust:klaxon:3.0.1'

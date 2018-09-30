@@ -1,11 +1,12 @@
 package util
 
+import javafx.application.Platform
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
 import javafx.geometry.Rectangle2D
-import javafx.scene.control.ButtonType
-import javafx.scene.control.Dialog
+import javafx.scene.control.*
 import javafx.scene.layout.Priority
+import javafx.scene.web.WebView
 import javafx.stage.Modality
 import javafx.stage.Screen
 import mu.KotlinLogging
@@ -17,6 +18,9 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.nio.charset.Charset
 import java.util.*
+import java.util.concurrent.Callable
+import java.util.concurrent.FutureTask
+import java.util.concurrent.RunnableFuture
 import java.util.jar.JarFile
 import kotlin.concurrent.timerTask
 
@@ -95,6 +99,55 @@ object Helpers {
         }
         return d
     }
+
+    fun <T>runUIwait( f: () -> T) : T {
+        return if (!Platform.isFxApplicationThread()) {
+            val runnable = Callable(f)
+            val future = FutureTask<T>(runnable)
+            println("ruw: before runlater")
+            runLater{ future.run() }
+            println("ruw: after runlater")
+            future.get()
+        } else {
+            f()
+        }
+    }
+
+    fun dialogOkCancel(titletext: String, header: String, content: String): Boolean {
+        return Alert(Alert.AlertType.CONFIRMATION).apply {
+            //initOwner(stage)
+            title = titletext
+            headerText = header
+            contentText = content
+        }.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK
+    }
+
+    fun dialogInputString(titletext: String, header: String, content: String): String {
+        return TextInputDialog().apply {
+            //initOwner(stage)
+            title = titletext
+            headerText = header
+            contentText = content
+        }.showAndWait().orElse("")
+    }
+
+    fun dialogMessage(alertType: Alert.AlertType, titletext: String, header: String, htmlmsg: String) {
+        Dialog<Boolean>().apply {
+            //if (stage.owner.nonEmpty) initOwner(stage)
+            title = titletext
+            headerText = header
+            val sp2 = ScrollPane().apply { // optional html message
+                content = WebView().apply {
+                    engine.loadContent(htmlmsg)
+                }
+                isFitToWidth = true
+                isFitToHeight = true
+            }
+            dialogPane.content = sp2
+            dialogPane.buttonTypes += listOf(ButtonType.OK).observable()
+        }.showAndWait()
+    }
+
 }
 
 
