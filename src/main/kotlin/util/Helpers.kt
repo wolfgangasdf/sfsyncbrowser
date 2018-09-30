@@ -3,6 +3,7 @@ import javafx.beans.property.ObjectProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
+import javafx.event.EventType
 import javafx.geometry.Rectangle2D
 import javafx.scene.control.ButtonType
 import javafx.scene.control.Dialog
@@ -122,8 +123,6 @@ typealias Triple<A, B, C> = Tuple3<A, B, C>
 // all other solutions didn't work well...
 open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
 
-    val myTitleProperty = SimpleStringProperty("huhu")
-
     override fun call(): T {
         return callfun()
     }
@@ -132,7 +131,6 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
         runLater {
             println("updatetit: before")
             updateTitle(title)
-            myTitleProperty.set(title)
             println("updatetit: after")
         }
     }
@@ -142,90 +140,39 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
             updateMessage(msg)
             updateProgress(workDone, max)
             println("updateprogr [${this.title}] done=$workDone msg=$msg")
-            myTitleProperty.set(msg)
         }
     }
 }
 
 object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
-    val taskList = FXCollections.observableArrayList<MyTask<*>>()
+    private val taskList = FXCollections.observableArrayList<MyTask<*>>()
+    private var backgroundTimer: java.util.Timer? = null // just to clean up finished tasks
 
-    class TodoItemModel(property: ObjectProperty<MyTask<*>>) : ItemViewModel<MyTask<*>>(itemProperty = property) {
-        val text = bind(autocommit = true) {
-            item?.myTitleProperty }
-    }
+    private val taskListView = listview(taskList) {
+        cellFormat {
+            graphic = /*cache {*/
+                vbox {
+                    hbox {
+                        label(it.titleProperty()) {
+                            isWrapText = true
+                            //                    prefWidthProperty().bind(lv.widthProperty() - 180)
+                            hgrow = Priority.ALWAYS
+                        }
+                        progressbar(it.progressProperty()) {
+                            prefWidth = 150.0
+                        }
+                    }
+                    label(it.messageProperty()) {
+                        isWrapText = true
+                        //                    prefWidthProperty().bind(lv.widthProperty() - 30)
+                        style = "-fx-font-size: 10"
+                    }
+                }
+            /*}*/
 
-    class TaskListFragment : ListCellFragment<MyTask<*>>() {
-        val todoitem = TodoItemModel(itemProperty)
-        override val root = vbox {
-            println("xxxxxxx item=$item $itemProperty ${itemProperty.get()}")
-            label(todoitem.text)
-//            label(itemProperty.getProperty(MyTask::titleProperty))
         }
-//            hbox {
-//                label(item.titleProperty()) {
-//                    isWrapText = true
-////                    prefWidthProperty().bind(lv.widthProperty() - 180)
-//                    hgrow = Priority.ALWAYS
-//                }
-//                progressbar(item.progressProperty()) {
-//                    prefWidth = 150.0
-//                }
-//            }
-//            label(item.messageProperty()) {
-//                isWrapText = true
-////                    prefWidthProperty().bind(lv.widthProperty() - 30)
-//                style = "-fx-font-size: 10"
-//            }
-//        }
     }
 
-    val taskListView = listview(taskList) {
-        cellFragment(DefaultScope, TaskListFragment::class)
-    }
-
-//    private val taskListView = ListView<MyTask<*>>().apply {
-//        items = taskList
-//
-//
-//        setCellFactory { lv ->
-//            ListCell<MyTask<*>>().apply {
-//                itemProperty().onChange {
-//                    println("itemonch: $item")
-//                    if (item?.value != null) {
-//                        val title = label {
-//                            isWrapText = true
-//                            textProperty().bind(item.titleProperty())
-//                            prefWidthProperty().bind(lv.widthProperty() - 180)
-//                            hgrow = Priority.ALWAYS
-//                        }
-//                        val message = label {
-//                            isWrapText = true
-//                            prefWidthProperty().bind(lv.widthProperty() - 30)
-//                            textProperty().bind(item.messageProperty())
-//                            style = "-fx-font-size: 10"
-//                        }
-//                        val progress = progressbar {
-//                            prefWidth = 150.0
-//                            progressProperty().bind(item.progressProperty())
-//                        }
-//                        val hb = hbox {
-//                            this += title
-//                            this += progress
-//                        }
-//                        val vb = vbox {
-//                            this += hb
-//                            this += message
-//                            isFillWidth = true
-//                        }
-//                        graphic = vb
-//                    } else {
-//                        graphic = null
-//                    }
-//                }
-//            }
-//        }
-//    }
     init {
         // not needed? initOwner(Main.stage)
         title = "Progress"
@@ -244,42 +191,46 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
                 println("cancelled all tasks!")
             }
         }
-    }
 
-    var backgroundTimer: java.util.Timer? = null // just to clean up finished tasks
-    init {
-        showingProperty().onChange { newv ->
-            if (newv) {
-                val ttask = timerTask {
-                    if (taskList.isNotEmpty()) runLater {
-                        var iii = 0
-                        while (iii < taskList.size) {
-                            if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
-                                println("remove task ${taskList[iii].title}")
-                                taskList.remove(iii, iii + 1)
-                            } else
-                                iii += 1
-                        }
-                        if (taskList.isEmpty()) {
-                            this@MyWorker.close()
+        setOnShown {
+            println("onshown: taskList=${taskList.joinToString { it.title + ";" }}")
+            val ttask = timerTask {
+                if (taskList.isNotEmpty()) runLater {
+                    var iii = 0
+                    while (iii < taskList.size) {
+                        if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
+                            println("remove task ${taskList[iii].title}")
+                            taskList.remove(iii, iii + 1)
+                        } else {
+                            iii += 1
+                            println("timer: taskList=${taskList.joinToString { it.title + ";" }}")
+                            taskListView.refresh()
                         }
                     }
+                    if (taskList.isEmpty()) {
+                        this@MyWorker.close()
+                    }
                 }
-                backgroundTimer = java.util.Timer()
-                backgroundTimer!!.schedule(ttask, 0, 500)
-            } else {
-                backgroundTimer!!.cancel()
             }
+            backgroundTimer = java.util.Timer()
+            backgroundTimer!!.schedule(ttask, 0, 500)
+            println("scheduled timer!")
         }
+
+        setOnHidden {
+            println("kill timer!")
+            backgroundTimer!!.cancel()
+        }
+
     }
 
     fun runTask(atask: MyTask<*>) {
-        taskList.add(atask)
+        taskList += atask
+//        taskListView.items = taskList
         if (!this.isShowing) this.show()
         println("added task " + atask)
         val th = Thread(atask) // doesn't work
         th.isDaemon = true
         th.start()
-        this.taskListView.refresh()
     }
 }
