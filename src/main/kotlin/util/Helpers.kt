@@ -1,3 +1,4 @@
+import javafx.application.Platform
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
 import javafx.geometry.Rectangle2D
@@ -116,44 +117,37 @@ typealias Pair<A, B> = Tuple2<A, B>
 typealias Triple<A, B, C> = Tuple3<A, B, C>
 
 
-//abstract class myTask: javafx.concurrent.Task<Any>() { // TODO capital letter
-//    fun updateProgr(workDone: Double, max: Double, msg: String) {
-//        updateMessage(msg)
-//        updateProgress(workDone, max)
-//    }
-//}
+// all other solutions didn't work well...
+open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
+    override fun call(): T {
+        return callfun()
+    }
 
-//open class myTask(val callfun: Task<Any>.() -> Any): Task<Any>() {
-//    override fun call(): Any {
-//        return callfun()
-//    }
-//    fun updateProgr(workDone: Double, max: Double, msg: String) {
-//        updateMessage(msg)
-//        updateProgress(workDone, max)
-//    }
-//}
+    fun updateTit(title: String?) {
+        runLater {
+            println("updatetit: before")
+            updateTitle(title)
+            println("updatetit: after")
+        }
+    }
 
-//abstract class myTask: FXTask<Any>() { // TODO capital letter
-//    fun updateProgr(workDone: Double, max: Double, msg: String) {
-//        updateMessage(msg)
-//        updateProgress(workDone, max)
-//    }
-//}
-
-// can't nicely override javafx Task, can't access in costructor protected methods. tornadofx.FXtask is final, can't make subclass. therefore this:
-fun FXTask<*>.updateProgr(workDone: Double, max: Double, msg: String) {
-    logger.debug("updateprogr [${this.title}] done=$workDone msg=$msg")
-    updateMessage(msg)
-    updateProgress(workDone, max)
+    fun updateProgr(workDone: Double, max: Double, msg: String) {
+        runLater {
+            updateMessage(msg)
+            updateProgress(workDone, max)
+            println("updateprogr [${this.title}] done=$workDone msg=$msg")
+        }
+    }
 }
 
 object MyWorker {
-    val taskList = FXCollections.observableArrayList<FXTask<*>>()
-    private val taskListView = ListView<FXTask<*>>().apply {
+    val taskList = FXCollections.observableArrayList<MyTask<*>>()
+    private val taskListView = ListView<MyTask<*>>().apply {
         items = taskList
         setCellFactory { lv ->
-            ListCell<FXTask<*>>().apply {
+            ListCell<MyTask<*>>().apply {
                 itemProperty().onChange {
+                    println("itemonch: $item")
                     if (item?.value != null) {
                         val title = label {
                             isWrapText = true
@@ -216,7 +210,7 @@ object MyWorker {
                     if (taskList.isNotEmpty()) runLater {
                         var iii = 0
                         while (iii < taskList.size) {
-                            if (taskList[iii].completed || taskList.get(iii).isCancelled) {
+                            if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
                                 logger.debug("remove task ${taskList[iii].title}")
                                 taskList.remove(iii, iii + 1)
                             } else
@@ -235,21 +229,12 @@ object MyWorker {
         }
     }
 
-    fun runTask(atask: FXTask<*>) {
-        runAsync {
-            println("starting async...")
-            val th = Thread(atask) // doesn't work
-            th.isDaemon = true
-            th.start()
-            println("finished run!")
-        }
-//        runLater {
-//            if (!al.isShowing) al.show()
-//            taskList.add(atask)
-//            println("added task " + atask)
-//            val th = Thread(atask)
-//            th.isDaemon = true
-//            th.start()
-//        }
+    fun runTask(atask: MyTask<*>) {
+        if (!al.isShowing) al.show()
+        taskList.add(atask)
+        println("added task " + atask)
+        val th = Thread(atask) // doesn't work
+        th.isDaemon = true
+        th.start()
     }
 }
