@@ -1,6 +1,7 @@
 import javafx.application.Application
 import mu.KotlinLogging
 import tornadofx.launch
+import util.Helpers
 
 fun main(args: Array<String>) {
 

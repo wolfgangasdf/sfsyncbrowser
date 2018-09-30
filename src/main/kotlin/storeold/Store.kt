@@ -2,8 +2,6 @@
 package storeold
 
 import CF
-import Helpers
-import Helpers.filecharset
 import javafx.beans.property.Property
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
@@ -20,6 +18,8 @@ import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import tornadofx.onChange
+import util.Helpers
+import util.Helpers.filecharset
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
