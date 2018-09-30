@@ -11,7 +11,7 @@ task wrapper(type: Wrapper) {
 
 
 buildscript {
-    ext.kotlin_version = '1.2.70'
+    ext.kotlin_version = '1.2.71'
 
     repositories {
         mavenCentral()
@@ -31,6 +31,11 @@ buildscript {
 
 
 apply plugin: 'kotlin'
+
+sourceSets { // TODO
+    main.kotlin.exclude "**/Connection.kt"
+    main.kotlin.exclude "**/Profile.kt"
+}
 
 apply plugin: 'idea'
 idea {
@@ -84,9 +89,6 @@ dependencies {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
 

@@ -10,10 +10,13 @@ import javafx.scene.layout.Pane
 import javafx.scene.paint.Color
 import javafx.stage.Stage
 import javafx.util.Callback
+import mu.KotlinLogging
 import store.*
 import tornadofx.*
 import java.io.File
 import java.util.*
+
+private val logger = KotlinLogging.logger {}
 
 
 class Styles : Stylesheet() {
@@ -185,6 +188,40 @@ class BrowserView : View("Browser view") {
             RFile("/aaa/f4", 100,false, "")
     ).toMutableList().observable()
 
+//    val taskIni = object : myTask() { override fun call() {
+//        updateTitle("Initialize connections...${Thread.currentThread().id}")
+//        updateProgr(0.0, 100.0, "execute 'before'...")
+//        //        throw Exception("error executing 'before' command!")
+//        Thread.sleep(1000)
+//        updateProgr(50.0, 100.0, "initialize remote connection...")
+//        Thread.sleep(1000)
+//        updateProgr(100.0, 100.0, "done!")
+//    } }
+
+//    val taskIni = myTask {
+//        title= "asdf"
+//        updateTitle("Initialize connections...${Thread.currentThread().id}")
+//        updateProgr(0.0, 100.0, "execute 'before'...")
+//        //        throw Exception("error executing 'before' command!")
+//        Thread.sleep(1000)
+//        updateProgr(50.0, 100.0, "initialize remote connection...")
+//        Thread.sleep(1000)
+//        updateProgr(100.0, 100.0, "done!")
+//    }
+
+    val taskIni = FXTask {
+        updateTitle("Initialize connections...${Thread.currentThread().id}")
+        updateProgr(0.0, 100.0, "execute 'before'...")
+        //        throw Exception("error executing 'before' command!")
+        Thread.sleep(1000)
+        updateProgr(50.0, 100.0, "initialize remote connection...")
+        Thread.sleep(1000)
+        updateProgr(50.0, 100.0, "initialize remote connection...2")
+        Thread.sleep(1000)
+        updateProgr(100.0, 100.0, "done!")
+    }
+
+
     override val root = vbox {
         prefWidth = 800.0
         prefHeight = 600.0
@@ -194,7 +231,21 @@ class BrowserView : View("Browser view") {
         label("browserview")
         button("compare&sync") { action {
             println("comp: ${Thread.currentThread().id}")
+            runAsync {
+                println("compasync: ${Thread.currentThread().id}")
+                Thread.sleep(1000)
+            } ui {
+                files.add(RFile("/aaa/fxxxxxx", 100,false, ""))
+            }
         } }
+
+        taskIni.setOnSucceeded { println("back here: succ!") }
+
+        button("testmytask") { action {
+            println("gui: ${Thread.currentThread().id}")
+            MyWorker.runTask(taskIni)
+        } }
+
         label("Files:")
         // TODO need cellfactory to color rows!
         tableview(files) {
