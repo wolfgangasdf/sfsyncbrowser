@@ -1,9 +1,7 @@
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
 import javafx.scene.control.TreeItem
-import javafx.scene.control.TreeTableView
 import javafx.scene.control.cell.TextFieldListCell
-import javafx.scene.layout.Pane
 import store.*
 import tornadofx.*
 import util.Helpers
@@ -12,71 +10,88 @@ import util.MyWorker
 
 class BookmarksView : View() {
 
-    open class SettingsPane: Pane()
-
-    class ServerSettingsPane(server: Server): SettingsPane() {
-        init {
-            this += vbox {
-                this += hbox { label("Server name: ") ; textfield(server.name) }
-                this += hbox { label("Server type: ") ; textfield(server.type) }
-                this += hbox { label("Status: ") ; label(server.status) }
-                this += hbox { label("Protocol URI: ") ; textfield(server.proto.protocoluri) }
-                this += hbox { label("Protocol basefolder: ") ; textfield(server.proto.baseFolder) }
-                this += checkbox("Protocol set permissions", server.proto.doSetPermissions)
-                this += hbox { label("Protocol permissions: ") ; textfield(server.proto.perms) }
-                this += checkbox("Protocol don't set date", server.proto.cantSetDate)
-                this += button("Add new sync") { action {
-                    server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
-                            SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
-                } }
-            }
-        }
+    class SettingsViewPlaceholder: View() {
+        override val root = Form()
     }
 
-    class SyncSettingsPane(sync: Sync): SettingsPane()  {
-        init {
-            this += vbox {
-                this += hbox { label("Sync name: "); textfield(sync.name) }
-                this += hbox { label("Sync cacheid: "); label(sync.cacheid) }
-                this += hbox { label("type: "); textfield(sync.type) }
-                this += hbox { label("Status: "); label(sync.status) }
-                this += hbox { label("Local folder: "); textfield(sync.localfolder) }
-                this += button("Add new subset") { action {
-                    println("syncchilds=${sync.children} ${sync.children::class.java}")
-                    sync.children += SubSet(SimpleStringProperty("ssname"),
-                            SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), FXCollections.observableArrayList<String>(), sync)
-                } }
-            }
-        }
-    }
+    class ServerSettingsPane(server: Server): View() {
+        override val root = Form()
 
-    class SubsetSettingsPane(subset: SubSet): SettingsPane() {
         init {
-            this += vbox {
-                this += hbox { label("Subset name: "); textfield(subset.name) }
-                this += button("sync...") { action {
-                    println("bm: ${Thread.currentThread().id}")
-                    val sv = SyncView(subset.sync.server, subset.sync, subset)
-                    openNewWindow(sv)
-                } }
-                this += hbox { label("Exclude filter: "); textfield(subset.excludeFilter) }
-                this += button("Add new remote folder") { action {
-                    subset.remotefolders += "newrf"
-                } }
-                this += listview(subset.remotefolders).apply {
-                    isEditable = true
-                    cellFactory = TextFieldListCell.forListView()
+            with(root) {
+                fieldset("Server") {
+                    field("Name") { textfield(server.name) }
+                    field("Type") { textfield(server.type) }
+                    field("Status") { label(server.status) }
+                    field("Protocol URI") { textfield(server.proto.protocoluri) }
+                    field("Protocol password") { passwordfield(server.proto.password) }
+                    field("Protocol basefolder") { textfield(server.proto.baseFolder) }
+                    field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) }
+                    field("Protocol permissions") { textfield(server.proto.perms) }
+                    field("Protocol don't set date") { checkbox("", server.proto.cantSetDate) }
+                    field { button("Add new sync") { action {
+                        server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
+                                SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
+                    } } }
                 }
             }
         }
     }
 
-    private var settingsview = SettingsPane()
+    class SyncSettingsPane(sync: Sync): View() {
+        override val root = Form()
+        init {
+            with(root) {
+                fieldset("Sync") {
+                    field("Name") { textfield(sync.name) }
+                    field("Sync cacheid") { textfield(sync.cacheid) }
+                    field("Type") { textfield(sync.type) }
+                    field("Status") { label(sync.status) }
+                    field("Local folder") { textfield(sync.localfolder) }
+                    field { button("Add new subset") { action {
+                            println("syncchilds=${sync.children} ${sync.children::class.java}")
+                            sync.children += SubSet(SimpleStringProperty("ssname"),
+                                    SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), FXCollections.observableArrayList<String>(), sync)
+                        } } }
+                }
+            }
+        }
+    }
 
-    private val ttv = TreeTableView<TtvThing>().apply {
+    class SubsetSettingsPane(subset: SubSet): View() {
+        override val root = Form()
+        init {
+            with(root) {
+                fieldset("Subset") {
+                    field("Name: ") { textfield(subset.name) }
+                    field { button("Open sync view!") { action {
+                        println("bm: ${Thread.currentThread().id}")
+                        val sv = SyncView(subset.sync.server, subset.sync, subset)
+                        openNewWindow(sv)
+                    } } }
+                    field("Exclude filter") { textfield(subset.excludeFilter) }
+                    field { button("Add new remote folder") { action {
+                        subset.remotefolders += "newrf"
+                    } } }
+                    field { listview(subset.remotefolders).apply {
+                        isEditable = true
+                        prefHeight = 50.0
+                        cellFactory = TextFieldListCell.forListView()
+                    } }
+
+                }
+            }
+        }
+    }
+
+
+    private var settingsview: View = SettingsViewPlaceholder()
+
+    private val ttv = treetableview<TtvThing> {
         column("type", TtvThing::type)
         column("name", TtvThing::name)
         column("status", TtvThing::status)
+        columnResizePolicy = TreeTableSmartResize.POLICY
         root = TreeItem<TtvThing>(RootThing(SimpleStringProperty("root"),
                 SimpleStringProperty("rootn"), SimpleStringProperty("roots"), SettingsStore.servers))
         populate { it.value.children }
@@ -86,6 +101,7 @@ class BookmarksView : View() {
         resizeColumnsToFitContent()
         useMaxHeight = true
         useMaxWidth = true
+        requestResize()
     }
 
     override val root = vbox {
@@ -93,7 +109,6 @@ class BookmarksView : View() {
         prefHeight = 600.0
         label("conns")
         this += ttv
-        this += settingsview
         hbox {
             button("open browser") { action {
                 println("browser")
@@ -127,20 +142,22 @@ class BookmarksView : View() {
                 taskIni.setOnSucceeded { println("back here: succ!") }
                 MyWorker.runTask(taskIni)
             } }
-
         }
+        this += settingsview
     }
 
     init {
         ttv.selectionModel.selectedItemProperty().onChange {
-            println("selch: name=${it?.value?.name?.value} sv.par=$settingsview")
             if (it != null) {
                 val ti = it.value
-                when(ti) {
-                    is Server -> settingsview.children.setAll(ServerSettingsPane(ti))
-                    is Sync -> settingsview.children.setAll(SyncSettingsPane(ti))
-                    is SubSet -> settingsview.children.setAll(SubsetSettingsPane(ti))
+                settingsview.removeFromParent()
+                settingsview = when(ti) {
+                    is Server -> ServerSettingsPane(ti)
+                    is Sync -> SyncSettingsPane(ti)
+                    is SubSet -> SubsetSettingsPane(ti)
+                    else -> SettingsViewPlaceholder()
                 }
+                root += settingsview
             }
 
         }
