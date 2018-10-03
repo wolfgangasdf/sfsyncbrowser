@@ -1,4 +1,4 @@
-
+@file:Suppress("unused") // TODO
 package store
 
 import javafx.beans.property.*
@@ -53,7 +53,7 @@ object DBSettings {
 
     private val lockFile = java.io.File("$settpath/SSB.lock")
 
-    private val knownHostsFile = java.io.File("$settpath/known_hosts")
+    val knownHostsFile = java.io.File("$settpath/known_hosts")
 
     init {
         knownHostsFile.createNewFile()
@@ -88,14 +88,15 @@ class RootThing(override val type: StringProperty, override val name: StringProp
              override val children: ObservableList<Server> = FXCollections.emptyObservableList()): TtvThing
 
 class Sync(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val localfolder: StringProperty,
-           override val children: ObservableList<SubSet> = FXCollections.observableArrayList<SubSet>()): TtvThing {
-    var cacheid = "TODO" // TODO: Property??? one cache db per sync thing:
-}
+           val cacheid: StringProperty = SimpleStringProperty(java.util.Date().time.toString()), val server: Server,
+           override val children: ObservableList<SubSet> = FXCollections.observableArrayList<SubSet>() ): TtvThing
 
-class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty, val cantSetDate: BooleanProperty)
+class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
+               val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty)
 
 class SubSet(override val name: StringProperty, override val status: StringProperty, val excludeFilter: StringProperty,
              val remotefolders: ObservableList<String> = FXCollections.observableArrayList<String>(),// TODO rename to subfolders
+             val sync: Sync,
              override val type: StringProperty = SimpleStringProperty("subset")): TtvThing {
     override val children: ObservableList<SubSet> = FXCollections.emptyObservableList()
 }
@@ -103,7 +104,7 @@ class SubSet(override val name: StringProperty, override val status: StringPrope
 class Server(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val proto: Protocol,
              override val children: ObservableList<Sync>): TtvThing
 
-object Store {
+object SettingsStore {
     val servers = FXCollections.observableArrayList<Server>()!!
 
     fun saveSettings() {
@@ -117,11 +118,14 @@ object Store {
             props["se.$idx.cantSetDate"] = server.proto.cantSetDate.value.toString()
             props["se.$idx.doSetPermissions"] = server.proto.doSetPermissions.value.toString()
             props["se.$idx.perms"] = server.proto.perms.value
+            props["se.$idx.protoBaseFolder"] = server.proto.baseFolder.value
+            props["se.$idx.protoPassword"] = server.proto.password.value
             props["se.$idx.childs"] = server.children.size.toString()
             server.children.forEachIndexed { idx2, sync ->
                 if (sync is Sync) {
                     props["sy.$idx.$idx2.type"] = sync.type.value
                     props["sy.$idx.$idx2.name"] = sync.name.value
+                    props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
                     props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
                     props["sy.$idx.$idx2.subsets"] = sync.children.size.toString()
                     sync.children.forEachIndexed { iss, subSet ->
@@ -155,16 +159,17 @@ object Store {
             for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
 
                 val proto = Protocol(p2sp("se.$idx.protocoluri"), p2bp("se.$idx.doSetPermissions"),
-                        p2sp("se.$idx.perms"), p2bp("se.$idx.cantSetDate"))
+                        p2sp("se.$idx.perms"), p2bp("se.$idx.cantSetDate"), p2sp("se.$idx.protoBaseFolder"),
+                        p2sp("se.$idx.protoPassword"))
 
                 val server = Server(p2sp("se.$idx.type"), p2sp("se.$idx.name"),
                         SimpleStringProperty(""), proto, FXCollections.observableArrayList())
 
                 for (idx2 in 0 until props.getOrDefault("se.$idx.childs", "").toInt()) {
                     val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.name"),
-                            SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"))
+                            SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
                     for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
-                        val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.name"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"))
+                        val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.name"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
                         for (irf in 0 until props["ss.$idx.$idx2.$iss.remotefolders"]!!.toInt()) subSet.remotefolders += props["ssrf.$idx.$idx2.$iss.$irf"]!!
                         sync.children += subSet
                     }
@@ -292,7 +297,7 @@ class SyncEntry(var action: Int,
 // must be synchronized: better ConcurrentSkipListMap as synchronizedSortedMap(TreeMap) locks whole thing
 class MyTreeMap<K, V> : java.util.concurrent.ConcurrentSkipListMap<K, V>() {
     // old with treemap: this is 10x faster than foreach, can do it.remove(), return false to stop (or true/Unit for continue)
-    fun iterate(reversed: Boolean = false, func: (Iterator<Map.Entry<K, V>>, K, V) -> Any) {
+    fun iterate(reversed: Boolean = false, func: (MutableIterator<Map.Entry<K, V>>, K, V) -> Any) {
         val it = if (reversed)
             this.descendingMap().entries.iterator()
         else
@@ -311,8 +316,8 @@ class MyTreeMap<K, V> : java.util.concurrent.ConcurrentSkipListMap<K, V>() {
 
 
 // this holds the main database of files. also takes care of GUI observable list
-object Cache {
-    private const val CACHEVERSION = "V1"
+class Cache(val cacheid: String) {
+    private val CACHEVERSION = "V1"
     var cache = MyTreeMap<String, SyncEntry>()
     private var observableListSleep = false
     var observableList = FXCollections.emptyObservableList<SyncEntry2>()!!
@@ -338,8 +343,7 @@ object Cache {
     private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"
 
     fun iniCache() {
-        @Suppress("RemoveExplicitTypeArguments") // TODO ???
-        cache = MyTreeMap<String, SyncEntry>()
+        cache = MyTreeMap()
         observableListSleep = true
         observableList.clear()
         observableListSleep = false
@@ -354,11 +358,11 @@ object Cache {
         return listOf(tag, content)
     }
 
-    fun loadCache(name: String) {
-        logger.info("load cache database...$name")
+    fun loadCache() {
+        logger.info("load cache database...$cacheid")
         iniCache()
 
-        val fff = Paths.get(getCacheFilename(name))
+        val fff = Paths.get(getCacheFilename(cacheid))
         if (!Files.exists(fff)) {
             logger.info("create cache file!")
             if (!Files.exists(fff.parent)) Files.createDirectories(fff.parent)
@@ -387,9 +391,9 @@ object Cache {
         logger.info("cache database loaded!")
     }
 
-    fun saveCache(name: String) {
-        logger.info("save cache database...$name")
-        val fff = java.io.File(getCacheFilename(name)) // forget scalax.io.file: much too slow
+    fun saveCache() {
+        logger.info("save cache database...$cacheid")
+        val fff = java.io.File(getCacheFilename(cacheid)) // forget scalax.io.file: much too slow
         if (fff.exists()) fff.delete()
         val out = java.io.BufferedWriter(java.io.FileWriter(fff), 1000000)
         out.write(CACHEVERSION + "\n")
@@ -400,9 +404,9 @@ object Cache {
         logger.info("cache database saved!")
     }
 
-    fun clearCacheFile(name: String) {
-        logger.info("delete cache database $name")
-        val fff = Paths.get(getCacheFilename(name))
+    fun clearCacheFile() {
+        logger.info("delete cache database $cacheid")
+        val fff = Paths.get(getCacheFilename(cacheid))
         if (Files.exists(fff)) {
             Files.delete(fff)
         }
@@ -413,7 +417,7 @@ object Cache {
     // for listview
     private var filterActions = ALLACTIONS
 
-    private fun updateObservableBuffer() {
+    fun updateObservableBuffer() {
         logger.debug("update obs buffer...")
         observableListSleep = true
         observableList.clear()

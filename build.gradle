@@ -32,9 +32,9 @@ buildscript {
 
 apply plugin: 'kotlin'
 
-sourceSets { // TODO
-    main.kotlin.exclude "**/Connection.kt"
-    main.kotlin.exclude "**/Profile.kt"
+sourceSets {
+//    main.kotlin.exclude "**/Connection.kt"
+//    main.kotlin.exclude "**/Profile.kt"
 }
 
 apply plugin: 'idea'

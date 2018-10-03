@@ -1,7 +1,8 @@
-import javafx.application.Application
 import mu.KotlinLogging
 import tornadofx.launch
 import util.Helpers
+
+// do not initialize logger in Main.kt, first set properties!
 
 fun main(args: Array<String>) {
 
@@ -19,7 +20,7 @@ fun main(args: Array<String>) {
     logger.debug("debug")
     logger.trace("trace")
 
-    val infos = "SSyncBrowser built ${Helpers.getClassBuildTime().toString()}"
+    logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
 
     launch<SSBApp>(*args)
 }

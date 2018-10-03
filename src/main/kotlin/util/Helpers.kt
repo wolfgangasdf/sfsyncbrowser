@@ -23,6 +23,7 @@ import java.util.concurrent.FutureTask
 import java.util.concurrent.RunnableFuture
 import java.util.jar.JarFile
 import kotlin.concurrent.timerTask
+import kotlin.math.floor
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,6 +31,20 @@ object Helpers {
     fun isMac() = System.getProperty("os.name").toLowerCase().contains("mac")
     fun isLinux() = System.getProperty("os.name").toLowerCase().matches("(.*nix)|(.*nux)".toRegex())
     fun isWin() = System.getProperty("os.name").toLowerCase().contains("win")
+
+    fun tokMGTPE(d: Double): String {
+        var num = d
+        var ext = ""
+        val expo = minOf(floor(Math.log(d) / Math.log(1000.0)).toInt(), 6)
+        if (expo > 0) {
+            ext = "kMGTPE" [expo - 1].toString()
+            num = d / Math.pow(1000.0, expo.toDouble())
+        }
+        val res = "%.1f%s".format(num, ext)
+        return res
+    }
+
+
     fun openURL(url: String) {
         if (Desktop.isDesktopSupported() && url != "") {
             val desktop = Desktop.getDesktop()
@@ -131,7 +146,7 @@ object Helpers {
         }.showAndWait().orElse("")
     }
 
-    fun dialogMessage(alertType: Alert.AlertType, titletext: String, header: String, htmlmsg: String) {
+    fun dialogMessage(titletext: String, header: String, htmlmsg: String) {
         Dialog<Boolean>().apply {
             //if (stage.owner.nonEmpty) initOwner(stage)
             title = titletext
