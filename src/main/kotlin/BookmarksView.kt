@@ -5,8 +5,10 @@ import javafx.scene.control.cell.TextFieldListCell
 import store.*
 import tornadofx.*
 import util.Helpers
+import util.Helpers.runUIwait
 import util.MyTask
 import util.MyWorker
+import kotlin.concurrent.thread
 
 class BookmarksView : View() {
 
@@ -29,10 +31,18 @@ class BookmarksView : View() {
                     field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) }
                     field("Protocol permissions") { textfield(server.proto.perms) }
                     field("Protocol don't set date") { checkbox("", server.proto.cantSetDate) }
-                    field { button("Add new sync") { action {
-                        server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
+                    hbox {
+                        button("Add new sync") { action {
+                            server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
                                 SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
-                    } } }
+                        } }
+                        button("open browser") { action {
+                            println("openbrowser ${Thread.currentThread().id}")
+                            val bv = BrowserView(server, server.proto.baseFolder.value)
+                            openNewWindow(bv)
+                        } }
+
+                    }
                 }
             }
         }
@@ -110,16 +120,11 @@ class BookmarksView : View() {
         label("conns")
         this += ttv
         hbox {
-            button("open browser") { action {
-                println("browser")
-                val bv = BrowserView()
-                openNewWindow(bv)
-            } }
             button("save sett") { action {
                 SettingsStore.saveSettings()
             } }
 
-            button("testmytask") { action {
+            button("testmyworker") { action {
                 println("gui: ${Thread.currentThread().id}")
                 val taskIni = MyTask<Unit> {
                     println("taskini: !!!!!!! ${Thread.currentThread().id}")
@@ -141,6 +146,28 @@ class BookmarksView : View() {
 
                 taskIni.setOnSucceeded { println("back here: succ!") }
                 MyWorker.runTask(taskIni)
+            } }
+            button("testrunuiwait1") { action {
+                println("huhu 1 ${Thread.currentThread().id}")
+                val res = runUIwait {
+                    println("huhu rui 1 ${Thread.currentThread().id}")
+                    Helpers.dialogOkCancel("test", "test",
+                            "testc.")
+                }
+                println("huhu res=$res")
+            } }
+            button("testrunuiwait2") { action {
+                println("huhu 1 ${Thread.currentThread().id}")
+                thread(true) {
+                    println("huhu t1 ${Thread.currentThread().id}")
+                    val res = runUIwait {
+                        println("huhu rui 1 ${Thread.currentThread().id}")
+                        Helpers.dialogOkCancel("test", "test",
+                                "testc.")
+                    }
+                    println("huhu t1 res=$res ${Thread.currentThread().id}")
+                }
+                println("huhu 2 ${Thread.currentThread().id}")
             } }
         }
         this += settingsview

@@ -6,31 +6,29 @@ import synchro.Actions.A_ISEQUAL
 import synchro.Actions.A_RMLOCAL
 import synchro.Actions.A_RMREMOTE
 import synchro.Actions.A_UNKNOWN
+import util.Helpers.getParentFolder
 import util.StopWatch
 
 private val logger = KotlinLogging.logger {}
 
 
 object Actions {
-    val A_UNCHECKED: Int = -99
-    val A_UNKNOWN: Int = -1
-    val A_ISEQUAL = 0
-    val A_USELOCAL = 1
-    val A_USEREMOTE = 2
-    val A_MERGE = 3
-    val A_RMLOCAL = 4
-    val A_RMREMOTE = 5
-    val A_CACHEONLY = 6
-    val A_RMBOTH = 7
-    val A_SYNCERROR = 8
-    val A_SKIP = 9
+    const val A_UNCHECKED: Int = -99
+    const val A_UNKNOWN: Int = -1
+    const val A_ISEQUAL = 0
+    const val A_USELOCAL = 1
+    const val A_USEREMOTE = 2
+    const val A_MERGE = 3
+    const val A_RMLOCAL = 4
+    const val A_RMREMOTE = 5
+    const val A_CACHEONLY = 6
+    const val A_RMBOTH = 7
+    const val A_SYNCERROR = 8
+    const val A_SKIP = 9
     val ALLACTIONS = listOf(-99, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 }
 
 object Comparison {
-    fun getParentFolder(path: String) =
-            path.split("/").dropLastWhile { it.isEmpty() }.dropLast(1).joinToString("/") + "/"
-
     // compare, update database entries only.
     fun compareSyncEntries(): Boolean {
         logger.debug("compare sync entries...")
@@ -49,7 +47,7 @@ object Comparison {
                     tmpf = getParentFolder(tmpf)
                     if (tmpf != "/") {
                         if (Cache.cache.containsKey(tmpf))
-                            if (Cache.cache.get(tmpf)!!.cSize != -1L) haveCachedParentDir = true
+                            if (Cache.cache[tmpf]!!.cSize != -1L) haveCachedParentDir = true
                     } else {
                         doit = false
                     }
@@ -74,7 +72,7 @@ object Comparison {
             if (se.relevant && !se.isDir) {
                 if (se.cSize == -1L) { // only get parent folder for unknown files, faster!
                     val parent = getParentFolder(path)
-                    if (!Cache.cache.get(parent)!!.hasCachedParent) {
+                    if (!Cache.cache[parent]!!.hasCachedParent) {
                         se.compareSetAction(newcache = true) // test
                     } else {
                         se.compareSetAction(newcache = false)

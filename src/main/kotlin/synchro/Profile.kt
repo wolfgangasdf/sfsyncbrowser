@@ -42,13 +42,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
 
     var local: GeneralConnection? = null
     var remote: GeneralConnection? = null
-    val UIUpdateInterval = 0.5
-    var profileInitialized = false
-    val protocol = server.proto // TODO remove?
+    private val uiUpdateInterval = 0.5
+    private var profileInitialized = false
+    private val protocol = server.proto // TODO remove?
 
     class ProfileAbortedException(message: String = "", cause: Throwable = Throwable()) : RuntimeException(message, cause)
 
-    val taskIni = MyTask<Unit>() {
+    val taskIni = MyTask<Unit> {
         updateTit("Initialize connections...")
         cache.loadCache()
 
@@ -59,11 +59,8 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         logger.debug("puri = ${protocol.protocoluri.value}  proto = ${uri.protocol}")
         updateProgr(50, 100, "initialize remote connection...")
 
-        remote = when (uri.protocol) {
-            "sftp" -> SftpConnection(protocol, uri)
-            "file" -> LocalConnection(protocol)
-            else -> throw RuntimeException("wrong protocol: " + uri.protocol)
-        }
+        remote = server.getConnection()
+
         if (Helpers.failat == 1) throw UnsupportedOperationException("fail 1")
         remote!!.localBasePath = sync.localfolder.value
         remote!!.remoteBasePath = protocol.baseFolder.valueSafe
@@ -101,7 +98,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
 
         fun acLocRem(vf: VirtualFile, isloc: Boolean, updact: (VirtualFile) -> Unit) {
             //logger.debug("found loc=$isloc : " + vf)
-            if (swUIupdate.doit(UIUpdateInterval)) updact(vf)
+            if (swUIupdate.doit(uiUpdateInterval)) updact(vf)
 
             cache.cache.merge(vf.path,
                     SyncEntry(A_UNCHECKED, if (isloc) vf.modTime else 0, if (isloc) vf.size else -1,
@@ -150,11 +147,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
 
         val res = runUIwait {
             logger.debug("state after list: " + taskListLocal.state + "  remote:" + taskListRemote.state)
-            if (taskListLocal.state == Worker.State.FAILED) taskListLocal.exception
-            else if (taskListRemote.state == Worker.State.FAILED) taskListRemote.exception
-            else if (taskListLocal.state == Worker.State.CANCELLED) InterruptedException("Cancelled local task")
-            else if (taskListRemote.state == Worker.State.CANCELLED) InterruptedException("Cancelled remote task")
-            else null
+            when {
+                taskListLocal.state == Worker.State.FAILED -> taskListLocal.exception
+                taskListRemote.state == Worker.State.FAILED -> taskListRemote.exception
+                taskListLocal.state == Worker.State.CANCELLED -> InterruptedException("Cancelled local task")
+                taskListRemote.state == Worker.State.CANCELLED -> InterruptedException("Cancelled remote task")
+                else -> null
+            }
         }
         if (res != null) throw res
 
@@ -163,7 +162,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         sw.restart()
         logger.info("*********************** compare sync entrie")
         val haveChanges = Comparison.compareSyncEntries()
-        logger.debug("havechanges1: " + haveChanges)
+        logger.debug("havechanges1: $haveChanges")
 
         logger.debug("sw: comparing: " + sw.getTimeRestart())
         updateProgr(100, 100, "done")
@@ -196,13 +195,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
             val relevantSize = if (se.action == A_USELOCAL) se.lSize else if (se.action == A_USEREMOTE) se.rSize else 0
             if (relevantSize > 10000) showit = true
 
-            var msg: String
+            val msg: String
             remote!!.onProgress = { progressVal, bytesPerSecond ->
                 val pv = (100 * progressVal).toInt()
                 updateMsg(" [${CF.amap[se.action]}]: $path...$pv% (${Helpers.tokMGTPE(bytesPerSecond)}B/s)")
             }
 
-            if (showit || swUIupdate.doit(UIUpdateInterval)) {
+            if (showit || swUIupdate.doit(uiUpdateInterval)) {
                 msg = " [${CF.amap[se.action]}]: $path..."
                 updateProgr(transferredSize.toInt(), totalTransferSize.toInt(), msg)
             }
@@ -246,7 +245,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
                 se.action = A_SYNCERROR
                 se.delete = false
                 syncLog += (e.message + "[" + path + "]" + "\n")
-                updateMsg("Failed: " + path + ": " + e)
+                updateMsg("Failed: $path: $e")
                 if (!ignoreErrors) {
                     if (runUIwait {
                                 dialogOkCancel("Error", "Synchronization Error. Press OK to continue ignoring errors, Cancel to abort.",
@@ -254,7 +253,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
                             })
                         ignoreErrors = true
                     else
-                        throw Exception("Exception(s) during synchronize:\n" + syncLog)
+                        throw Exception("Exception(s) during synchronize:\n$syncLog")
                 }
                 // many exceptions are very slow, problem is stacktrace: http://stackoverflow.com/a/569118. Impossible to disable ST via Runtime.getRuntime()
                 Thread.sleep(600) // to keep sfsync responsive...
@@ -263,7 +262,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
 
         for (state in listOf(1, 2)) {
             // delete and add dirs must be done in reverse order!
-            logger.debug("syncing state = " + state)
+            logger.debug("syncing state = $state")
             when (state) {
                 1 -> // delete
                     cache.cache.iterate(reversed = true) { _, path, se ->
@@ -275,7 +274,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
                         }
                     }
                 else -> // put/get and others
-                    cache.cache.iterate() { _, path, se ->
+                    cache.cache.iterate { _, path, se ->
                         {
                             if (local!!.interrupted.get() || remote!!.interrupted.get()) throw InterruptedException("profile: connections interrupted")
                             if (se.relevant) dosync(path, se)

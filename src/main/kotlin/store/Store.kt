@@ -13,6 +13,10 @@ import synchro.Actions.A_RMREMOTE
 import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
+import synchro.GeneralConnection
+import synchro.LocalConnection
+import synchro.MyURI
+import synchro.SftpConnection
 import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
@@ -92,7 +96,10 @@ class Sync(override val type: StringProperty, override val name: StringProperty,
            override val children: ObservableList<SubSet> = FXCollections.observableArrayList<SubSet>() ): TtvThing
 
 class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
-               val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty)
+               val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty) {
+    fun getmyuri() = MyURI(protocoluri.value)
+    override fun toString(): String = "[Protocol $protocoluri]"
+}
 
 class SubSet(override val name: StringProperty, override val status: StringProperty, val excludeFilter: StringProperty,
              val remotefolders: ObservableList<String> = FXCollections.observableArrayList<String>(),// TODO rename to subfolders
@@ -102,7 +109,20 @@ class SubSet(override val name: StringProperty, override val status: StringPrope
 }
 
 class Server(override val type: StringProperty, override val name: StringProperty, override val status: StringProperty, val proto: Protocol,
-             override val children: ObservableList<Sync>): TtvThing
+             override val children: ObservableList<Sync>): TtvThing {
+    private var connection: GeneralConnection? = null
+    fun getConnection(): GeneralConnection {
+        if (connection == null) {
+            logger.info("opening new connection to $proto")
+            connection = when {
+                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
+                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
+                else -> throw java.lang.UnsupportedOperationException("asdf")
+            }
+        }
+        return connection!!
+    }
+}
 
 object SettingsStore {
     val servers = FXCollections.observableArrayList<Server>()!!
@@ -316,11 +336,11 @@ class MyTreeMap<K, V> : java.util.concurrent.ConcurrentSkipListMap<K, V>() {
 
 
 // this holds the main database of files. also takes care of GUI observable list
-class Cache(val cacheid: String) {
+class Cache(private val cacheid: String) {
     private val CACHEVERSION = "V1"
     var cache = MyTreeMap<String, SyncEntry>()
     private var observableListSleep = false
-    var observableList = FXCollections.emptyObservableList<SyncEntry2>()!!
+    private var observableList = FXCollections.emptyObservableList<SyncEntry2>()!!
 
     init {
         observableList.onChange { op ->
@@ -342,7 +362,7 @@ class Cache(val cacheid: String) {
 
     private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"
 
-    fun iniCache() {
+    private fun iniCache() {
         cache = MyTreeMap()
         observableListSleep = true
         observableList.clear()
@@ -350,7 +370,7 @@ class Cache(val cacheid: String) {
     }
 
     // splits safely: at first comma
-    fun splitsetting(ss: String): List<String> {
+    private fun splitsetting(ss: String): List<String> {
         val commapos = ss.indexOf(",")
         val tag = ss.substring(0, commapos)
         val content = ss.substring(commapos + 1).trim()

@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package util
 
 import javafx.application.Platform
@@ -11,6 +13,9 @@ import javafx.stage.Modality
 import javafx.stage.Screen
 import mu.KotlinLogging
 import tornadofx.*
+import util.MyWorker.setOnCloseRequest
+import util.MyWorker.setOnHidden
+import util.MyWorker.setOnShown
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
@@ -20,10 +25,10 @@ import java.nio.charset.Charset
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
-import java.util.concurrent.RunnableFuture
 import java.util.jar.JarFile
 import kotlin.concurrent.timerTask
 import kotlin.math.floor
+
 
 private val logger = KotlinLogging.logger {}
 
@@ -40,8 +45,7 @@ object Helpers {
             ext = "kMGTPE" [expo - 1].toString()
             num = d / Math.pow(1000.0, expo.toDouble())
         }
-        val res = "%.1f%s".format(num, ext)
-        return res
+        return "%.1f%s".format(num, ext)
     }
 
 
@@ -58,14 +62,20 @@ object Helpers {
         if (isWin()) input.replace("""\\""", "/")
         else input
 
+    fun getParentFolder(path: String) =
+            path.split("/").dropLastWhile { it.isEmpty() }.dropLast(1).joinToString("/") + "/"
+
+    fun getFileName(path: String) =
+            path.split("/").dropLastWhile { it.isEmpty() }.last()
+
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.
     // after MyWorker etc changes, test all if exceptions propagate as intended!
-    val failat = 0 // 0..5 currently
+    const val failat = 0 // 0..5 currently
 
     val filecharset: Charset = java.nio.charset.Charset.forName("UTF-8")
 
-    val directoryFilter = "([a-zA-Z]:)?/.*" // not for sftp... if (isWin) ".:/.*" else "/.*"
+    const val directoryFilter = "([a-zA-Z]:)?/.*" // not for sftp... if (isWin) ".:/.*" else "/.*"
 
     fun openDocument(file: File) {
         if (Desktop.isDesktopSupported()) {
@@ -115,14 +125,12 @@ object Helpers {
         return d
     }
 
+    // If it hangs, most likely a GUI thread hangs which made a thread which called this
     fun <T>runUIwait( f: () -> T) : T {
         return if (!Platform.isFxApplicationThread()) {
-            val runnable = Callable(f)
-            val future = FutureTask<T>(runnable)
-            println("ruw: before runlater")
-            runLater{ future.run() }
-            println("ruw: after runlater")
-            future.get()
+            val query = FutureTask<T>(Callable<T> { f() })
+            Platform.runLater(query)
+            query.get()
         } else {
             f()
         }
@@ -258,7 +266,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
                 if (taskList.isNotEmpty()) runLater {
                     var iii = 0
                     while (iii < taskList.size) {
-                        if (taskList[iii].isDone || taskList.get(iii).isCancelled) {
+                        if (taskList[iii].isDone || taskList[iii].isCancelled) {
                             taskList.remove(iii, iii + 1)
                         } else {
                             iii += 1
