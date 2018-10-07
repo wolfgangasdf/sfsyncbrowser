@@ -1,11 +1,17 @@
 import javafx.beans.property.SimpleStringProperty
+import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
+import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
-import store.*
+import store.Server
+import store.SettingsStore
+import store.SubSet
+import store.Sync
 import tornadofx.*
 import util.Helpers
 import util.Helpers.runUIwait
+import util.Helpers.valitextfield
 import util.MyTask
 import util.MyWorker
 import kotlin.concurrent.thread
@@ -27,18 +33,18 @@ class BookmarksView : View() {
                     field("Status") { label(server.status) }
                     field("Protocol URI") { textfield(server.proto.protocoluri) }
                     field("Protocol password") { passwordfield(server.proto.password) }
-                    field("Protocol basefolder") { textfield(server.proto.baseFolder) }
+                    // TODO make everything with file selectors, disable editing.
+                    field("Protocol basefolder") { valitextfield(server.proto.baseFolder, "^/.*[^/]$", "/f1/f2 or /") }
                     field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) }
                     field("Protocol permissions") { textfield(server.proto.perms) }
                     field("Protocol don't set date") { checkbox("", server.proto.cantSetDate) }
-                    hbox {
+                    field {
                         button("Add new sync") { action {
-                            server.children += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
+                            server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
                                 SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
                         } }
-                        button("open browser") { action {
-                            println("openbrowser ${Thread.currentThread().id}")
-                            val bv = BrowserView(server, server.proto.baseFolder.value)
+                        button("Open browser") { action {
+                            val bv = BrowserView(server, "")
                             openNewWindow(bv)
                         } }
 
@@ -57,12 +63,16 @@ class BookmarksView : View() {
                     field("Sync cacheid") { textfield(sync.cacheid) }
                     field("Type") { textfield(sync.type) }
                     field("Status") { label(sync.status) }
-                    field("Local folder") { textfield(sync.localfolder) }
-                    field { button("Add new subset") { action {
-                            println("syncchilds=${sync.children} ${sync.children::class.java}")
-                            sync.children += SubSet(SimpleStringProperty("ssname"),
+                    field("Local folder") { valitextfield(sync.localfolder, "^/.*[^/]$", "/f1/f2 or /") }
+                    field {
+                        button("Add new subset") { action {
+                            sync.subsets += SubSet(SimpleStringProperty("ssname"),
                                     SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), FXCollections.observableArrayList<String>(), sync)
-                        } } }
+                        } }
+                        button("Remove sync") { action {
+                            sync.server.syncs.remove(sync)
+                        } }
+                    }
                 }
             }
         }
@@ -74,21 +84,24 @@ class BookmarksView : View() {
             with(root) {
                 fieldset("Subset") {
                     field("Name: ") { textfield(subset.title) }
-                    field { button("Open sync view!") { action {
-                        println("bm: ${Thread.currentThread().id}")
-                        val sv = SyncView(subset.sync.server, subset.sync, subset)
-                        openNewWindow(sv)
-                    } } }
-                    field("Exclude filter") { textfield(subset.excludeFilter) }
-                    field { button("Add new remote folder") { action {
-                        subset.remotefolders += "newrf"
-                    } } }
-                    field { listview(subset.remotefolders).apply {
+                    field { listview(subset.subfolders).apply {
                         isEditable = true
                         prefHeight = 50.0
                         cellFactory = TextFieldListCell.forListView()
                     } }
-
+                    field("Exclude filter") { textfield(subset.excludeFilter) }
+                    field {
+                        button("Open sync view!") { action {
+                            val sv = SyncView(subset.sync.server, subset.sync, subset)
+                            openNewWindow(sv)
+                        } }
+                        button("Add new remote folder") { action {
+                            subset.subfolders += "newrf"
+                        } }
+                        button("Remove subset") { action {
+                            subset.sync.subsets.remove(subset)
+                        } }
+                    }
                 }
             }
         }
@@ -97,22 +110,41 @@ class BookmarksView : View() {
 
     private var settingsview: View = SettingsViewPlaceholder()
 
-    private val ttv = treetableview<TtvThing> {
-//        column("What", Bindings.createStringBinding( Callable { "${type.value} ${title.value}" } , type, title))
-        column("type", TtvThing::type).remainingWidth()
-        column("title", TtvThing::title)
-        column("status", TtvThing::status)
-        columnResizePolicy = TreeTableSmartResize.POLICY
-        root = TreeItem<TtvThing>(RootThing(SimpleStringProperty("root"),
-                SimpleStringProperty("rootn"), SimpleStringProperty("roots"), SettingsStore.servers))
-        populate { it.value.children }
+    // https://stackoverflow.com/questions/32478383/updating-treeview-items-from-textfield
+    // this is better than writing generic type TtvThing, which gets messy!
+    private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
+        private val nameListener = ChangeListener<String> { _, _, _ ->
+            val event = TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this)
+            Event.fireEvent(this, event)
+        }
+        init {
+            when (ele) {
+                is Server -> ele.title.addListener(nameListener)
+                is Sync -> ele.title.addListener(nameListener)
+                is SubSet -> ele.title.addListener(nameListener)
+            }
+            // have to remove listeners? I don't think so.
+        }
+    }
+
+    private val ttv = treeview<Any> {
+        root = TreeItem<Any>("root")
+
+        populate({ ite -> MyTreeItem(ite)}) { parent ->
+            val value = parent.value
+            when {
+                parent == root -> SettingsStore.servers
+                value is Server -> value.syncs
+                value is Sync -> value.subsets
+                else -> null
+            }
+        }
+
         root.isExpanded = true
         isShowRoot = false
         root.children.forEach { it.isExpanded = true ; it.children.forEach { it2 -> it2.isExpanded = true }}
-        resizeColumnsToFitContent()
         useMaxHeight = true
         useMaxWidth = true
-        requestResize()
     }
 
     override val root = vbox {
@@ -125,51 +157,6 @@ class BookmarksView : View() {
                 SettingsStore.saveSettings()
             } }
 
-            button("testmyworker") { action {
-                println("gui: ${Thread.currentThread().id}")
-                val taskIni = MyTask<Unit> {
-                    println("taskini: !!!!!!! ${Thread.currentThread().id}")
-                    updateTit("Initialize connections...${Thread.currentThread().id}")
-                    updateProgr(0, 100, "execute 'before'...")
-                    //        throw Exception("error executing 'before' command!")
-                    Thread.sleep(1000)
-                    updateProgr(50, 100, "initialize remote connection...")
-                    Thread.sleep(1000)
-                    updateProgr(50, 100, "initialize remote connection...2")
-                    Thread.sleep(1000)
-
-                    println("hereAAAA")
-                    val res = Helpers.runUIwait{ Helpers.dialogOkCancel("Warning", "Directory ", "content") }
-                    println("hereBBBB $res")
-
-                    updateProgr(100, 100, "done!")
-                }
-
-                taskIni.setOnSucceeded { println("back here: succ!") }
-                MyWorker.runTask(taskIni)
-            } }
-            button("testrunuiwait1") { action {
-                println("huhu 1 ${Thread.currentThread().id}")
-                val res = runUIwait {
-                    println("huhu rui 1 ${Thread.currentThread().id}")
-                    Helpers.dialogOkCancel("test", "test",
-                            "testc.")
-                }
-                println("huhu res=$res")
-            } }
-            button("testrunuiwait2") { action {
-                println("huhu 1 ${Thread.currentThread().id}")
-                thread(true) {
-                    println("huhu t1 ${Thread.currentThread().id}")
-                    val res = runUIwait {
-                        println("huhu rui 1 ${Thread.currentThread().id}")
-                        Helpers.dialogOkCancel("test", "test",
-                                "testc.")
-                    }
-                    println("huhu t1 res=$res ${Thread.currentThread().id}")
-                }
-                println("huhu 2 ${Thread.currentThread().id}")
-            } }
         }
         this += settingsview
     }

@@ -177,11 +177,9 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
         prefWidth = 800.0
         prefHeight = 600.0
         toolbar {
-            button("Refresh").setOnAction { println("refresh ${Thread.currentThread().id}") }
             this += btCompare
             this += btSync
-            button("done") { action {
-                println("done: ${Thread.currentThread().id}")
+            button("Close") { action {
                 close()
             } }
         }

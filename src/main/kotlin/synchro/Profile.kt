@@ -62,8 +62,6 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         remote = server.getConnection()
 
         if (Helpers.failat == 1) throw UnsupportedOperationException("fail 1")
-        remote!!.localBasePath = sync.localfolder.value
-        remote!!.remoteBasePath = protocol.baseFolder.valueSafe
         profileInitialized = true
         updateProgr(100, 100, "done!")
     }
@@ -78,13 +76,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         updateProgr(0, 100, "resetting database...")
 
         var cacheall = false
-        for (sf in subfolder.remotefolders) if (sf == "") cacheall = true
+        for (sf in subfolder.subfolders) if (sf == "") cacheall = true
         // remove cache orphans (happens if user doesn't click synchronize
         cache.cache.iterate { iter, _, se -> if (se.cSize == -1L) iter.remove() }
         // ini files
         cache.cache.iterate { _, path, se ->
             var addit = cacheall
-            if (!cacheall) for (sf in subfolder.remotefolders) if (path.startsWith("/$sf/")) addit = true
+            if (!cacheall) for (sf in subfolder.subfolders) if (path.startsWith("/$sf/")) addit = true
             if (addit) {
                 se.action = A_UNCHECKED; se.lSize = -1; se.lTime = -1; se.rSize = -1; se.rTime = -1; se.relevant = true
             } else {
@@ -118,13 +116,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
 
         val taskListLocal = MyTask<Unit> {
             updateTit("Find local file")
-            subfolder.remotefolders.forEach {
+            subfolder.subfolders.forEach {
                 local!!.list(it, subfolder.excludeFilter.valueSafe, recursive = true) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
         val taskListRemote = MyTask<Unit> {
             updateTit("Find remote file")
-            subfolder.remotefolders.forEach {
+            subfolder.subfolders.forEach {
                 remote!!.list(it, subfolder.excludeFilter.valueSafe, recursive = true) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
@@ -220,12 +218,12 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
                         local!!.deletefile(path, se.lTime); remote!!.deletefile(path, se.rTime); se.delete = true; se.relevant = false
                     }
                     A_USELOCAL -> {
-                        val nrt = remote!!.putfile(path, se.lTime)
+                        val nrt = remote!!.putfile(sync.localfolder.value, path, se.lTime)
                         se.rTime = nrt; se.rSize = se.lSize; se.cSize = se.lSize; se.lcTime = se.lTime; se.rcTime = nrt; se.relevant = false
                         transferredSize += se.lSize
                     }
                     A_USEREMOTE -> {
-                        remote!!.getfile(path, se.rTime)
+                        remote!!.getfile(sync.localfolder.value, path, se.rTime)
                         se.lTime = se.rTime; se.lSize = se.rSize; se.cSize = se.rSize; se.rcTime = se.rTime; se.lcTime = se.rTime; se.relevant = false
                         transferredSize += se.rSize
                     }

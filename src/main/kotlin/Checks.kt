@@ -1,3 +1,4 @@
+import mu.KotlinLogging
 import storeold.Cache
 import storeold.SyncEntry
 import synchro.Actions.A_ISEQUAL
@@ -9,6 +10,8 @@ import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import synchro.Comparison
+
+private val logger = KotlinLogging.logger {}
 
 object Checks {
     fun checkComparedFile() {
@@ -107,17 +110,17 @@ object Checks {
         // insert stuff
         ces.forEach { ce -> Cache.cache[ce.path] = ce.se }
 
-//    println("**** initial:")
+//    logger.info("**** initial:")
 //    Cache.dumpAll()
 
         Comparison.compareSyncEntries()
 
         // check if ok
-        println("**** checks:")
+        logger.info("**** checks:")
         var fail = false
         ces.forEach { ce ->
             val senew = Cache.cache[ce.path]
-            println(
+            logger.info(
                     (if (senew!!.action == ce.expectedAction) "" else {fail = true; "XX"})
                     +  "[${ce.path}]: action=[${CF.amap[senew.action]}] (expected [${CF.amap[ce.expectedAction]}])")
         }

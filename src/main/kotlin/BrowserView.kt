@@ -13,7 +13,7 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
 
     private var currentPath = SimpleStringProperty(path)
 
-    class RFile (private val path: String, var size: Long, private val isdirectory: Boolean, var permissions: String) {
+    class RFile (val path: String, var size: Long, val isdirectory: Boolean, var permissions: String) {
         fun getName(): String = File(path).name
         override fun toString(): String {
             return "[rf: p=$path isd=$isdirectory"
@@ -34,42 +34,37 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
         }
         label("browserview")
         hbox {
-            button("testasync") { action {
-                println("comp: ${Thread.currentThread().id}")
-                runAsync {
-                    println("compasync: ${Thread.currentThread().id}")
-                    Thread.sleep(1000)
-                } ui {
-                    files.add(RFile("/aaa/fxxxxxx", 100, false, ""))
-                }
-            } }
             button("Refresh") { action {
-                println("refresh ${Thread.currentThread().id}")
                 updateBrowser()
             } }
         }
-        pathButtonFlowPane
+        label(currentPath)
+        this += pathButtonFlowPane
         label("Files:")
-        // TODO need cellfactory to color rows!
         tableview(files) {
-            column("title", RFile::getName)
+            column("title", RFile::getName).remainingWidth()
             column("size", RFile::size)
             column("perms", RFile::permissions)
-        }.rowFactory = Callback {
-            val row = TableRow<RFile>()
-            println("idx=" + row.index)
-            row
-        }
+        }.apply {
+            rowFactory = Callback {
+                val row = TableRow<RFile>()
+                row.setOnMouseClicked { it2 ->
+                    if (it2.clickCount == 2 && row.item.isdirectory) {
+                        currentPath.set(row.item.path)
+                    }
+                }
+                row
+            }
+        }.smartResize()
     }
 
     private fun updateBrowser() {
-        println("update browser!")
-
         val taskListLocal = MyTask<MutableList<RFile>> {
-            updateTit("Find local file")
             val tmpl = mutableListOf<RFile>()
-            server.getConnection().list(currentPath.value, "", false) {
-                it2 -> tmpl.add(RFile(it2.path, it2.size, it2.isDir(), "todo"))
+            server.getConnection().list(currentPath.value, "", false) { it2 ->
+                with(it2.path.removePrefix("/")) {
+                    if (this != currentPath.value) tmpl.add(RFile(this, it2.size, it2.isDir(), "todo"))
+                }
             }
             tmpl
         }
@@ -77,17 +72,24 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
             files.clear()
             files.setAll(taskListLocal.value)
             pathButtonFlowPane.children.clear()
+            pathButtonFlowPane.add(label("Parents: "))
             var tmpp = currentPath.value
+            val pl = mutableListOf<String>()
             while (tmpp != "/") {
-                pathButtonFlowPane.add(button(Helpers.getFileName(tmpp)))
                 tmpp = Helpers.getParentFolder(tmpp)
+                pl += tmpp.removeSuffix("/")
+            }
+            pl.reversed().forEach { it2 ->
+                pathButtonFlowPane.add(button(Helpers.getFileName(it2)?:"remroot") {
+                    action {
+                    currentPath.set(it2)
+                }})
             }
         }
         MyWorker.runTask(taskListLocal)
     }
     init {
         currentPath.onChange { if (it != null) {
-            println("huhu onchange")
             updateBrowser()
         } }
         updateBrowser()

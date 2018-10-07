@@ -1,4 +1,11 @@
+@file:Suppress("unused", "MemberVisibilityCanBePrivate")
+
 package util
+
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
+
 
 // all in seconds!
 class StopWatch {
@@ -24,11 +31,11 @@ class StopWatch {
     }
 
     fun stopPrintTime(msg: String) {
-        println(msg + stopGetTimeString())
+        logger.info(msg + stopGetTimeString())
     }
 
     fun printLapTime(msg: String) {
-        println(msg + getTime())
+        logger.info(msg + getTime())
     }
 
     fun restart() {

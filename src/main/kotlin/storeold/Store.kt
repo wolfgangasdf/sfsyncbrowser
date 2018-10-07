@@ -388,7 +388,7 @@ object Cache {
     }
 
     fun dumpAll() {
-        cache.iterate { _, path, se -> println(path + ": " + se.toString()) }
+        cache.iterate { _, path, se -> logger.debug(path + ": " + se.toString()) }
     }
 
     private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"

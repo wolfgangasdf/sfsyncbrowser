@@ -3,8 +3,10 @@
 package util
 
 import javafx.application.Platform
+import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
 import javafx.concurrent.Task
+import javafx.event.EventTarget
 import javafx.geometry.Rectangle2D
 import javafx.scene.control.*
 import javafx.scene.layout.Priority
@@ -58,15 +60,21 @@ object Helpers {
         }
     }
 
+    fun toHex(i: Int): String {
+        return java.lang.Integer.toHexString(i)
+    }
+
     fun toJavaPathSeparator(input: String): String =
         if (isWin()) input.replace("""\\""", "/")
         else input
 
-    fun getParentFolder(path: String) =
-            path.split("/").dropLastWhile { it.isEmpty() }.dropLast(1).joinToString("/") + "/"
+    fun getParentFolder(path: String): String {
+        println("getparent of $path")
+        return path.split("/").dropLastWhile { it.isEmpty() }.dropLast(1).joinToString("/") + "/"
+    }
 
     fun getFileName(path: String) =
-            path.split("/").dropLastWhile { it.isEmpty() }.last()
+            path.split("/").dropLastWhile { it.isEmpty() }.lastOrNull()
 
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.
@@ -171,6 +179,19 @@ object Helpers {
         }.showAndWait()
     }
 
+    // this is because simply property-bound textfields can't have validator without ViewModel...
+    fun EventTarget.valitextfield(property: ObservableValue<String>, valiregex: String, valimsg: String, op: TextField.() -> Unit = {}) = textfield().apply {
+        bind(property)
+        op(this)
+        fun updateit() {
+            if (!text.matches(valiregex.toRegex()))
+                addDecorator(SimpleMessageDecorator(valimsg, ValidationSeverity.Error))
+            else while (decorators.isNotEmpty()) removeDecorator(decorators.first())
+        }
+        this.textProperty().onChange { updateit() }
+        updateit()
+    }
+
 }
 
 
@@ -257,7 +278,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         setOnCloseRequest {
             if (taskList.isNotEmpty()) {
                 taskList.forEach { t -> if (t.isRunning) t.cancel() }
-                println("cancelled all tasks!")
+                logger.info("cancelled all tasks!")
             }
         }
 
@@ -279,7 +300,6 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
             }
             backgroundTimer = java.util.Timer()
             backgroundTimer!!.schedule(ttask, 0, 500)
-            println("scheduled timer!")
         }
 
         setOnHidden {

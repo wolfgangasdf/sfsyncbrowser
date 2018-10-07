@@ -64,7 +64,7 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
     }
 }
 
-// path below baspath with a leading "/"
+// path below basepath with a leading "/"
 // if ends on "/", is dir!
 class VirtualFile(var path: String, var modTime: Long, var size: Long) : Comparable<VirtualFile> { // TODO was Ordered in scala
     // modtime in milliseconds since xxx
@@ -86,15 +86,16 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long) : Compara
 
 }
 
+
+// subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
-    var localBasePath: String = ""
-    var remoteBasePath: String = ""
+    var remoteBasePath: String = protocol.baseFolder.value
     var filterregex: Regex = Regex(""".*""")
     val debugslow = false
     val interrupted = AtomicBoolean(false)
-    abstract fun getfile(from: String, mtime: Long, to: String)
-    abstract fun getfile(from: String, mtime: Long)
-    abstract fun putfile(from: String, mtime: Long): Long // returns mtime if cantSetDate
+    abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)
+    abstract fun getfile(localBasePath: String, from: String, mtime: Long)
+    abstract fun putfile(localBasePath: String, from: String, mtime: Long): Long // returns mtime if cantSetDate
     abstract fun mkdirrec(absolutePath: String)
     abstract fun deletefile(what: String, mtime: Long)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
@@ -135,7 +136,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun putfile(from: String, mtime: Long): Long {
+    override fun putfile(localBasePath: String, from: String, mtime: Long): Long {
         val (cp, isdir) = checkIsDir(from)
         logger.debug("from=$from isdir=$isdir")
         if (isdir) { // ensure that target path exists
@@ -149,7 +150,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         return mtime
     }
 
-    override fun getfile(from: String, mtime: Long, to: String) {
+    // here, "to" is a full path!
+    override fun getfile(localBasePath: String, from: String, mtime: Long, to: String) {
         val (cp, isdir) = checkIsDir(from)
         if (isdir) { // ensure that target path exists
             Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
@@ -159,10 +161,10 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
     }
 
-    override fun getfile(from: String, mtime: Long) {
+    override fun getfile(localBasePath: String, from: String, mtime: Long) {
         val (cp, _) = checkIsDir(from)
         val lp = "$localBasePath/$cp"
-        getfile(from, mtime, lp)
+        getfile(localBasePath, from, mtime, lp)
     }
 
     // include the subfolder but root "/" is not allowed!
@@ -241,9 +243,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    fun isDirectoryx(fa: FileAttributes): Boolean =
-            ((fa.type.toMask() or FileMode.Type.DIRECTORY.toMask()) > 0)
-
+    private fun isDirectoryx(fa: FileAttributes): Boolean =
+            ((fa.type.toMask() and FileMode.Type.DIRECTORY.toMask()) > 0)
 
     private var transferListener: MyTransferListener? = null
 
@@ -276,7 +277,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun putfile(from: String, mtime: Long): Long {
+    override fun putfile(localBasePath: String, from: String, mtime: Long): Long {
         val (cp, isdir) = checkIsDir(from)
         val rp = "$remoteBasePath/$cp"
 
@@ -329,7 +330,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun getfile(from: String, mtime: Long, to: String) {
+    override fun getfile(localBasePath: String, from: String, mtime: Long, to: String) {
         val (cp, isdir) = checkIsDir(from)
         if (isdir) {
             Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
@@ -351,10 +352,10 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun getfile(from: String, mtime: Long) {
+    override fun getfile(localBasePath: String, from: String, mtime: Long) {
         val (cp, _) = checkIsDir(from)
         val lp = "$localBasePath/$cp"
-        getfile(from, mtime, lp)
+        getfile(localBasePath, from, mtime, lp)
     }
 
     private fun sftpexists(sp: String): FileAttributes? {
@@ -375,7 +376,17 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 path = fullFilePath.substring(remoteBasePath.length)
                 modTime = attrs.mtime * 1000
                 size = attrs.size
-                if (isDirectoryx(attrs) && path != "/") path += "/"
+                if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
+            }
+        }
+
+        fun doaction(rripath: String, rriattributes: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
+            val vf = VFfromSftp(rripath, rriattributes)
+            if (!vf.fileName().matches(filterregexp.toRegex())) {
+                action(vf)
+                if (isDirectoryx(rriattributes) && (recursive || parsealways)) {
+                    parseContentFun(rripath)
+                }
             }
         }
 
@@ -385,43 +396,24 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             for (rri in rris.sortedBy { it.name }) {
                 // if (stopRequested) return
                 if (!rri.name.equals(".") && !rri.name.equals("..")) {
-                    val vf = VFfromSftp(rri.path, rri.attributes)
-                    if (!vf.fileName().matches(filterregexp.toRegex())) {
-                        action(vf)
-                        if (isDirectoryx(rri.attributes) && recursive) {
-                            parseContent(rri.path)
-                        }
-                    }
+                    doaction(rri.path, rri.attributes) { parseContent(it) }
                 }
             }
         }
-        logger.debug("searching $remoteBasePath/$subfolder")
-        val sp = remoteBasePath + (if (subfolder.length > 0) "/" else "") + subfolder
+        val sp = remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder
+        logger.debug("searching $sp")
         val sftpsp = sftpexists(sp)
-        if (sftpsp != null) { // not nice: duplicate code (above)
-            val vf = VFfromSftp(sp, sftpsp) // not nice: duplicate code (above)
-            if (!vf.fileName().matches(filterregexp.toRegex())) {
-                action(vf)
-                if (isDirectoryx(sftpsp)) {
-                    parseContent(sp)
-                }
-            }
+        if (sftpsp != null) { // run for base folder
+            doaction(sp, sftpsp, true) { parseContent(it) }
         }
         logger.debug("parsing done")
     }
 
-    // init
-
-//  System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
-
     // see ConsoleKnownHostsVerifier
     class MyHostKeyVerifier : OpenSSHKnownHosts(DBSettings.knownHostsFile) {
         override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
-            return if (runUIwait {
-                        println("huhu ask 1 ${Thread.currentThread().id}")
-                        Helpers.dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
-                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK to connect and add to SFSync's known_hosts.")
-                    }) {
+            return if (runUIwait { Helpers.dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
+                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK to connect and add to SFSync's known_hosts.") }) {
                 entries.add(OpenSSHKnownHosts.HostEntry(null, hostname, KeyType.fromKey(key), key))
                 write()
                 true
@@ -429,11 +421,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         override fun hostKeyChangedAction(hostname: String?, key: PublicKey?): Boolean {
-            return if (runUIwait {
-                        println("huhu ask 2 ${Thread.currentThread().id}")
-                        dialogOkCancel("SFTP server verification", "Host key of server $hostname has changed!",
-                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK if you are 100% sure if this change was intended.")
-                    }) {
+            return if (runUIwait { dialogOkCancel("SFTP server verification", "Host key of server $hostname has changed!",
+                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK if you are 100% sure if this change was intended.") }) {
                 entries.add(OpenSSHKnownHosts.HostEntry(null, hostname, KeyType.fromKey(key), key))
                 write()
                 true
@@ -442,7 +431,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun isAlive() = ssh.isConnected
-//
+
     init {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
         ssh.addHostKeyVerifier(MyHostKeyVerifier())
