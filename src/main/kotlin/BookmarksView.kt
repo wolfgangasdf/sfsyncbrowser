@@ -22,7 +22,7 @@ class BookmarksView : View() {
         init {
             with(root) {
                 fieldset("Server") {
-                    field("Name") { textfield(server.name) }
+                    field("Name") { textfield(server.title) }
                     field("Type") { textfield(server.type) }
                     field("Status") { label(server.status) }
                     field("Protocol URI") { textfield(server.proto.protocoluri) }
@@ -53,7 +53,7 @@ class BookmarksView : View() {
         init {
             with(root) {
                 fieldset("Sync") {
-                    field("Name") { textfield(sync.name) }
+                    field("Name") { textfield(sync.title) }
                     field("Sync cacheid") { textfield(sync.cacheid) }
                     field("Type") { textfield(sync.type) }
                     field("Status") { label(sync.status) }
@@ -73,7 +73,7 @@ class BookmarksView : View() {
         init {
             with(root) {
                 fieldset("Subset") {
-                    field("Name: ") { textfield(subset.name) }
+                    field("Name: ") { textfield(subset.title) }
                     field { button("Open sync view!") { action {
                         println("bm: ${Thread.currentThread().id}")
                         val sv = SyncView(subset.sync.server, subset.sync, subset)
@@ -98,8 +98,9 @@ class BookmarksView : View() {
     private var settingsview: View = SettingsViewPlaceholder()
 
     private val ttv = treetableview<TtvThing> {
-        column("type", TtvThing::type)
-        column("name", TtvThing::name)
+//        column("What", Bindings.createStringBinding( Callable { "${type.value} ${title.value}" } , type, title))
+        column("type", TtvThing::type).remainingWidth()
+        column("title", TtvThing::title)
         column("status", TtvThing::status)
         columnResizePolicy = TreeTableSmartResize.POLICY
         root = TreeItem<TtvThing>(RootThing(SimpleStringProperty("root"),

@@ -52,7 +52,7 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
         label("Files:")
         // TODO need cellfactory to color rows!
         tableview(files) {
-            column("name", RFile::getName)
+            column("title", RFile::getName)
             column("size", RFile::size)
             column("perms", RFile::permissions)
         }.rowFactory = Callback {

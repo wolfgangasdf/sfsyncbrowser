@@ -98,6 +98,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun mkdirrec(absolutePath: String)
     abstract fun deletefile(what: String, mtime: Long)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
+    abstract fun isAlive(): Boolean
 
     //noinspection ScalaUnusedSymbol
     var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> }
@@ -113,6 +114,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
 }
 
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
+
     override fun cleanUp() {}
 
     override fun deletefile(what: String, mtime: Long) {
@@ -198,12 +200,17 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun mkdirrec(absolutePath: String) {
         Files.createDirectories(Paths.get(absolutePath))
     }
+
+    override fun isAlive() = true
+
 }
 
 
 class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
+
+    private val ssh = SSHClient()
 
     inner class MyTransferListener(private var relPath: String = "") : TransferListener {
         var bytesTransferred: Long = 0
@@ -434,8 +441,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    private val ssh = SSHClient()
-
+    override fun isAlive() = ssh.isConnected
+//
     init {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
         ssh.addHostKeyVerifier(MyHostKeyVerifier())
