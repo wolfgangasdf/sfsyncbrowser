@@ -66,11 +66,12 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 
 // path below basepath with a leading "/"
 // if ends on "/", is dir!
-class VirtualFile(var path: String, var modTime: Long, var size: Long) : Comparable<VirtualFile> { // TODO was Ordered in scala
+class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: String = "") : Comparable<VirtualFile> { // TODO was Ordered in scala
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
-    fun fileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last()
+    fun getFileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last()
+
     override fun toString(): String = "[$path]:$modTime,$size"
 
     fun isDir(): Boolean = path.endsWith("/")
@@ -181,7 +182,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             var strippedPath: String = if (fixedPath == remoteBasePath) "/" else fixedPath.substring(remoteBasePath.length)
             if (Files.isDirectory(cc) && strippedPath != "/") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
-            if (!vf.fileName().matches(filterregexp.toRegex())) {
+            if (!vf.getFileName().matches(filterregexp.toRegex())) {
                 if (debugslow) Thread.sleep(500)
                 action(vf)
                 if (Files.isDirectory(cc) && goDeeper) {
@@ -376,17 +377,16 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 path = fullFilePath.substring(remoteBasePath.length)
                 modTime = attrs.mtime * 1000
                 size = attrs.size
+                permissions = attrs.permissions.toString() // TODO make unix like
                 if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
             }
         }
 
         fun doaction(rripath: String, rriattributes: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
             val vf = VFfromSftp(rripath, rriattributes)
-            if (!vf.fileName().matches(filterregexp.toRegex())) {
+            if (!vf.getFileName().matches(filterregexp.toRegex())) {
                 action(vf)
-                if (isDirectoryx(rriattributes) && (recursive || parsealways)) {
-                    parseContentFun(rripath)
-                }
+                if (isDirectoryx(rriattributes) && (recursive || parsealways))  parseContentFun(rripath)
             }
         }
 
@@ -400,7 +400,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 }
             }
         }
-        val sp = remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder
+        val sp = remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder.removePrefix("/")
         logger.debug("searching $sp")
         val sftpsp = sftpexists(sp)
         if (sftpsp != null) { // run for base folder

@@ -69,7 +69,6 @@ object Helpers {
         else input
 
     fun getParentFolder(path: String): String {
-        println("getparent of $path")
         return path.split("/").dropLastWhile { it.isEmpty() }.dropLast(1).joinToString("/") + "/"
     }
 

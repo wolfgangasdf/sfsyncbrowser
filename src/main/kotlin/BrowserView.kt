@@ -2,25 +2,18 @@ import javafx.beans.property.SimpleStringProperty
 import javafx.scene.control.TableRow
 import javafx.util.Callback
 import store.Server
+import synchro.VirtualFile
 import tornadofx.*
 import util.Helpers
 import util.MyTask
 import util.MyWorker
-import java.io.File
 
 
 class BrowserView(private val server: Server, path: String) : View("Browser view") {
 
     private var currentPath = SimpleStringProperty(path)
 
-    class RFile (val path: String, var size: Long, val isdirectory: Boolean, var permissions: String) {
-        fun getName(): String = File(path).name
-        override fun toString(): String {
-            return "[rf: p=$path isd=$isdirectory"
-        }
-    }
-
-    private val files = mutableListOf<RFile>().observable()
+    private val files = mutableListOf<VirtualFile>().observable()
 
     private val pathButtonFlowPane = hbox {
         label("Path:")
@@ -42,14 +35,14 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
         this += pathButtonFlowPane
         label("Files:")
         tableview(files) {
-            column("title", RFile::getName).remainingWidth()
-            column("size", RFile::size)
-            column("perms", RFile::permissions)
+            column("title", VirtualFile::getFileName).remainingWidth()
+            column("size", VirtualFile::size)
+            column("perms", VirtualFile::permissions)
         }.apply {
             rowFactory = Callback {
-                val row = TableRow<RFile>()
+                val row = TableRow<VirtualFile>()
                 row.setOnMouseClicked { it2 ->
-                    if (it2.clickCount == 2 && row.item.isdirectory) {
+                    if (it2.clickCount == 2 && row.item.isDir()) {
                         currentPath.set(row.item.path)
                     }
                 }
@@ -59,31 +52,29 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
     }
 
     private fun updateBrowser() {
-        val taskListLocal = MyTask<MutableList<RFile>> {
-            val tmpl = mutableListOf<RFile>()
+        val taskListLocal = MyTask<MutableList<VirtualFile>> {
+            val tmpl = mutableListOf<VirtualFile>()
             server.getConnection().list(currentPath.value, "", false) { it2 ->
-                with(it2.path.removePrefix("/")) {
-                    if (this != currentPath.value) tmpl.add(RFile(this, it2.size, it2.isDir(), "todo"))
-                }
+                if (it2.path != currentPath.value) tmpl.add(it2) // TODO it2.path.removePrefix("/") ????
             }
             tmpl
         }
         taskListLocal.setOnSucceeded {
             files.clear()
-            files.setAll(taskListLocal.value)
+            files.setAll(taskListLocal.value) // TODO it2.path.removePrefix("/") ????
             pathButtonFlowPane.children.clear()
             pathButtonFlowPane.add(label("Parents: "))
             var tmpp = currentPath.value
             val pl = mutableListOf<String>()
-            while (tmpp != "/") {
-                tmpp = Helpers.getParentFolder(tmpp)
+            while (tmpp.removeSuffix("/").isNotEmpty()) {
                 pl += tmpp.removeSuffix("/")
+                tmpp = Helpers.getParentFolder(tmpp)
             }
+            pathButtonFlowPane.add(button("base") { action { currentPath.set("/") }})
             pl.reversed().forEach { it2 ->
-                pathButtonFlowPane.add(button(Helpers.getFileName(it2)?:"remroot") {
-                    action {
-                    currentPath.set(it2)
-                }})
+                pathButtonFlowPane.add(button(Helpers.getFileName(it2)!!) {
+                    action { currentPath.set(it2) }
+                })
             }
         }
         MyWorker.runTask(taskListLocal)
