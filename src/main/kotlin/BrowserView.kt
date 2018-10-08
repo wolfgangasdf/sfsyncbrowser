@@ -31,7 +31,6 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
                 updateBrowser()
             } }
         }
-        label(currentPath)
         this += pathButtonFlowPane
         label("Files:")
         tableview(files) {
@@ -54,16 +53,17 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
     private fun updateBrowser() {
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
             val tmpl = mutableListOf<VirtualFile>()
+            updateTit("Getting remote file list...")
             server.getConnection().list(currentPath.value, "", false) { it2 ->
-                if (it2.path != currentPath.value) tmpl.add(it2) // TODO it2.path.removePrefix("/") ????
+                if (it2.path != currentPath.value) tmpl.add(it2)
             }
             tmpl
         }
         taskListLocal.setOnSucceeded {
             files.clear()
-            files.setAll(taskListLocal.value) // TODO it2.path.removePrefix("/") ????
+            files.setAll(taskListLocal.value)
             pathButtonFlowPane.children.clear()
-            pathButtonFlowPane.add(label("Parents: "))
+            pathButtonFlowPane.add(label("Path:"))
             var tmpp = currentPath.value
             val pl = mutableListOf<String>()
             while (tmpp.removeSuffix("/").isNotEmpty()) {

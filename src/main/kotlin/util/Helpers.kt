@@ -13,6 +13,7 @@ import javafx.scene.layout.Priority
 import javafx.scene.web.WebView
 import javafx.stage.Modality
 import javafx.stage.Screen
+import javafx.stage.Stage
 import mu.KotlinLogging
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
@@ -179,11 +180,11 @@ object Helpers {
     }
 
     // this is because simply property-bound textfields can't have validator without ViewModel...
-    fun EventTarget.valitextfield(property: ObservableValue<String>, valiregex: String, valimsg: String, op: TextField.() -> Unit = {}) = textfield().apply {
+    fun EventTarget.valitextfield(property: ObservableValue<String>, valiregex: Regex, valimsg: String, op: TextField.() -> Unit = {}) = textfield().apply {
         bind(property)
         op(this)
         fun updateit() {
-            if (!text.matches(valiregex.toRegex()))
+            if (!text.matches(valiregex))
                 addDecorator(SimpleMessageDecorator(valimsg, ValidationSeverity.Error))
             else while (decorators.isNotEmpty()) removeDecorator(decorators.first())
         }
@@ -261,7 +262,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     }
 
     init {
-        // not needed? initOwner(Main.stage)
+        initOwner(FX.primaryStage)
         title = "Progress"
         isResizable = true
         dialogPane.content = vbox {
@@ -273,6 +274,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         dialogPane.setPrefSize(sb.width/2.5, sb.height/3)
 
         initModality(Modality.NONE)
+        (dialogPane.scene.window as Stage).isAlwaysOnTop = true
 
         setOnCloseRequest {
             if (taskList.isNotEmpty()) {

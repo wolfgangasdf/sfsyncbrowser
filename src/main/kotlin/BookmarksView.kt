@@ -9,12 +9,7 @@ import store.SettingsStore
 import store.SubSet
 import store.Sync
 import tornadofx.*
-import util.Helpers
-import util.Helpers.runUIwait
 import util.Helpers.valitextfield
-import util.MyTask
-import util.MyWorker
-import kotlin.concurrent.thread
 
 class BookmarksView : View() {
 
@@ -29,15 +24,13 @@ class BookmarksView : View() {
             with(root) {
                 fieldset("Server") {
                     field("Name") { textfield(server.title) }
-                    field("Type") { textfield(server.type) }
                     field("Status") { label(server.status) }
-                    field("Protocol URI") { textfield(server.proto.protocoluri) }
-                    field("Protocol password") { passwordfield(server.proto.password) }
+                    field("Protocol URI and password") { textfield(server.proto.protocoluri) ; passwordfield(server.proto.password) }
                     // TODO make everything with file selectors, disable editing.
-                    field("Protocol basefolder") { valitextfield(server.proto.baseFolder, "^/.*[^/]$", "/f1/f2 or /") }
-                    field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) }
-                    field("Protocol permissions") { textfield(server.proto.perms) }
+                    field("Protocol basefolder") { valitextfield(server.proto.baseFolder, "(^/$)|(/.*[^/]$)".toRegex(), "/f1/f2 or /") }
+                    field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) ; textfield(server.proto.perms) }
                     field("Protocol don't set date") { checkbox("", server.proto.cantSetDate) }
+                    field("Protocol tunnel host") { textfield(server.proto.tunnelHost) }
                     field {
                         button("Add new sync") { action {
                             server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
@@ -59,11 +52,10 @@ class BookmarksView : View() {
         init {
             with(root) {
                 fieldset("Sync") {
-                    field("Name") { textfield(sync.title) }
+                    field("Name and type") { textfield(sync.title) ; textfield(sync.type) }
                     field("Sync cacheid") { textfield(sync.cacheid) }
-                    field("Type") { textfield(sync.type) }
                     field("Status") { label(sync.status) }
-                    field("Local folder") { valitextfield(sync.localfolder, "^/.*[^/]$", "/f1/f2 or /") }
+                    field("Local folder") { valitextfield(sync.localfolder, "^/.*[^/]$".toRegex(), "/f1/f2 or /") }
                     field {
                         button("Add new subset") { action {
                             sync.subsets += SubSet(SimpleStringProperty("ssname"),

@@ -1,4 +1,4 @@
-@file:Suppress("unused") // TODO
+@file:Suppress("unused", "MemberVisibilityCanBePrivate", "ConstantConditionIf") // TODO
 
 package synchro
 
@@ -113,6 +113,20 @@ abstract class GeneralConnection(val protocol: Protocol) {
     }
 
     abstract fun cleanUp()
+
+    fun permToString(permissions: Set<FilePermission>): String {
+        val mask = FilePermission.toMask(permissions)
+        return  (if (FilePermission.USR_R.isIn(mask)) "r" else "-") +
+                (if (FilePermission.USR_W.isIn(mask)) "w" else "-") +
+                (if (FilePermission.USR_X.isIn(mask)) "x" else "-") +
+                (if (FilePermission.GRP_R.isIn(mask)) "r" else "-") +
+                (if (FilePermission.GRP_W.isIn(mask)) "w" else "-") +
+                (if (FilePermission.GRP_X.isIn(mask)) "x" else "-") +
+                (if (FilePermission.OTH_R.isIn(mask)) "r" else "-") +
+                (if (FilePermission.OTH_W.isIn(mask)) "w" else "-") +
+                (if (FilePermission.OTH_X.isIn(mask)) "x" else "-")
+    }
+
 }
 
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
@@ -193,7 +207,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
         }
 
-        val sp = Paths.get(remoteBasePath + (if (subfolder.length > 0) "/" else "") + subfolder)
+        val sp = Paths.get(remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder)
         if (Files.exists(sp)) {
             parseContent(sp, goDeeper = true)
         }
@@ -372,18 +386,18 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
 
-        fun VFfromSftp(fullFilePath: String, attrs: FileAttributes): VirtualFile {
+        fun vfFromSftp(fullFilePath: String, attrs: FileAttributes): VirtualFile {
             return VirtualFile().apply {
                 path = fullFilePath.substring(remoteBasePath.length)
                 modTime = attrs.mtime * 1000
                 size = attrs.size
-                permissions = attrs.permissions.toString() // TODO make unix like
+                permissions = permToString(attrs.permissions)
                 if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
             }
         }
 
         fun doaction(rripath: String, rriattributes: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
-            val vf = VFfromSftp(rripath, rriattributes)
+            val vf = vfFromSftp(rripath, rriattributes)
             if (!vf.getFileName().matches(filterregexp.toRegex())) {
                 action(vf)
                 if (isDirectoryx(rriattributes) && (recursive || parsealways))  parseContentFun(rripath)
@@ -395,7 +409,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             val rris = sftpc.ls(folder)
             for (rri in rris.sortedBy { it.name }) {
                 // if (stopRequested) return
-                if (!rri.name.equals(".") && !rri.name.equals("..")) {
+                if (rri.name != "." && rri.name != "..") {
                     doaction(rri.path, rri.attributes) { parseContent(it) }
                 }
             }

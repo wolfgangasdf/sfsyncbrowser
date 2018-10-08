@@ -83,7 +83,8 @@ class Sync(val type: StringProperty, val title: StringProperty, val status: Stri
 }
 
 class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
-               val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty) {
+               val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
+               val tunnelHost: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
     override fun toString(): String = "[Protocol ${protocoluri.value}]"
 }
@@ -128,6 +129,7 @@ object SettingsStore {
             props["se.$idx.perms"] = server.proto.perms.value
             props["se.$idx.protoBaseFolder"] = server.proto.baseFolder.value
             props["se.$idx.protoPassword"] = server.proto.password.value
+            props["se.$idx.tunnelHost"] = server.proto.tunnelHost.value
             props["se.$idx.childs"] = server.syncs.size.toString()
             server.syncs.forEachIndexed { idx2, sync ->
                 if (sync is Sync) {
@@ -168,7 +170,7 @@ object SettingsStore {
 
                 val proto = Protocol(p2sp("se.$idx.protocoluri"), p2bp("se.$idx.doSetPermissions"),
                         p2sp("se.$idx.perms"), p2bp("se.$idx.cantSetDate"), p2sp("se.$idx.protoBaseFolder"),
-                        p2sp("se.$idx.protoPassword"))
+                        p2sp("se.$idx.protoPassword"), p2sp("se.$idx.tunnelHost"))
 
                 val server = Server(p2sp("se.$idx.type"), p2sp("se.$idx.title"),
                         SimpleStringProperty(""), proto, FXCollections.observableArrayList())
