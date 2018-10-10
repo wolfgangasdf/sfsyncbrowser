@@ -1,6 +1,7 @@
 @file:Suppress("unused") // TODO
 package store
 
+import CF
 import javafx.beans.property.*
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -20,12 +21,13 @@ import synchro.SftpConnection
 import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
+import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
-
+import SortedProperties
 
 private val logger = KotlinLogging.logger {}
 
@@ -82,7 +84,7 @@ class Sync(val type: StringProperty, val title: StringProperty, val status: Stri
     override fun toString() = "[Sync] ${title.value}"
 }
 
-class Protocol(val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
+class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
                val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
                val tunnelHost: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
@@ -96,56 +98,62 @@ class SubSet(val title: StringProperty, val status: StringProperty, val excludeF
     override fun toString() = "[SubSet] ${title.value}"
 }
 
-class Server(val type: StringProperty, val title: StringProperty, val status: StringProperty, val proto: Protocol,
-             val syncs: ObservableList<Sync>) {
+class Server(val title: StringProperty, val status: StringProperty, val currentProtocol: IntegerProperty,
+             val protocols: ObservableList<Protocol>, val syncs: ObservableList<Sync>) {
+    val proto = SimpleObjectProperty<Protocol>().apply {
+        onChange { currentProtocol.set(protocols.indexOf(it)) }
+    }
     private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"
     fun getConnection(): GeneralConnection {
         if (connection?.isAlive() != true) {
+            val proto = protocols[currentProtocol.value]
             logger.info("opening new connection to $proto")
             connection = when {
                 proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
                 proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
-                else -> throw java.lang.UnsupportedOperationException("asdf")
+                else -> throw java.lang.Exception("asdf")
             }
         }
         return connection!!
     }
+    fun getProtocol(): Protocol = protocols[currentProtocol.value]
 }
 
 object SettingsStore {
     val servers = FXCollections.observableArrayList<Server>()!!
 
     fun saveSettings() {
-        val props = Properties()
+        val props = SortedProperties()
         props["settingsversion"] = "1"
         props["servers"] = servers.size.toString()
         servers.forEachIndexed { idx, server ->
-            props["se.$idx.type"] = server.type.value
             props["se.$idx.title"] = server.title.value
-            props["se.$idx.protocoluri"] = server.proto.protocoluri.value
-            props["se.$idx.cantSetDate"] = server.proto.cantSetDate.value.toString()
-            props["se.$idx.doSetPermissions"] = server.proto.doSetPermissions.value.toString()
-            props["se.$idx.perms"] = server.proto.perms.value
-            props["se.$idx.protoBaseFolder"] = server.proto.baseFolder.value
-            props["se.$idx.protoPassword"] = server.proto.password.value
-            props["se.$idx.tunnelHost"] = server.proto.tunnelHost.value
-            props["se.$idx.childs"] = server.syncs.size.toString()
+            props["se.$idx.currentProtocol"] = server.currentProtocol.value.toString()
+            props["se.$idx.protocols"] = server.protocols.size.toString()
+            server.protocols.forEachIndexed { idx2, proto ->
+                props["sp.$idx.$idx2.uri"] = proto.protocoluri.value
+                props["sp.$idx.$idx2.cantSetDate"] = proto.cantSetDate.value.toString()
+                props["sp.$idx.$idx2.doSetPermissions"] = proto.doSetPermissions.value.toString()
+                props["sp.$idx.$idx2.perms"] = proto.perms.value
+                props["sp.$idx.$idx2.baseFolder"] = proto.baseFolder.value
+                props["sp.$idx.$idx2.password"] = proto.password.value
+                props["sp.$idx.$idx2.tunnelHost"] = proto.tunnelHost.value
+            }
+            props["se.$idx.syncs"] = server.syncs.size.toString()
             server.syncs.forEachIndexed { idx2, sync ->
-                if (sync is Sync) {
-                    props["sy.$idx.$idx2.type"] = sync.type.value
-                    props["sy.$idx.$idx2.title"] = sync.title.value
-                    props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
-                    props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
-                    props["sy.$idx.$idx2.subsets"] = sync.subsets.size.toString()
-                    sync.subsets.forEachIndexed { iss, subSet ->
-                        props["ss.$idx.$idx2.$iss.title"] = subSet.title.value
-                        props["ss.$idx.$idx2.$iss.excludeFilter"] = subSet.excludeFilter.value
-                        props["ss.$idx.$idx2.$iss.status"] = subSet.status.value
-                        props["ss.$idx.$idx2.$iss.subfolders"] = subSet.subfolders.size.toString()
-                        subSet.subfolders.forEachIndexed { irf, s ->
-                            props["sssf.$idx.$idx2.$iss.$irf"] = s
-                        }
+                props["sy.$idx.$idx2.type"] = sync.type.value
+                props["sy.$idx.$idx2.title"] = sync.title.value
+                props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
+                props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
+                props["sy.$idx.$idx2.subsets"] = sync.subsets.size.toString()
+                sync.subsets.forEachIndexed { iss, subSet ->
+                    props["ss.$idx.$idx2.$iss.title"] = subSet.title.value
+                    props["ss.$idx.$idx2.$iss.excludeFilter"] = subSet.excludeFilter.value
+                    props["ss.$idx.$idx2.$iss.status"] = subSet.status.value
+                    props["ss.$idx.$idx2.$iss.subfolders"] = subSet.subfolders.size.toString()
+                    subSet.subfolders.forEachIndexed { irf, s ->
+                        props["sssf.$idx.$idx2.$iss.$irf"] = s
                     }
                 }
             }
@@ -158,40 +166,44 @@ object SettingsStore {
     private fun loadSettings() {
         logger.info("load settings ${DBSettings.getSettingPath()}")
         servers.clear()
-        val propsx = Properties()
-        val fr = FileReader(DBSettings.getSettingPath())
-        propsx.load(fr)
-        val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
-        if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
-        fun p2sp(key: String) = SimpleStringProperty(props.getOrDefault(key, ""))
-        fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
-        try {
-            for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
-
-                val proto = Protocol(p2sp("se.$idx.protocoluri"), p2bp("se.$idx.doSetPermissions"),
-                        p2sp("se.$idx.perms"), p2bp("se.$idx.cantSetDate"), p2sp("se.$idx.protoBaseFolder"),
-                        p2sp("se.$idx.protoPassword"), p2sp("se.$idx.tunnelHost"))
-
-                val server = Server(p2sp("se.$idx.type"), p2sp("se.$idx.title"),
-                        SimpleStringProperty(""), proto, FXCollections.observableArrayList())
-
-                for (idx2 in 0 until props.getOrDefault("se.$idx.childs", "").toInt()) {
-                    val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
-                            SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
-                    for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
-                        val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
-                        for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!
-                        sync.subsets += subSet
+        if (File(DBSettings.getSettingPath()).exists()) {
+            val propsx = Properties()
+            val fr = FileReader(DBSettings.getSettingPath())
+            propsx.load(fr)
+            val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
+            if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
+            fun p2sp(key: String) = SimpleStringProperty(props.getOrDefault(key, ""))
+            fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
+            fun p2ip(key: String) = SimpleIntegerProperty(props.getOrDefault(key, "0").toInt())
+            try {
+                for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
+                    val server = Server(p2sp("se.$idx.title"),
+                            SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"),
+                            FXCollections.observableArrayList(), FXCollections.observableArrayList())
+                    for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "").toInt()) {
+                        server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
+                                p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
+                                p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"))
                     }
-                    server.syncs += sync
+                    server.proto.set(server.protocols[server.currentProtocol.value])
+                    for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "").toInt()) {
+                        val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
+                                SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
+                        for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
+                            val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
+                            for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!
+                            sync.subsets += subSet
+                        }
+                        server.syncs += sync
+                    }
+                    servers += server
                 }
-                servers += server
+            } catch (e: Exception) {
+                logger.error("error loading settings: ${e.message}")
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            logger.error("error loading settings: ${e.message}")
-            e.printStackTrace()
+            logger.info("settings loaded!")
         }
-        logger.info("settings loaded!")
     }
 
     init {

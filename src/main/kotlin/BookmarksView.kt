@@ -1,13 +1,12 @@
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
 import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
-import store.Server
-import store.SettingsStore
-import store.SubSet
-import store.Sync
+import store.*
 import tornadofx.*
 import util.Helpers.valitextfield
 
@@ -19,26 +18,48 @@ class BookmarksView : View() {
 
     class ServerSettingsPane(server: Server): View() {
         override val root = Form()
-
         init {
             with(root) {
                 fieldset("Server") {
                     field("Name") { textfield(server.title) }
                     field("Status") { label(server.status) }
-                    field("Protocol URI and password") { textfield(server.proto.protocoluri) ; passwordfield(server.proto.password) }
-                    // TODO make everything with file selectors, disable editing.
-                    field("Protocol basefolder") { valitextfield(server.proto.baseFolder, "(^/$)|(/.*[^/]$)".toRegex(), "/f1/f2 or /") }
-                    field("Protocol set permissions") { checkbox("", server.proto.doSetPermissions) ; textfield(server.proto.perms) }
-                    field("Protocol don't set date") { checkbox("", server.proto.cantSetDate) }
-                    field("Protocol tunnel host") { textfield(server.proto.tunnelHost) }
+                    field("Protocol") { combobox<Protocol>(server.proto, server.protocols) }
                     field {
+                        button("Add new protocol") { action {
+                            server.protocols += Protocol(server, SimpleStringProperty("sftp:user@//"), SimpleBooleanProperty(false),
+                                    SimpleStringProperty(""), SimpleBooleanProperty(false),
+                                    SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(""))
+                            // TODO why not refreshed??
+                        } }
                         button("Add new sync") { action {
                             server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
                                 SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
+                            // TODO why not refreshed??
                         } }
                         button("Open browser") { action {
                             val bv = BrowserView(server, "")
                             openNewWindow(bv)
+                        } }
+
+                    }
+                }
+            }
+        }
+    }
+
+    class ProtocolSettingsPane(proto: Protocol): View() {
+        override val root = Form()
+        init {
+            with(root) {
+                fieldset("Protocol") {
+                    field("URI and password") { textfield(proto.protocoluri) ; passwordfield(proto.password) }
+                    field("Basefolder") { valitextfield(proto.baseFolder, "(^/$)|(/.*[^/]$)".toRegex(), "/f1/f2 or /") }
+                    field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
+                    field("Don't set date") { checkbox("", proto.cantSetDate) }
+                    field("Tunnel host") { textfield(proto.tunnelHost) }
+                    field {
+                        button("Remove protocol") { action {
+                            proto.server.protocols.remove(proto)
                         } }
 
                     }
@@ -102,7 +123,7 @@ class BookmarksView : View() {
 
     private var settingsview: View = SettingsViewPlaceholder()
 
-    // https://stackoverflow.com/questions/32478383/updating-treeview-items-from-textfield
+    // annoying that needed: https://stackoverflow.com/questions/32478383/updating-treeview-items-from-textfield
     // this is better than writing generic type TtvThing, which gets messy!
     private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
         private val nameListener = ChangeListener<String> { _, _, _ ->
@@ -112,6 +133,7 @@ class BookmarksView : View() {
         init {
             when (ele) {
                 is Server -> ele.title.addListener(nameListener)
+                is Protocol -> ele.protocoluri.addListener(nameListener)
                 is Sync -> ele.title.addListener(nameListener)
                 is SubSet -> ele.title.addListener(nameListener)
             }
@@ -126,7 +148,11 @@ class BookmarksView : View() {
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
-                value is Server -> value.syncs
+                value is Server -> { val res = mutableListOf<Any>()
+                    res.addAll(value.protocols)
+                    res.addAll(value.syncs)
+                res
+                }
                 value is Sync -> value.subsets
                 else -> null
             }
@@ -145,10 +171,13 @@ class BookmarksView : View() {
         label("conns")
         this += ttv
         hbox {
+            button("Add server") { action {
+                SettingsStore.servers += Server(SimpleStringProperty("name"), SimpleStringProperty("status"),
+                        SimpleIntegerProperty(-1), FXCollections.observableArrayList<Protocol>(), FXCollections.observableArrayList<Sync>())
+            } }
             button("save sett") { action {
                 SettingsStore.saveSettings()
             } }
-
         }
         this += settingsview
     }
@@ -160,6 +189,7 @@ class BookmarksView : View() {
                 settingsview.removeFromParent()
                 settingsview = when(ti) {
                     is Server -> ServerSettingsPane(ti)
+                    is Protocol -> ProtocolSettingsPane(ti)
                     is Sync -> SyncSettingsPane(ti)
                     is SubSet -> SubsetSettingsPane(ti)
                     else -> SettingsViewPlaceholder()

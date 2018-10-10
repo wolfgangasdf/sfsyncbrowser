@@ -1,4 +1,4 @@
-@file:Suppress("unused") // TODO
+@file:Suppress("unused", "ConstantConditionIf") // TODO
 
 package synchro
 
@@ -44,7 +44,6 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
     var remote: GeneralConnection? = null
     private val uiUpdateInterval = 0.5
     private var profileInitialized = false
-    private val protocol = server.proto // TODO remove?
 
     class ProfileAbortedException(message: String = "", cause: Throwable = Throwable()) : RuntimeException(message, cause)
 
@@ -52,11 +51,11 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         updateTit("Initialize connections...")
         cache.loadCache()
 
-        local = LocalConnection(server.proto).apply {
+        local = LocalConnection(server.getProtocol()).apply {// todo it's strange to give remote protocol...
             remoteBasePath = sync.localfolder.value
         }
-        val uri = MyURI(server.proto.protocoluri.value)
-        logger.debug("puri = ${protocol.protocoluri.value}  proto = ${uri.protocol}")
+        val uri = MyURI(server.getProtocol().protocoluri.value)
+        logger.debug("puri = ${server.getProtocol().protocoluri.value}  proto = ${uri.protocol}")
         updateProgr(50, 100, "initialize remote connection...")
 
         remote = server.getConnection()
