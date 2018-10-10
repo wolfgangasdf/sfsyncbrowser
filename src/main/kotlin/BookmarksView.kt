@@ -1,8 +1,11 @@
+import javafx.beans.binding.ListBinding
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
+import javafx.collections.ListChangeListener
+import javafx.collections.ObservableList
 import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
@@ -126,16 +129,21 @@ class BookmarksView : View() {
     // annoying that needed: https://stackoverflow.com/questions/32478383/updating-treeview-items-from-textfield
     // this is better than writing generic type TtvThing, which gets messy!
     private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
-        private val nameListener = ChangeListener<String> { _, _, _ ->
-            val event = TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this)
-            Event.fireEvent(this, event)
+        private val changeListener = ChangeListener<String> { _, _, _ ->
+            Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this))
+        }
+        private val listChangeListener = ListChangeListener<Any> { _ ->
+            Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.childrenModificationEvent<Any>(), this))
         }
         init {
             when (ele) {
-                is Server -> ele.title.addListener(nameListener)
-                is Protocol -> ele.protocoluri.addListener(nameListener)
-                is Sync -> ele.title.addListener(nameListener)
-                is SubSet -> ele.title.addListener(nameListener)
+                is Server -> {
+                    ele.title.addListener(changeListener)
+                    ele.protocols.addListener(listChangeListener) // TODO doesn't work if new proto added
+                }
+                is Protocol -> ele.protocoluri.addListener(changeListener)
+                is Sync -> ele.title.addListener(changeListener)
+                is SubSet -> ele.title.addListener(changeListener)
             }
             // have to remove listeners? I don't think so.
         }
@@ -144,15 +152,25 @@ class BookmarksView : View() {
     private val ttv = treeview<Any> {
         root = TreeItem<Any>("root")
 
+        fun concat(list1: ObservableList<out Any>, list2: ObservableList<out Any>): ObservableList<Any> {
+            return object: ListBinding<Any>() {
+                override fun computeValue(): ObservableList<Any> {
+                    val res = mutableListOf<Any>()
+                    res.addAll(list1)
+                    res.addAll(list2)
+                    return res.observable()
+                }
+                init {
+                    bind(list1, list2)
+                }
+            }
+        }
+
         populate({ ite -> MyTreeItem(ite)}) { parent ->
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
-                value is Server -> { val res = mutableListOf<Any>()
-                    res.addAll(value.protocols)
-                    res.addAll(value.syncs)
-                res
-                }
+                value is Server -> concat(value.protocols, value.syncs)
                 value is Sync -> value.subsets
                 else -> null
             }

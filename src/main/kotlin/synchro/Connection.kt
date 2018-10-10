@@ -449,6 +449,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     init {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
         ssh.addHostKeyVerifier(MyHostKeyVerifier())
+        // TODO: tunnel if tunnelhost present!
         ssh.connect(uri.host, uri.port.toInt())
         try {
             ssh.authPublickey(uri.username)
