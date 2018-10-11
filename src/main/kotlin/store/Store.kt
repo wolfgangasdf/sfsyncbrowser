@@ -2,6 +2,7 @@
 package store
 
 import CF
+import SortedProperties
 import javafx.beans.property.*
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -27,7 +28,6 @@ import java.io.FileWriter
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
-import SortedProperties
 
 private val logger = KotlinLogging.logger {}
 
@@ -74,7 +74,6 @@ object DBSettings {
     fun releaseLock(): Boolean = lockFile.delete()
 
 }
-
 
 ///////////////////////// settings
 

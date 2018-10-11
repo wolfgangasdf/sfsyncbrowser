@@ -1,16 +1,14 @@
-import javafx.beans.binding.ListBinding
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.collections.FXCollections
-import javafx.collections.ListChangeListener
-import javafx.collections.ObservableList
 import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import store.*
 import tornadofx.*
+import util.Helpers.concatObsLists
 import util.Helpers.valitextfield
 
 class BookmarksView : View() {
@@ -130,9 +128,6 @@ class BookmarksView : View() {
         private val changeListener = ChangeListener<String> { _, _, _ ->
             Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this))
         }
-        private val listChangeListener = ListChangeListener<Any> { _ ->
-            Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.childrenModificationEvent<Any>(), this))
-        }
         init {
             when (ele) {
                 is Server -> ele.title.addListener(changeListener)
@@ -146,32 +141,16 @@ class BookmarksView : View() {
 
     private val ttv = treeview<Any> {
 
-        // read only observablelist concatenation
-        fun concatObsLists(list1: ObservableList<out Any>, list2: ObservableList<out Any>): ObservableList<Any> {
-            return object: ListBinding<Any>() {
-                override fun computeValue(): ObservableList<Any> {
-                    val res = mutableListOf<Any>()
-                    res.addAll(list1)
-                    res.addAll(list2)
-                    return res.observable()
-                }
-                init {
-                    bind(list1, list2)
-                }
-            }
-        }
-
         root = TreeItem<Any>("root")
         populate({ ite -> MyTreeItem(ite)}) { parent ->
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
                 value is Server -> concatObsLists(value.protocols, value.syncs)
-                value is Sync -> value.subsets
+                value is Sync -> value.subsets.sorted()
                 else -> null
             }
         }
-
         root.isExpanded = true
         isShowRoot = false
         root.children.forEach { it.isExpanded = true ; it.children.forEach { it2 -> it2.isExpanded = true }}

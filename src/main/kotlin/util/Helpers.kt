@@ -3,7 +3,6 @@
 package util
 
 import javafx.application.Platform
-import javafx.beans.binding.ListBinding
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -194,6 +193,24 @@ object Helpers {
         updateit()
     }
 
+    // observablelist concatenation, target is read only
+    fun concatObsLists(vararg lists: ObservableList<out Any>): ObservableList<Any> {
+        val into = FXCollections.observableArrayList<Any>()
+        for (l in lists) {
+            for (ll in l) into.add(ll)
+            l.addListener { c: javafx.collections.ListChangeListener.Change<out Any> ->
+                while (c.next()) {
+                    if (c.wasAdded()) {
+                        for (ll in c.addedSubList) into.add(ll)
+                    }
+                    if (c.wasRemoved()) {
+                        for (ll in c.removed) into.remove(ll)
+                    }
+                }
+            }
+        }
+        return into
+    }
 }
 
 
