@@ -1,6 +1,6 @@
 import mu.KotlinLogging
-import storeold.Cache
-import storeold.SyncEntry
+import store.Cache
+import store.SyncEntry
 import synchro.Actions.A_ISEQUAL
 import synchro.Actions.A_UNCHECKED
 import synchro.Actions.A_CACHEONLY
@@ -23,7 +23,7 @@ object Checks {
 
         class CheckEntry(val expectedAction: Int, val path: String, val se: SyncEntry)
 
-        Cache.iniCache()
+        val cache = Cache("checks")
         // setup cachedb
         // stuff in existing & synced subfolder
         val ces = mutableListOf<CheckEntry>()
@@ -108,18 +108,18 @@ object Checks {
 
 
         // insert stuff
-        ces.forEach { ce -> Cache.cache[ce.path] = ce.se }
+        ces.forEach { ce -> cache.cache[ce.path] = ce.se }
 
 //    logger.info("**** initial:")
 //    Cache.dumpAll()
 
-        Comparison.compareSyncEntries()
+        Comparison.compareSyncEntries(cache)
 
         // check if ok
         logger.info("**** checks:")
         var fail = false
         ces.forEach { ce ->
-            val senew = Cache.cache[ce.path]
+            val senew = cache.cache[ce.path]
             logger.info(
                     (if (senew!!.action == ce.expectedAction) "" else {fail = true; "XX"})
                     +  "[${ce.path}]: action=[${CF.amap[senew.action]}] (expected [${CF.amap[ce.expectedAction]}])")

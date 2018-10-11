@@ -195,7 +195,7 @@ object Helpers {
 
     // observablelist concatenation, target is read only
     fun concatObsLists(vararg lists: ObservableList<out Any>): ObservableList<Any> {
-        val into = FXCollections.observableArrayList<Any>()
+        val into = SortedFilteredList<Any>()
         for (l in lists) {
             for (ll in l) into.add(ll)
             l.addListener { c: javafx.collections.ListChangeListener.Change<out Any> ->

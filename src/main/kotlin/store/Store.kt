@@ -19,6 +19,7 @@ import synchro.GeneralConnection
 import synchro.LocalConnection
 import synchro.MyURI
 import synchro.SftpConnection
+import tornadofx.SortedFilteredList
 import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
@@ -79,7 +80,7 @@ object DBSettings {
 
 class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty,
            val cacheid: StringProperty = SimpleStringProperty(java.util.Date().time.toString()), val server: Server,
-           val subsets: ObservableList<SubSet> = FXCollections.observableArrayList<SubSet>() ) {
+           val subsets: ObservableList<SubSet> = SortedFilteredList() ) {
     override fun toString() = "[Sync] ${title.value}"
 }
 
@@ -91,14 +92,14 @@ class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPer
 }
 
 class SubSet(val title: StringProperty, val status: StringProperty, val excludeFilter: StringProperty,
-             val subfolders: ObservableList<String> = FXCollections.observableArrayList<String>(),// TODO rename to subfolders
+             val subfolders: ObservableList<String> = SortedFilteredList(),
              val sync: Sync,
              val type: StringProperty = SimpleStringProperty("subset")) {
     override fun toString() = "[SubSet] ${title.value}"
 }
 
 class Server(val title: StringProperty, val status: StringProperty, val currentProtocol: IntegerProperty,
-             val protocols: ObservableList<Protocol>, val syncs: ObservableList<Sync>) {
+             val protocols: ObservableList<Protocol> = SortedFilteredList(), val syncs: ObservableList<Sync> = SortedFilteredList()) {
     val proto = SimpleObjectProperty<Protocol>().apply {
         onChange { currentProtocol.set(protocols.indexOf(it)) }
     }
@@ -120,7 +121,7 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
 }
 
 object SettingsStore {
-    val servers = FXCollections.observableArrayList<Server>()!!
+    val servers = SortedFilteredList<Server>()
 
     fun saveSettings() {
         val props = SortedProperties()
@@ -177,8 +178,7 @@ object SettingsStore {
             try {
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
-                            SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"),
-                            FXCollections.observableArrayList(), FXCollections.observableArrayList())
+                            SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"))
                     for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "").toInt()) {
                         server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
@@ -236,7 +236,7 @@ class SyncEntry(var action: Int,
                 var lTime: Long, var lSize: Long,
                 var rTime: Long, var rSize: Long,
                 var lcTime: Long, var rcTime: Long, var cSize: Long,
-                private var isDir: Boolean,
+                var isDir: Boolean,
                 var relevant: Boolean,
                 var selected: Boolean = false,
                 var delete: Boolean = false
@@ -362,7 +362,7 @@ class Cache(private val cacheid: String) {
 
     private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"
 
-    private fun iniCache() {
+    private fun iniCache() { // TODO needed?
         cache = MyTreeMap()
         observableListSleep = true
         observableList.clear()

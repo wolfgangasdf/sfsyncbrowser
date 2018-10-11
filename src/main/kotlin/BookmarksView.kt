@@ -79,7 +79,7 @@ class BookmarksView : View() {
                     field {
                         button("Add new subset") { action {
                             sync.subsets += SubSet(SimpleStringProperty("ssname"),
-                                    SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), FXCollections.observableArrayList<String>(), sync)
+                                    SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), sync = sync)
                         } }
                         button("Remove sync") { action {
                             sync.server.syncs.remove(sync)
@@ -166,7 +166,7 @@ class BookmarksView : View() {
         hbox {
             button("Add server") { action {
                 SettingsStore.servers += Server(SimpleStringProperty("name"), SimpleStringProperty("status"),
-                        SimpleIntegerProperty(-1), FXCollections.observableArrayList<Protocol>(), FXCollections.observableArrayList<Sync>())
+                        SimpleIntegerProperty(-1))
             } }
             button("save sett") { action {
                 SettingsStore.saveSettings()

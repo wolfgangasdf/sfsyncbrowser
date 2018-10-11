@@ -158,7 +158,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "s
         updateProgr(76, 100, "comparing...")
         sw.restart()
         logger.info("*********************** compare sync entrie")
-        val haveChanges = Comparison.compareSyncEntries()
+        val haveChanges = Comparison.compareSyncEntries(cache)
         logger.debug("havechanges1: $haveChanges")
 
         logger.debug("sw: comparing: " + sw.getTimeRestart())
