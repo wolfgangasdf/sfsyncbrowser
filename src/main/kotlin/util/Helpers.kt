@@ -3,8 +3,10 @@
 package util
 
 import javafx.application.Platform
+import javafx.beans.binding.ListBinding
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
+import javafx.collections.ObservableList
 import javafx.concurrent.Task
 import javafx.event.EventTarget
 import javafx.geometry.Rectangle2D

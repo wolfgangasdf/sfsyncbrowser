@@ -185,7 +185,7 @@ object SettingsStore {
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
                                 p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"))
                     }
-                    server.proto.set(server.protocols[server.currentProtocol.value])
+                    if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "").toInt()) {
                         val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
                                 SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)

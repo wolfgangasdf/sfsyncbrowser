@@ -32,12 +32,10 @@ class BookmarksView : View() {
                             server.protocols += Protocol(server, SimpleStringProperty("sftp:user@//"), SimpleBooleanProperty(false),
                                     SimpleStringProperty(""), SimpleBooleanProperty(false),
                                     SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(""))
-                            // TODO why not refreshed??
                         } }
                         button("Add new sync") { action {
                             server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
                                 SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
-                            // TODO why not refreshed??
                         } }
                         button("Open browser") { action {
                             val bv = BrowserView(server, "")
@@ -137,10 +135,7 @@ class BookmarksView : View() {
         }
         init {
             when (ele) {
-                is Server -> {
-                    ele.title.addListener(changeListener)
-                    ele.protocols.addListener(listChangeListener) // TODO doesn't work if new proto added
-                }
+                is Server -> ele.title.addListener(changeListener)
                 is Protocol -> ele.protocoluri.addListener(changeListener)
                 is Sync -> ele.title.addListener(changeListener)
                 is SubSet -> ele.title.addListener(changeListener)
@@ -150,9 +145,9 @@ class BookmarksView : View() {
     }
 
     private val ttv = treeview<Any> {
-        root = TreeItem<Any>("root")
 
-        fun concat(list1: ObservableList<out Any>, list2: ObservableList<out Any>): ObservableList<Any> {
+        // read only observablelist concatenation
+        fun concatObsLists(list1: ObservableList<out Any>, list2: ObservableList<out Any>): ObservableList<Any> {
             return object: ListBinding<Any>() {
                 override fun computeValue(): ObservableList<Any> {
                     val res = mutableListOf<Any>()
@@ -166,11 +161,12 @@ class BookmarksView : View() {
             }
         }
 
+        root = TreeItem<Any>("root")
         populate({ ite -> MyTreeItem(ite)}) { parent ->
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
-                value is Server -> concat(value.protocols, value.syncs)
+                value is Server -> concatObsLists(value.protocols, value.syncs)
                 value is Sync -> value.subsets
                 else -> null
             }
