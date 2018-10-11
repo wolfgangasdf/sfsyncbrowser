@@ -193,9 +193,15 @@ object Helpers {
         updateit()
     }
 
+    fun <T> getSortedFilteredList(): SortedFilteredList<T> {
+        val res = SortedFilteredList<T>()
+        res.sortedItems.setComparator { o1, o2 -> o1.toString().compareTo(o2.toString()) }
+        return res
+    }
+
     // observablelist concatenation, target is read only
     fun concatObsLists(vararg lists: ObservableList<out Any>): ObservableList<Any> {
-        val into = SortedFilteredList<Any>()
+        val into = getSortedFilteredList<Any>()
         for (l in lists) {
             for (ll in l) into.add(ll)
             l.addListener { c: javafx.collections.ListChangeListener.Change<out Any> ->

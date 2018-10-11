@@ -19,10 +19,10 @@ import synchro.GeneralConnection
 import synchro.LocalConnection
 import synchro.MyURI
 import synchro.SftpConnection
-import tornadofx.SortedFilteredList
 import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
+import util.Helpers.getSortedFilteredList
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -80,7 +80,7 @@ object DBSettings {
 
 class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty,
            val cacheid: StringProperty = SimpleStringProperty(java.util.Date().time.toString()), val server: Server,
-           val subsets: ObservableList<SubSet> = SortedFilteredList() ) {
+           val subsets: ObservableList<SubSet> = getSortedFilteredList() ) {
     override fun toString() = "[Sync] ${title.value}"
 }
 
@@ -92,14 +92,14 @@ class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPer
 }
 
 class SubSet(val title: StringProperty, val status: StringProperty, val excludeFilter: StringProperty,
-             val subfolders: ObservableList<String> = SortedFilteredList(),
+             val subfolders: ObservableList<String> = getSortedFilteredList(),
              val sync: Sync,
              val type: StringProperty = SimpleStringProperty("subset")) {
     override fun toString() = "[SubSet] ${title.value}"
 }
 
 class Server(val title: StringProperty, val status: StringProperty, val currentProtocol: IntegerProperty,
-             val protocols: ObservableList<Protocol> = SortedFilteredList(), val syncs: ObservableList<Sync> = SortedFilteredList()) {
+             val protocols: ObservableList<Protocol> = getSortedFilteredList(), val syncs: ObservableList<Sync> = getSortedFilteredList()) {
     val proto = SimpleObjectProperty<Protocol>().apply {
         onChange { currentProtocol.set(protocols.indexOf(it)) }
     }
@@ -121,7 +121,7 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
 }
 
 object SettingsStore {
-    val servers = SortedFilteredList<Server>()
+    val servers = getSortedFilteredList<Server>()
 
     fun saveSettings() {
         val props = SortedProperties()
