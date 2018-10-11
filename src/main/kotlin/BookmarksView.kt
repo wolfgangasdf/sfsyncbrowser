@@ -2,7 +2,6 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
-import javafx.collections.FXCollections
 import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
@@ -39,7 +38,9 @@ class BookmarksView : View() {
                             val bv = BrowserView(server, "")
                             openNewWindow(bv)
                         } }
-
+                        button("Remove server") { action {
+                            SettingsStore.servers.remove(server)
+                        } }
                     }
                 }
             }

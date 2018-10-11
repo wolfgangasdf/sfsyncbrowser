@@ -287,7 +287,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     }
 
     init {
-        initOwner(FX.primaryStage)
+        //initOwner(FX.primaryStage)
         title = "Progress"
         isResizable = true
         dialogPane.content = vbox {

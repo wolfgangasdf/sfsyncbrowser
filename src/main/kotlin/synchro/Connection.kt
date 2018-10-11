@@ -5,15 +5,18 @@ package synchro
 import javafx.application.Platform
 import mu.KotlinLogging
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.common.IOUtils
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.common.StreamCopier.Listener
+import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
 import net.schmizz.sshj.sftp.FileAttributes
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.Response.StatusCode
 import net.schmizz.sshj.sftp.SFTPException
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
+import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.FilePermission
 import net.schmizz.sshj.xfer.FileSystemFile
@@ -25,10 +28,16 @@ import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
 import util.Helpers.toJavaPathSeparator
+import java.io.Closeable
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
 import java.security.PublicKey
+import java.security.Security
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 // DON'T call stuff here from UI thread, can lock!
@@ -446,8 +455,158 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun isAlive() = ssh.isConnected
 
-    init {
-        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
+    // https://stackoverflow.com/a/16023513
+    object PF { // TODO change in class or so?
+
+        class PortForwarder(val sshClient: SSHClient, val remoteAddress: InetSocketAddress, val localSocket: ServerSocket) : Thread(), Closeable {
+            val latch = CountDownLatch(1)
+
+            private fun buildName(remoteAddress: InetSocketAddress, localPort: Int): String {
+                return "SSH local port forward thread [$localPort:$remoteAddress]"
+            }
+
+            override fun run() {
+                val params = LocalPortForwarder.Parameters("127.0.0.1", localSocket.localPort,
+                        remoteAddress.hostName, remoteAddress.port)
+                val forwarder = sshClient.newLocalPortForwarder(params, localSocket)
+                try {
+                    latch.countDown()
+                    forwarder.listen()
+                } catch (ignore: IOException) {/* OK. */
+                }
+            }
+
+            override fun close() {
+                localSocket.close()
+                try {
+                    this.join()
+                } catch (e: InterruptedException) {/* OK.*/
+                }
+            }
+        }
+
+        class TunnelPortManager {
+            val maxPort = 65536
+            val portsHandedOut = HashSet<Int>()
+
+            fun leaseNewPort(startFrom: Int): ServerSocket {
+                for (port in startFrom..maxPort) {
+                    if (isLeased(port)) {
+                        continue
+                    }
+
+                    val socket = tryBind (port)
+                    if (socket != null) {
+                        portsHandedOut.add(port)
+                        println("handing out port $port for local binding")
+                        return socket
+                    }
+                }
+                throw IllegalStateException("Could not find a single free port in the range [$startFrom-$maxPort]...")
+            }
+
+            @Synchronized
+            fun returnPort(socket: ServerSocket) {
+                portsHandedOut.remove(socket.localPort)
+            }
+
+            fun isLeased(port: Int): Boolean {
+                return portsHandedOut.contains(port)
+            }
+
+            private fun tryBind(localPort: Int): ServerSocket? {
+                return try {
+                    val ss = ServerSocket()
+                    ss.reuseAddress = true
+                    ss.bind(InetSocketAddress("localhost", localPort))
+                    ss
+                } catch (e: IOException) {
+                    null
+                }
+            }
+        }
+
+        fun startForwarder(forwarderThread: PortForwarder): PortForwarder {
+            forwarderThread.start()
+            try {
+                forwarderThread.latch.await()
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            return forwarderThread
+        }
+
+
+        fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
+            val client = SSHClient()
+            client.addHostKeyVerifier(PromiscuousVerifier())
+            client.connect(hostname, port)
+            client.authPassword(username, pw)
+            return client
+        }
+
+        init {
+
+            //the sequence of hosts that the connections will be made through
+            val hosts = listOf("server1", "server2")
+            //the starting port for local port forwarding
+            val startPort = 2222
+            //username for connecting to all servers
+            val username = "user"
+            val pw = "pass"
+
+            //--------------------------------------------------------------------------//
+
+            val portManager = TunnelPortManager()
+
+            //list of all active port forwarders
+            val portForwarders = mutableListOf<PortForwarder>()
+
+            Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
+
+            val hostCount = hosts.size
+            var hostname = hosts[0]
+
+            var client = getSSHClient(username, pw, hostname, 22)
+            println("making initial connection to $hostname")
+
+            //create port forwards up until the final
+            for (i in 1..hostCount){
+                hostname = hosts[i]
+                println("creating connection to $hostname")
+                val ss = portManager.leaseNewPort(startPort)
+                val remoteAddress = InetSocketAddress(hostname, 22)
+
+                var forwarderThread = PortForwarder(client, remoteAddress, ss)
+                forwarderThread = startForwarder(forwarderThread)
+                client.startSession()
+
+                println("adding port forward from local port ${ss.localPort} to $remoteAddress")
+                portForwarders.add(forwarderThread)
+
+                client = getSSHClient(username, pw, "127.0.0.1", ss.localPort)
+            }
+
+            val session = client.startSession()
+
+            //shut down the running jboss using the script
+            val cmd = session.exec("hostname")
+            val response = IOUtils.readFully(cmd.inputStream).toString()
+            cmd.join(5, TimeUnit.SECONDS)
+            println("response -> $response")
+
+            portForwarders.forEach { pf ->
+                pf.close()
+            }
+
+            session.close()
+            client.disconnect()
+        }
+
+    }
+
+
+    fun connectAuth() {
         ssh.addHostKeyVerifier(MyHostKeyVerifier())
         // TODO: tunnel if tunnelhost present!
         ssh.connect(uri.host, uri.port.toInt())
@@ -468,6 +627,11 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         if (!ssh.isAuthenticated) {
             throw UserAuthException("Not authenticated!")
         } else logger.info("Authenticated!")
+    }
+
+    init {
+        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
+        connectAuth()
     }
 
     private val sftpc = ssh.newSFTPClient()

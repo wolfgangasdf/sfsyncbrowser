@@ -2,7 +2,6 @@
 
 import javafx.scene.Scene
 import javafx.scene.image.Image
-import javafx.scene.paint.Color
 import javafx.stage.Stage
 import mu.KotlinLogging
 import store.DBSettings
@@ -14,18 +13,18 @@ private val logger = KotlinLogging.logger {}
 
 class Styles : Stylesheet() {
 
-    init {
-        button {
-            and(hover) {
-                backgroundColor += Color.RED
-            }
-        }
-        cell {
-            and(selected) {
-                backgroundColor += Color.RED
-            }
-        }
-    }
+//    init {
+//        button {
+//            and(hover) {
+//                backgroundColor += Color.RED
+//            }
+//        }
+//        cell {
+//            and(selected) {
+//                backgroundColor += Color.RED
+//            }
+//        }
+//    }
 }
 
 fun openNewWindow(view: UIComponent) {

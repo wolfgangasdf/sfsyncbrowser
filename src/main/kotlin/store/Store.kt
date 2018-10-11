@@ -124,6 +124,7 @@ object SettingsStore {
     val servers = getSortedFilteredList<Server>()
 
     fun saveSettings() {
+        if (servers.isEmpty()) return
         val props = SortedProperties()
         props["settingsversion"] = "1"
         props["servers"] = servers.size.toString()
@@ -362,7 +363,7 @@ class Cache(private val cacheid: String) {
 
     private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"
 
-    private fun iniCache() { // TODO needed?
+    private fun iniCache() {
         cache = MyTreeMap()
         observableListSleep = true
         observableList.clear()
