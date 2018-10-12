@@ -1,4 +1,5 @@
 import mu.KotlinLogging
+import synchro.SftpConnection
 import tornadofx.launch
 import util.Helpers
 
@@ -6,7 +7,6 @@ import util.Helpers
 
 fun main(args: Array<String>) {
 
-    System.setProperty("org.slf4j.simpleLogger.log.org.eclipse.jetty", "INFO")
     System.setProperty("org.slf4j.simpleLogger.log.net.schmizz", "INFO")
     System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
     System.setProperty(org.slf4j.impl.SimpleLogger.SHOW_DATE_TIME_KEY, "true")
@@ -23,5 +23,6 @@ fun main(args: Array<String>) {
 
     logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
 
-    launch<SSBApp>(*args)
+    SftpConnection.PF // TODO testing
+//    launch<SSBApp>(*args)
 }

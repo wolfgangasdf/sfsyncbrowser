@@ -5,7 +5,6 @@ package synchro
 import javafx.application.Platform
 import mu.KotlinLogging
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.common.IOUtils
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.common.StreamCopier.Listener
@@ -37,7 +36,6 @@ import java.nio.file.attribute.FileTime
 import java.security.PublicKey
 import java.security.Security
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 // DON'T call stuff here from UI thread, can lock!
@@ -548,14 +546,14 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         init {
 
             //the sequence of hosts that the connections will be made through
-            val hosts = listOf("server1", "server2")
+            val hosttunnel = "ssh3.physics.leidenuniv.nl"
+            val hostsftp = "data02.physics.leidenuniv.nl"
+
             //the starting port for local port forwarding
             val startPort = 2222
             //username for connecting to all servers
-            val username = "user"
-            val pw = "pass"
-
-            //--------------------------------------------------------------------------//
+            val username = "loeffler"
+            val pw = "asdf" // TODO
 
             val portManager = TunnelPortManager()
 
@@ -564,42 +562,34 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
             Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
-            val hostCount = hosts.size
-            var hostname = hosts[0]
+            println("making initial connection to $hosttunnel")
+            val client = getSSHClient(username, pw, hosttunnel, 22)
 
-            var client = getSSHClient(username, pw, hostname, 22)
-            println("making initial connection to $hostname")
+            println("creating connection to $hostsftp")
+            val ss = portManager.leaseNewPort(startPort)
+            val sftpAddress = InetSocketAddress(hostsftp, 22)
 
-            //create port forwards up until the final
-            for (i in 1..hostCount){
-                hostname = hosts[i]
-                println("creating connection to $hostname")
-                val ss = portManager.leaseNewPort(startPort)
-                val remoteAddress = InetSocketAddress(hostname, 22)
+            var forwarderThread = PortForwarder(client, sftpAddress, ss)
+            forwarderThread = startForwarder(forwarderThread)
+            client.startSession()
 
-                var forwarderThread = PortForwarder(client, remoteAddress, ss)
-                forwarderThread = startForwarder(forwarderThread)
-                client.startSession()
+            println("adding port forward from local port ${ss.localPort} to $sftpAddress")
+            portForwarders.add(forwarderThread)
+            val sftpc = client.newSFTPClient()
 
-                println("adding port forward from local port ${ss.localPort} to $remoteAddress")
-                portForwarders.add(forwarderThread)
+            // test
+            val res = sftpc.ls("/")
+            res.forEach { rri -> println("rri: $rri") }
 
-                client = getSSHClient(username, pw, "127.0.0.1", ss.localPort)
-            }
-
-            val session = client.startSession()
-
-            //shut down the running jboss using the script
-            val cmd = session.exec("hostname")
-            val response = IOUtils.readFully(cmd.inputStream).toString()
-            cmd.join(5, TimeUnit.SECONDS)
-            println("response -> $response")
-
+            println("sftp.close...")
+            sftpc.close()
+            println("client.disconnect...")
+            client.disconnect()
             portForwarders.forEach { pf ->
+                println("close pf $pf")
                 pf.close()
             }
 
-            session.close()
             client.disconnect()
         }
 
