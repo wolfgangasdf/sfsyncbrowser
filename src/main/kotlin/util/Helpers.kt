@@ -148,6 +148,7 @@ object Helpers {
     fun dialogOkCancel(titletext: String, header: String, content: String): Boolean {
         return Alert(Alert.AlertType.CONFIRMATION).apply {
             //initOwner(stage)
+            (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
             contentText = content
@@ -157,6 +158,7 @@ object Helpers {
     fun dialogInputString(titletext: String, header: String, content: String): String {
         return TextInputDialog().apply {
             //initOwner(stage)
+            (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
             contentText = content
@@ -166,6 +168,7 @@ object Helpers {
     fun dialogMessage(titletext: String, header: String, htmlmsg: String) {
         Dialog<Boolean>().apply {
             //if (stage.owner.nonEmpty) initOwner(stage)
+            (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
             val sp2 = ScrollPane().apply { // optional html message

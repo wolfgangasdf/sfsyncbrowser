@@ -1,5 +1,4 @@
 import mu.KotlinLogging
-import synchro.SftpConnection
 import tornadofx.launch
 import util.Helpers
 
@@ -23,6 +22,5 @@ fun main(args: Array<String>) {
 
     logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
 
-    SftpConnection.PF // TODO testing
-//    launch<SSBApp>(*args)
+    launch<SSBApp>(*args)
 }

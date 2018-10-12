@@ -15,7 +15,6 @@ import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.Response.StatusCode
 import net.schmizz.sshj.sftp.SFTPException
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
-import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.FilePermission
 import net.schmizz.sshj.xfer.FileSystemFile
@@ -34,7 +33,6 @@ import java.net.ServerSocket
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
 import java.security.PublicKey
-import java.security.Security
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -234,7 +232,9 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
 
-    private val ssh = SSHClient()
+    init {
+        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
+    }
 
     inner class MyTransferListener(private var relPath: String = "") : TransferListener {
         var bytesTransferred: Long = 0
@@ -451,17 +451,16 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun isAlive() = ssh.isConnected
-
     // https://stackoverflow.com/a/16023513
-    object PF { // TODO change in class or so?
+    class PortForwardedSftp(val hostsftp: String, val hosttunnel: String, val username: String, val password: String) {
+
+        val startPort = 2222
 
         class PortForwarder(val sshClient: SSHClient, val remoteAddress: InetSocketAddress, val localSocket: ServerSocket) : Thread(), Closeable {
             val latch = CountDownLatch(1)
 
-            private fun buildName(remoteAddress: InetSocketAddress, localPort: Int): String {
-                return "SSH local port forward thread [$localPort:$remoteAddress]"
-            }
+            private fun buildName(remoteAddress: InetSocketAddress, localPort: Int) =
+                "SSH local port forward thread [$localPort:$remoteAddress]"
 
             override fun run() {
                 val params = LocalPortForwarder.Parameters("127.0.0.1", localSocket.localPort,
@@ -470,16 +469,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 try {
                     latch.countDown()
                     forwarder.listen()
-                } catch (ignore: IOException) {/* OK. */
-                }
+                } catch (ignore: IOException) {} /* OK. */
             }
 
             override fun close() {
                 localSocket.close()
-                try {
-                    this.join()
-                } catch (e: InterruptedException) {/* OK.*/
-                }
+                try { this.join() } catch (e: InterruptedException) {} /* OK.*/
             }
         }
 
@@ -489,14 +484,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
             fun leaseNewPort(startFrom: Int): ServerSocket {
                 for (port in startFrom..maxPort) {
-                    if (isLeased(port)) {
-                        continue
-                    }
+                    if (isLeased(port)) continue
 
                     val socket = tryBind (port)
                     if (socket != null) {
                         portsHandedOut.add(port)
-                        println("handing out port $port for local binding")
+                        logger.info("handing out port $port for local binding")
                         return socket
                     }
                 }
@@ -508,9 +501,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 portsHandedOut.remove(socket.localPort)
             }
 
-            fun isLeased(port: Int): Boolean {
-                return portsHandedOut.contains(port)
-            }
+            fun isLeased(port: Int) = portsHandedOut.contains(port)
 
             private fun tryBind(localPort: Int): ServerSocket? {
                 return try {
@@ -536,96 +527,73 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
 
         fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
-            val client = SSHClient()
-            client.addHostKeyVerifier(PromiscuousVerifier())
-            client.connect(hostname, port)
-            client.authPassword(username, pw)
-            return client
-        }
-
-        init {
-
-            //the sequence of hosts that the connections will be made through
-            val hosttunnel = "ssh3.physics.leidenuniv.nl"
-            val hostsftp = "data02.physics.leidenuniv.nl"
-
-            //the starting port for local port forwarding
-            val startPort = 2222
-            //username for connecting to all servers
-            val username = "loeffler"
-            val pw = "asdf" // TODO
-
-            val portManager = TunnelPortManager()
-
-            //list of all active port forwarders
-            val portForwarders = mutableListOf<PortForwarder>()
-
-            Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
-
-            println("making initial connection to $hosttunnel")
-            val client = getSSHClient(username, pw, hosttunnel, 22)
-
-            println("creating connection to $hostsftp")
-            val ss = portManager.leaseNewPort(startPort)
-            val sftpAddress = InetSocketAddress(hostsftp, 22)
-
-            var forwarderThread = PortForwarder(client, sftpAddress, ss)
-            forwarderThread = startForwarder(forwarderThread)
-            client.startSession()
-
-            println("adding port forward from local port ${ss.localPort} to $sftpAddress")
-            portForwarders.add(forwarderThread)
-            val sftpc = client.newSFTPClient()
-
-            // test
-            val res = sftpc.ls("/")
-            res.forEach { rri -> println("rri: $rri") }
-
-            println("sftp.close...")
-            sftpc.close()
-            println("client.disconnect...")
-            client.disconnect()
-            portForwarders.forEach { pf ->
-                println("close pf $pf")
-                pf.close()
+            val ssh = SSHClient()
+            ssh.addHostKeyVerifier(MyHostKeyVerifier())
+            ssh.connect(hostname, port)
+            try {
+                ssh.authPublickey(username)
+            } catch (e: UserAuthException) {
+                logger.info("Public key auth failed: $e")
+                logger.info("auth methods: " + ssh.userAuth.allowedMethods.joinToString(","))
+                // under win7 this doesn't work, try password in any case
+                //      if (ssh.getUserAuth.getAllowedMethods.exists(s => s == "keyboard-interactive" || s == "password" )) {
+                if (pw != "") {
+                    ssh.authPassword(username, pw)
+                } else {
+                    runUIwait { dialogMessage("SSH", "Public key auth failed, require password.", "") }
+                    throw UserAuthException("No password")
+                }
             }
-
-            client.disconnect()
+            if (!ssh.isAuthenticated) {
+                throw UserAuthException("Not authenticated!")
+            } else logger.info("Authenticated!")
+            return ssh
         }
 
-    }
+        fun connect(): SSHClient {
+            return if (hosttunnel.isNotEmpty()) {
+                println("making initial connection to $hosttunnel")
+                val sshClient = getSSHClient(username, password, hosttunnel, 22)
+                println("creating connection to $hostsftp")
+                val ss = portManager.leaseNewPort(startPort)
 
+                val sftpAddress = InetSocketAddress(hostsftp, 22)
 
-    fun connectAuth() {
-        ssh.addHostKeyVerifier(MyHostKeyVerifier())
-        // TODO: tunnel if tunnelhost present!
-        ssh.connect(uri.host, uri.port.toInt())
-        try {
-            ssh.authPublickey(uri.username)
-        } catch (e: UserAuthException) {
-            logger.info("Public key auth failed: $e")
-            logger.info("auth methods: " + ssh.userAuth.allowedMethods.joinToString(","))
-            // under win7 this doesn't work, try password in any case
-            //      if (ssh.getUserAuth.getAllowedMethods.exists(s => s == "keyboard-interactive" || s == "password" )) {
-            if (protocol.password.value != "") {
-                ssh.authPassword(uri.username, protocol.password.value)
+                forwarderThread = PortForwarder(sshClient, sftpAddress, ss)
+                forwarderThread = startForwarder(forwarderThread!!)
+                getSSHClient(username, password, "127.0.0.1", ss.localPort)
             } else {
-                runUIwait { dialogMessage("SSH", "Public key auth failed, require password.", "") }
-                throw UserAuthException("No password")
+                getSSHClient(username, password, hostsftp, 22)
             }
+
         }
-        if (!ssh.isAuthenticated) {
-            throw UserAuthException("Not authenticated!")
-        } else logger.info("Authenticated!")
+
+        fun close() {
+            sftpClient.close()
+            if (forwarderThread != null) {
+                println("close pf $forwarderThread")
+                forwarderThread!!.close()
+            }
+            if (sshClient.isConnected) sshClient.disconnect()
+        }
+
+        private var forwarderThread: PortForwarder? = null
+        private val portManager = TunnelPortManager()
+        // TODO: ? Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
+
+        val sshClient = connect()
+        init {
+            sshClient.startSession()
+        }
+        val sftpClient = sshClient.newSFTPClient()!!
     }
 
-    init {
-        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
-        connectAuth()
-    }
 
-    private val sftpc = ssh.newSFTPClient()
+
+    val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, uri.username, protocol.password.value)
+    private val sftpc = pfsftp.sshClient.newSFTPClient()
     private val sftpt = sftpc.fileTransfer
+
 
     init {
         transferListener = MyTransferListener()
@@ -636,9 +604,10 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         if (Helpers.failat == 2) throw UnsupportedOperationException("fail 2")
     }
 
+    override fun isAlive() = pfsftp.sshClient.isConnected
+
     override fun cleanUp() {
-        sftpc.close()
-        if (ssh.isConnected) ssh.disconnect()
+        pfsftp.close()
     }
 
     override fun mkdirrec(absolutePath: String) {
