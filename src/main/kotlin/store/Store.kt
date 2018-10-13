@@ -98,8 +98,14 @@ class SubSet(val title: StringProperty, val status: StringProperty, val excludeF
     override fun toString() = "[SubSet] ${title.value}"
 }
 
+class BrowserBookmark(val server: Server, val path: StringProperty) {
+    override fun toString() = "[Bookmark] ${path.value}"
+
+}
+
 class Server(val title: StringProperty, val status: StringProperty, val currentProtocol: IntegerProperty,
-             val protocols: ObservableList<Protocol> = getSortedFilteredList(), val syncs: ObservableList<Sync> = getSortedFilteredList()) {
+             val protocols: ObservableList<Protocol> = getSortedFilteredList(), val syncs: ObservableList<Sync> = getSortedFilteredList(),
+             val bookmarks: ObservableList<BrowserBookmark> = getSortedFilteredList()) {
     val proto = SimpleObjectProperty<Protocol>().apply {
         onChange { currentProtocol.set(protocols.indexOf(it)) }
     }
@@ -141,6 +147,10 @@ object SettingsStore {
                 props["sp.$idx.$idx2.password"] = proto.password.value
                 props["sp.$idx.$idx2.tunnelHost"] = proto.tunnelHost.value
             }
+            props["se.$idx.bookmarks"] = server.bookmarks.size.toString()
+            server.bookmarks.forEachIndexed { idx2, bookmark ->
+                props["sb.$idx.$idx2.path"] = bookmark.path.value
+            }
             props["se.$idx.syncs"] = server.syncs.size.toString()
             server.syncs.forEachIndexed { idx2, sync ->
                 props["sy.$idx.$idx2.type"] = sync.type.value
@@ -180,13 +190,16 @@ object SettingsStore {
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
                             SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"))
-                    for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "").toInt()) {
+                    for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "0").toInt()) {
                         server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
                                 p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"))
                     }
+                    for (idx2 in 0 until props.getOrDefault("se.$idx.bookmarks", "0").toInt()) {
+                        server.bookmarks += BrowserBookmark(server, p2sp("sb.$idx.$idx2.path"))
+                    }
                     if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
-                    for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "").toInt()) {
+                    for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
                                 SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {

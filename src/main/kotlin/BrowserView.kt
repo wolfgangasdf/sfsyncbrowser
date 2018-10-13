@@ -1,6 +1,7 @@
 import javafx.beans.property.SimpleStringProperty
 import javafx.scene.control.TableRow
 import javafx.util.Callback
+import store.BrowserBookmark
 import store.Server
 import synchro.VirtualFile
 import tornadofx.*
@@ -23,13 +24,10 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
         prefWidth = 800.0
         prefHeight = 600.0
         toolbar {
-            button("Refresh").setOnAction { println("refresh ${Thread.currentThread().id}") }
-        }
-        label("browserview")
-        hbox {
-            button("Refresh") { action {
-                updateBrowser()
-            } }
+            button("Refresh").setOnAction { updateBrowser() }
+            button("Add bookmark").setOnAction {
+                server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value))
+            }
         }
         this += pathButtonFlowPane
         label("Files:")

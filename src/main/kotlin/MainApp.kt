@@ -35,14 +35,14 @@ fun openNewWindow(view: UIComponent) {
 
 
 
-//class SSBApp : App(BookmarksView::class, Styles::class) {
+//class SSBApp : App(MainView::class, Styles::class) {
 class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace or leave to wait for improvements?
 
-    private val bookmarksView = BookmarksView()
+    private val bookmarksView = MainView()
 
 
     override fun onBeforeShow(view: UIComponent) {
-        //workspace.dock<BookmarksView>()
+        //workspace.dock<MainView>()
         workspace.dock(bookmarksView)
     }
 

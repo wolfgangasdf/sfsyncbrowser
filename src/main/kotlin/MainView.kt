@@ -10,7 +10,7 @@ import tornadofx.*
 import util.Helpers.concatObsLists
 import util.Helpers.valitextfield
 
-class BookmarksView : View() {
+class MainView : View() {
 
     class SettingsViewPlaceholder: View() {
         override val root = Form()
@@ -35,8 +35,7 @@ class BookmarksView : View() {
                                 SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
                         } }
                         button("Open browser") { action {
-                            val bv = BrowserView(server, "")
-                            openNewWindow(bv)
+                            openNewWindow(BrowserView(server, ""))
                         } }
                         button("Remove server") { action {
                             SettingsStore.servers.remove(server)
@@ -62,6 +61,25 @@ class BookmarksView : View() {
                             proto.server.protocols.remove(proto)
                         } }
 
+                    }
+                }
+            }
+        }
+    }
+
+    class BookmarkSettingsPane(bookmark: BrowserBookmark): View() {
+        override val root = Form()
+        init {
+            with(root) {
+                fieldset("Bookmark") {
+                    field("Path") { textfield(bookmark.path) }
+                    field {
+                        button("Open") { action {
+                            openNewWindow(BrowserView(bookmark.server, bookmark.path.value))
+                        } }
+                        button("Remove bookmark") { action {
+                            bookmark.server.bookmarks.remove(bookmark)
+                        } }
                     }
                 }
             }
@@ -133,6 +151,7 @@ class BookmarksView : View() {
             when (ele) {
                 is Server -> ele.title.addListener(changeListener)
                 is Protocol -> ele.protocoluri.addListener(changeListener)
+                is BrowserBookmark -> ele.path.addListener(changeListener)
                 is Sync -> ele.title.addListener(changeListener)
                 is SubSet -> ele.title.addListener(changeListener)
             }
@@ -147,7 +166,7 @@ class BookmarksView : View() {
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
-                value is Server -> concatObsLists(value.protocols, value.syncs)
+                value is Server -> concatObsLists(value.protocols, value.syncs, value.bookmarks)
                 value is Sync -> value.subsets.sorted()
                 else -> null
             }
@@ -184,6 +203,7 @@ class BookmarksView : View() {
                 settingsview = when(ti) {
                     is Server -> ServerSettingsPane(ti)
                     is Protocol -> ProtocolSettingsPane(ti)
+                    is BrowserBookmark -> BookmarkSettingsPane(ti)
                     is Sync -> SyncSettingsPane(ti)
                     is SubSet -> SubsetSettingsPane(ti)
                     else -> SettingsViewPlaceholder()
