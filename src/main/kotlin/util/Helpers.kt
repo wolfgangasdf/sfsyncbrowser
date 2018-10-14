@@ -18,8 +18,6 @@ import javafx.stage.Stage
 import mu.KotlinLogging
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
-import util.MyWorker.setOnHidden
-import util.MyWorker.setOnShown
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
@@ -30,7 +28,6 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 import java.util.jar.JarFile
-import kotlin.concurrent.timerTask
 import kotlin.math.floor
 
 
@@ -91,6 +88,18 @@ object Helpers {
             val desktop = Desktop.getDesktop()
             if (desktop.isSupported(Desktop.Action.OPEN)) {
                 desktop.open(file)
+            }
+        }
+    }
+
+    // do some quicklook-like thing. returns only after window closed!
+    fun previewDocument(file: File) {
+        runLater { // otherwise task doesn't close, unclear why
+            when {
+                isMac() -> {
+                    ProcessBuilder("qlmanage", "-p", file.absolutePath).start().waitFor()
+                }
+                else -> logger.info("Quicklook is not implemented on this platform.")
             }
         }
     }
@@ -310,37 +319,38 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
                 logger.info("cancelled all tasks!")
             }
         }
+    }
 
-        setOnShown {
-            val ttask = timerTask {
-                if (taskList.isNotEmpty()) runLater {
-                    var iii = 0
-                    while (iii < taskList.size) {
-                        if (taskList[iii].isDone || taskList[iii].isCancelled) {
-                            taskList.remove(iii, iii + 1)
-                        } else {
-                            iii += 1
-                        }
-                    }
-                    if (taskList.isEmpty()) {
-                        this@MyWorker.close()
-                    }
+    private fun cleanup() {
+        println("cleanup!!!")
+        /*if (taskList.isNotEmpty()) runLater {*/
+            var iii = 0
+            while (iii < taskList.size) {
+                if (taskList[iii].isDone || taskList[iii].isCancelled) {
+                    taskList.remove(iii, iii + 1)
+                } else {
+                    iii += 1
                 }
             }
-            backgroundTimer = java.util.Timer()
-            backgroundTimer!!.schedule(ttask, 0, 500)
-        }
-
-        setOnHidden {
-            backgroundTimer!!.cancel()
-        }
-
+            if (taskList.isEmpty()) {
+                println("close worker!")
+                this@MyWorker.hide() // TODO close? should be same...
+            }
+        //}
     }
 
     fun runTask(atask: MyTask<*>) {
+        // this is to close myworker dialog before calling onsucceeded etc...
+        val onsucc = atask.onSucceeded
+        val oncanc = atask.onCancelled
+        val onfail = atask.onFailed
+        atask.setOnSucceeded { taskList -= atask ; cleanup() ; onsucc.handle(it) }
+        atask.setOnCancelled { taskList -= atask ; cleanup() ; oncanc.handle(it) }
+        atask.setOnFailed { taskList -= atask ; cleanup() ; onfail.handle(it) }
+
         taskList += atask
         if (!this.isShowing) this.show()
-        val th = Thread(atask) // doesn't work
+        val th = Thread(atask)
         th.isDaemon = true
         th.start()
     }

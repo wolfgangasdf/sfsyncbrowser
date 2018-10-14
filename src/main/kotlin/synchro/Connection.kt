@@ -27,6 +27,7 @@ import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
 import util.Helpers.toJavaPathSeparator
 import java.io.Closeable
+import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -76,10 +77,12 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     constructor() : this("", 0, 0)
 
     fun getFileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last()
+    fun getFileExtension(): String = File(getFileName()).extension
 
     override fun toString(): String = "[$path]:$modTime,$size"
 
     fun isDir(): Boolean = path.endsWith("/")
+    fun isFile(): Boolean = !path.endsWith("/")
 
     override fun equals(other: Any?): Boolean {
         if (other is VirtualFile) if (this.hashCode() == other.hashCode()) return true

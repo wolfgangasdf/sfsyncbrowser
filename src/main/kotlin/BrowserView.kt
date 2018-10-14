@@ -1,6 +1,8 @@
 import javafx.beans.property.SimpleStringProperty
 import javafx.scene.control.TableRow
+import javafx.scene.input.KeyCode
 import javafx.util.Callback
+import mu.KotlinLogging
 import store.BrowserBookmark
 import store.Server
 import synchro.VirtualFile
@@ -8,7 +10,10 @@ import tornadofx.*
 import util.Helpers
 import util.MyTask
 import util.MyWorker
+import java.io.File
+import java.nio.file.Files
 
+private val logger = KotlinLogging.logger {}
 
 class BrowserView(private val server: Server, path: String) : View("Browser view") {
 
@@ -18,6 +23,34 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
 
     private val pathButtonFlowPane = hbox {
         label("Path:")
+    }
+
+    // mac quicklook lets "space" to close through... this is good in principle, to allow navigation while preview open. implement?
+    private var lastpreviewvf: VirtualFile? = null
+
+    private val fileTableView = tableview(files) {
+        column("title", VirtualFile::getFileName).remainingWidth()
+        column("size", VirtualFile::size)
+        column("perms", VirtualFile::permissions)
+    }.apply {
+        rowFactory = Callback {
+            val row = TableRow<VirtualFile>()
+            row.setOnMouseClicked { it2 ->
+                if (it2.clickCount == 2 && row.item.isDir()) {
+                    currentPath.set(row.item.path)
+                }
+            }
+            row
+        }
+        setOnKeyReleased { ke -> when(ke.code) {
+             KeyCode.SPACE -> {
+                 if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
+                     lastpreviewvf = selectedItem
+                     getFileIntoTempAndDo(selectedItem!!) { Helpers.previewDocument(it) }
+                 }
+             }
+            else -> {}
+        }}
     }
 
     override val root = vbox {
@@ -31,21 +64,20 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
         }
         this += pathButtonFlowPane
         label("Files:")
-        tableview(files) {
-            column("title", VirtualFile::getFileName).remainingWidth()
-            column("size", VirtualFile::size)
-            column("perms", VirtualFile::permissions)
-        }.apply {
-            rowFactory = Callback {
-                val row = TableRow<VirtualFile>()
-                row.setOnMouseClicked { it2 ->
-                    if (it2.clickCount == 2 && row.item.isDir()) {
-                        currentPath.set(row.item.path)
-                    }
-                }
-                row
-            }
-        }.smartResize()
+        this += fileTableView
+        fileTableView.smartResize()
+    }
+
+    private fun getFileIntoTempAndDo(vf: VirtualFile, action: (f: File) -> Unit) {
+        val taskListLocal = MyTask<File> {
+            updateTit("Downloading file $vf...")
+            val rf = Files.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
+            logger.debug("downloading into ${rf.toFile().absolutePath}...")
+            server.getConnection().getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
+            rf.toFile()
+        }
+        taskListLocal.setOnSucceeded { action(taskListLocal.value) }
+        MyWorker.runTask(taskListLocal)
     }
 
     private fun updateBrowser() {
