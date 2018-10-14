@@ -1,6 +1,7 @@
 import javafx.beans.property.SimpleStringProperty
 import javafx.scene.control.TableRow
 import javafx.scene.input.KeyCode
+import javafx.scene.input.TransferMode
 import javafx.util.Callback
 import mu.KotlinLogging
 import store.BrowserBookmark
@@ -51,6 +52,43 @@ class BrowserView(private val server: Server, path: String) : View("Browser view
              }
             else -> {}
         }}
+        setOnDragDetected { me ->
+            println("drag detected!")
+            if (selectedItem?.isFile() == true) { // TODO also for dirs
+                val dragBoard = startDragAndDrop(TransferMode.COPY, TransferMode.MOVE)
+                // TODO how to get notified when dropped? only then download, possibly remove!
+                dragBoard.setContent { putString("vf: $selectedItem") }
+                me.consume()
+            }
+        }
+        setOnDragOver { de ->
+            if (de.gestureSource != this) {
+                // TODO also for own type for DnD between browser windows!
+                if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY, TransferMode.MOVE)
+            }
+            de.consume()
+        }
+        setOnDragEntered { de ->
+            println("entered $de")
+            if (de.gestureSource != this && de.dragboard.hasFiles()) {
+                println("entered: accept...") // TODO do something?
+            }
+        }
+        setOnDragDropped { de ->
+            var success = false
+            if (de.dragboard.hasFiles()) {
+                println("drop file ${de.dragboard.files} mode=${de.transferMode}")
+                // TODO
+                success = true
+            }
+            de.isDropCompleted = success
+            de.consume()
+        }
+        setOnDragDone { de ->
+            println("dragdone: ${de.transferMode}, ${de.dragboard}")
+            de.dragboard.setContent { putString("newstring") }
+            // TODO
+        }
     }
 
     override val root = vbox {
