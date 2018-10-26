@@ -334,7 +334,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
             }
             if (taskList.isEmpty()) {
                 println("close worker!")
-                this@MyWorker.hide() // TODO close? should be same...
+                this@MyWorker.hide()
             }
         //}
     }

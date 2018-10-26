@@ -35,7 +35,7 @@ class TransferProtocol(
         var basefolder: String
 )
 
-class Profile(server: Server, sync: Sync, subfolder: SubSet) { // TODO rename "subfolder"
+class Profile(server: Server, sync: Sync, subfolder: SubSet) {
     //var cache = mutableListOf<VirtualFile>() // was MutableList
 
     var cache = Cache(sync.cacheid.value)

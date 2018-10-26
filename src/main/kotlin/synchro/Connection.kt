@@ -21,6 +21,7 @@ import net.schmizz.sshj.xfer.FileSystemFile
 import net.schmizz.sshj.xfer.TransferListener
 import store.DBSettings
 import store.Protocol
+import store.SettingsStore
 import util.Helpers
 import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
@@ -29,13 +30,16 @@ import util.Helpers.toJavaPathSeparator
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.UnknownHostException
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
 import java.security.PublicKey
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
 
 // DON'T call stuff here from UI thread, can lock!
 
@@ -455,7 +459,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // https://stackoverflow.com/a/16023513
-    class PortForwardedSftp(val hostsftp: String, val hosttunnel: String, val username: String, val password: String) {
+    class PortForwardedSftp(val hostsftp: String, val hosttunnel: String, val tunnelmode: Int, val username: String, val password: String) {
 
         val startPort = 2222
 
@@ -554,10 +558,19 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         fun connect(): SSHClient {
-            return if (hosttunnel.isNotEmpty()) {
-                println("making initial connection to $hosttunnel")
+            var usetunnel = tunnelmode == 1
+            if (tunnelmode == 2) {
+                try {
+                    val addr = InetAddress.getByName(hostsftp)
+                    usetunnel = !addr.isReachable(500)
+                } catch (e: UnknownHostException) { println("unknown host, assume not reachable!")}
+            }
+
+            return if (usetunnel) {
+                if (hosttunnel.isEmpty()) throw Exception("tunnel host must not be empty!")
+                logger.info("making initial connection to $hosttunnel")
                 val sshClient = getSSHClient(username, password, hosttunnel, 22)
-                println("creating connection to $hostsftp")
+                logger.info("creating connection to $hostsftp")
                 val ss = portManager.leaseNewPort(startPort)
 
                 val sftpAddress = InetSocketAddress(hostsftp, 22)
@@ -566,6 +579,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 forwarderThread = startForwarder(forwarderThread!!)
                 getSSHClient(username, password, "127.0.0.1", ss.localPort)
             } else {
+                logger.info("creating direct connection to $hostsftp")
                 getSSHClient(username, password, hostsftp, 22)
             }
 
@@ -593,7 +607,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
 
 
-    val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, uri.username, protocol.password.value)
+    val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
     private val sftpc = pfsftp.sshClient.newSFTPClient()
     private val sftpt = sftpc.fileTransfer
 

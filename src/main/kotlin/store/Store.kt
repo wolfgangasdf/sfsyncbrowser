@@ -86,7 +86,7 @@ class Sync(val type: StringProperty, val title: StringProperty, val status: Stri
 
 class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
                val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
-               val tunnelHost: StringProperty) {
+               val tunnelHost: StringProperty, val tunnelMode: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
     override fun toString(): String = "[Protocol ${protocoluri.value}]"
 }
@@ -123,11 +123,17 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
         }
         return connection!!
     }
+    fun closeConnection() {
+        connection?.cleanUp()
+        connection = null
+    }
     fun getProtocol(): Protocol = protocols[currentProtocol.value]
 }
 
 object SettingsStore {
     val servers = getSortedFilteredList<Server>()
+
+    val tunnelModes = FXCollections.observableArrayList("Off", "On", "Auto")!!
 
     fun saveSettings() {
         if (servers.isEmpty()) return
@@ -146,6 +152,7 @@ object SettingsStore {
                 props["sp.$idx.$idx2.baseFolder"] = proto.baseFolder.value
                 props["sp.$idx.$idx2.password"] = proto.password.value
                 props["sp.$idx.$idx2.tunnelHost"] = proto.tunnelHost.value
+                props["sp.$idx.$idx2.tunnelMode"] = proto.tunnelMode.value
             }
             props["se.$idx.bookmarks"] = server.bookmarks.size.toString()
             server.bookmarks.forEachIndexed { idx2, bookmark ->
@@ -193,7 +200,7 @@ object SettingsStore {
                     for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "0").toInt()) {
                         server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
-                                p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"))
+                                p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"), p2sp("sp.$idx.$idx2.tunnelMode"))
                     }
                     for (idx2 in 0 until props.getOrDefault("se.$idx.bookmarks", "0").toInt()) {
                         server.bookmarks += BrowserBookmark(server, p2sp("sb.$idx.$idx2.path"))

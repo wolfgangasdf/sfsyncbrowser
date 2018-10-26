@@ -28,7 +28,7 @@ class MainView : View() {
                         button("Add new protocol") { action {
                             server.protocols += Protocol(server, SimpleStringProperty("sftp:user@//"), SimpleBooleanProperty(false),
                                     SimpleStringProperty(""), SimpleBooleanProperty(false),
-                                    SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(""))
+                                    SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
                         } }
                         button("Add new sync") { action {
                             server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
@@ -39,6 +39,9 @@ class MainView : View() {
                         } }
                         button("Remove server") { action {
                             SettingsStore.servers.remove(server)
+                        } }
+                        button("Close connection") { action {
+                            server.closeConnection()
                         } }
                     }
                 }
@@ -55,7 +58,8 @@ class MainView : View() {
                     field("Basefolder") { valitextfield(proto.baseFolder, "(^/$)|(/.*[^/]$)".toRegex(), "/f1/f2 or /") }
                     field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
                     field("Don't set date") { checkbox("", proto.cantSetDate) }
-                    field("Tunnel host") { textfield(proto.tunnelHost) }
+                    field("Tunnel host") { textfield(proto.tunnelHost) ; combobox(proto.tunnelMode, SettingsStore.tunnelModes) }
+                    println("tmode=${proto.tunnelMode.value}")
                     field {
                         button("Remove protocol") { action {
                             proto.server.protocols.remove(proto)
