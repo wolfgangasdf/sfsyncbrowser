@@ -469,19 +469,20 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             private fun buildName(remoteAddress: InetSocketAddress, localPort: Int) =
                 "SSH local port forward thread [$localPort:$remoteAddress]"
 
+            var forwarder: LocalPortForwarder? = null
             override fun run() {
                 val params = LocalPortForwarder.Parameters("127.0.0.1", localSocket.localPort,
                         remoteAddress.hostName, remoteAddress.port)
-                val forwarder = sshClient.newLocalPortForwarder(params, localSocket)
+                forwarder = sshClient.newLocalPortForwarder(params, localSocket)
                 try {
                     latch.countDown()
-                    forwarder.listen()
+                    forwarder!!.listen()
                 } catch (ignore: IOException) {} /* OK. */
             }
 
             override fun close() {
                 localSocket.close()
-                try { this.join() } catch (e: InterruptedException) {} /* OK.*/
+                forwarder!!.close()
             }
         }
 
@@ -587,11 +588,9 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
         fun close() {
             sftpClient.close()
-            if (forwarderThread != null) {
-                println("close pf $forwarderThread")
-                forwarderThread!!.close()
-            }
+            if (forwarderThread != null) forwarderThread!!.close()
             if (sshClient.isConnected) sshClient.disconnect()
+            println("closed!")
         }
 
         private var forwarderThread: PortForwarder? = null
