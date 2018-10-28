@@ -29,22 +29,14 @@ class Styles : Stylesheet() {
 
 fun openNewWindow(view: UIComponent) {
     val newstage = Stage()
+    newstage.title = view.title
     newstage.scene = Scene(view.root)
     newstage.show()
 }
 
 
 
-//class SSBApp : App(MainView::class, Styles::class) {
-class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace or leave to wait for improvements?
-
-    private val bookmarksView = MainView()
-
-
-    override fun onBeforeShow(view: UIComponent) {
-        //workspace.dock<MainView>()
-        workspace.dock(bookmarksView)
-    }
+class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
 
     override fun stop() {
         logger.info("*************** stop app")
@@ -53,7 +45,6 @@ class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace o
         System.exit(0)
     }
 
-
     init {
         addStageIcon(Image(resources["/icons/icon_16x16.png"]))
         addStageIcon(Image(resources["/icons/icon_32x32.png"]))
@@ -61,7 +52,6 @@ class SSBApp : App(Workspace::class, Styles::class) { // TODO remove workspace o
         initit()
 
     }
-
 }
 
 

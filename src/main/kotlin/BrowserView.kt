@@ -16,7 +16,7 @@ import java.nio.file.Files
 
 private val logger = KotlinLogging.logger {}
 
-class BrowserView(private val server: Server, path: String) : View("Browser view") {
+class BrowserView(private val server: Server, path: String) : View(server.getProtocol().protocoluri.value) {
 
     private var currentPath = SimpleStringProperty(path)
 

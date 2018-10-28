@@ -10,7 +10,7 @@ import tornadofx.*
 import util.Helpers.concatObsLists
 import util.Helpers.valitextfield
 
-class MainView : View() {
+class MainView : View("SSyncBrowser") {
 
     class SettingsViewPlaceholder: View() {
         override val root = Form()
@@ -200,6 +200,15 @@ class MainView : View() {
     }
 
     init {
+        ttv.setOnMouseClicked { me ->
+            val src = ttv.selectedValue
+            if (src is BrowserBookmark) {
+                if (me.clickCount == 2) {
+                    openNewWindow(BrowserView(src.server, src.path.value))
+                    me.consume()
+                }
+            }
+        }
         ttv.selectionModel.selectedItemProperty().onChange {
             if (it != null) {
                 val ti = it.value

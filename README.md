@@ -13,6 +13,11 @@ SSyncBrowser is a file synchronization and remote file browsing program which wo
   * It keeps a local database to keep track of changes (remote / local) without needing full syncs.
   * You can define subsets of sync'ed folders for faster operation, while the same cache file is used.
 
+## Features
+
+* Quicklook on mac
+* Automatic ssh tunnel
+
 ### More information
 
 * sftp: use publickey or password-based authentification (password stored in settings, hashed but not very secure)
