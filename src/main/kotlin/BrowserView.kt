@@ -72,7 +72,7 @@ class BrowserView(private val server: Server, path: String) : View(server.getPro
             println("entered $de")
             if (de.gestureSource != this && de.dragboard.hasFiles()) {
                 println("entered: accept...") // TODO do something?
-            }
+            } // TODO also accept internal files
         }
         setOnDragDropped { de ->
             var success = false

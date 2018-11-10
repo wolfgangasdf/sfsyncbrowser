@@ -5,13 +5,13 @@
 group 'com.wolle.ssyncbrowser'
 version '1.0-SNAPSHOT'
 
-task wrapper(type: Wrapper) {
+wrapper {
     gradleVersion = "4.4.1"
 }
 
 
 buildscript {
-    ext.kotlin_version = '1.2.71'
+    ext.kotlin_version = '1.3.0'
 
     repositories {
         mavenCentral()
@@ -22,7 +22,7 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.4'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.2'
         classpath "gradle.plugin.edu.sc.seis:macAppBundle:2.2.3"
         classpath "com.hierynomus:sshj:0.26.0"
         classpath "com.github.ben-manes:gradle-versions-plugin:0.20.0"
@@ -51,7 +51,7 @@ idea {
     }
 }
 
-apply plugin: "com.github.ben-manes.versions"
+apply plugin: "com.github.ben-manes.versions" // gradle dependencyUpdates
 
 apply plugin: 'application' // needed? I use shadowjar currently
 mainClassName = 'MainKt'
@@ -87,11 +87,11 @@ repositories {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-    compile 'io.github.microutils:kotlin-logging:1.6.10'
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+    compile 'io.github.microutils:kotlin-logging:1.6.20'
     compile "com.hierynomus:sshj:0.26.0"
-    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25' // no colors, everything stderr
+    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta2' // no colors, everything stderr
     compile 'no.tornado:tornadofx:1.7.17'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.30.1'
 //    implementation 'com.beust:klaxon:3.0.1'
 //    compile "com.fasterxml.jackson.module:jackson-module-kotlin:2.9.+"
 }

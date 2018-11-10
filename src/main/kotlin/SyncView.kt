@@ -44,7 +44,7 @@ object CF {
     )
     fun stringToAction(actionString: String): Int {
         val x = amap.entries.associate{(k,v)-> v to k}
-        return x.get(actionString)!!
+        return x[actionString]!!
     }
     fun stringToColor(actionString: String): String {
         val cmap = mapOf( // http://docs.oracle.com/javafx/2/api/javafx/scene/doc-files/cssref.html#typecolor
@@ -62,13 +62,13 @@ object CF {
         A_SKIP to "salmon"
         )
         val a = stringToAction(actionString)
-        return cmap.get(a)!!
+        return cmap[a]!!
     }
 }
 
 // TODO add all the logic from FilesView.scala.
 class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("Sync view") {
-    val id = UUID.randomUUID()
+    val id = UUID.randomUUID()!!
 
     var profile = Profile(server, sync, subset)
 
@@ -95,7 +95,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
     private fun runCompare() = {
         logger.info("Compare...")
         btSync.isDisable = true
-        val ctask = MyTask<Unit>() {
+        val ctask = MyTask<Unit> {
             updateTit("A Compare files")
             updateProgr(0, 100, "Initialize local and remote...")
             profile.taskIni.setOnSucceeded {
@@ -105,7 +105,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
                     val haveChanges = profile.taskCompFiles.get()
                     btCompare.isDisable = false
                     profile.cache.updateObservableBuffer()
-                    logger.debug("havechanges=" + haveChanges)
+                    logger.debug("havechanges=$haveChanges")
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
