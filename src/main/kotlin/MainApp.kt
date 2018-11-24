@@ -30,7 +30,8 @@ class Styles : Stylesheet() {
 
 fun <T: UIComponent> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     val newstage = Stage()
-    newstage.title = view.title
+//    newstage.title = view.title
+    newstage.titleProperty().bind(view.titleProperty)
     newstage.scene = Scene(view.root)
     newstage.initModality(m)
     newstage.show()

@@ -104,7 +104,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
                 profile.taskCompFiles.setOnSucceeded {
                     val haveChanges = profile.taskCompFiles.get()
                     btCompare.isDisable = false
-                    profile.cache.updateObservableBuffer()
+                    runUIwait { profile.cache.updateObservableBuffer() }
                     logger.debug("havechanges=$haveChanges")
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {

@@ -74,13 +74,14 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
     }
 }
 
-// path below basepath with a leading "/"
+// path below basepath with a leading "/" TODO this should be without!!!!
 // if ends on "/", is dir!
 class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: String = "") : Comparable<VirtualFile> { // TODO was Ordered in scala
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
-    fun getFileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last()
+    // TODO asdf what is with "/"? should not exist! but then browser doesn't work anymore.
+    fun getFileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last() + (if (isDir()) "/" else "")
     fun getFileExtension(): String = File(getFileName()).extension
 
     override fun toString(): String = "[$path]:$modTime,$size"
@@ -96,15 +97,14 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     override fun hashCode(): Int = path.hashCode() + modTime.hashCode() + size.hashCode() // TODO this is crap
 
     override fun compareTo(other: VirtualFile): Int = path.compareTo(other.path)
-
 }
 
 
 // subfolder should NOT start or end with /
-abstract class GeneralConnection(val protocol: Protocol, remoteFolder: String) {
-    val remoteBasePath: String = protocol.baseFolder.value + "/" + remoteFolder
-    var filterregex: Regex = Regex(""".*""")
-    val debugslow = false
+abstract class GeneralConnection(val protocol: Protocol) {
+    protected var remoteBasePath: String = protocol.baseFolder.value
+    protected var filterregex: Regex = Regex(""".*""")
+    protected val debugslow = false
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long)
@@ -114,6 +114,9 @@ abstract class GeneralConnection(val protocol: Protocol, remoteFolder: String) {
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
     abstract fun isAlive(): Boolean
 
+    fun assignRemoteBasePath(remoteFolder: String) {
+        remoteBasePath = protocol.baseFolder.value + remoteFolder
+    }
     //noinspection ScalaUnusedSymbol
     var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> }
 
@@ -141,13 +144,13 @@ abstract class GeneralConnection(val protocol: Protocol, remoteFolder: String) {
 
 }
 
-class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnection(protocol, remoteFolder) {
+class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun cleanUp() {}
 
     override fun deletefile(what: String, mtime: Long) {
         val (cp, _) = checkIsDir(what)
-        val fp = Paths.get("$remoteBasePath/$cp")
+        val fp = Paths.get("$remoteBasePath$cp")
         try {
             Files.delete(fp)
         } catch (e: DirectoryNotEmptyException) {
@@ -167,13 +170,13 @@ class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnect
         val (cp, isdir) = checkIsDir(from)
         logger.debug("from=$from isdir=$isdir")
         if (isdir) { // ensure that target path exists
-            val abspath = "$remoteBasePath/$cp"
+            val abspath = "$remoteBasePath$cp"
             if (!Files.exists(Paths.get(abspath).parent)) {
                 logger.debug("creating folder $cp")
                 mkdirrec(Paths.get(abspath).parent.toString())
             }
         }
-        Files.copy(Paths.get("$localBasePath/$cp"), Paths.get("$remoteBasePath/$cp"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+        Files.copy(Paths.get("$localBasePath$cp"), Paths.get("$remoteBasePath$cp"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
         return mtime
     }
 
@@ -183,14 +186,14 @@ class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnect
         if (isdir) { // ensure that target path exists
             Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
         } else {
-            Files.copy(Paths.get("$remoteBasePath/$cp"), Paths.get(to), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+            Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get(to), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
         }
         Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
     }
 
     override fun getfile(localBasePath: String, from: String, mtime: Long) {
         val (cp, _) = checkIsDir(from)
-        val lp = "$localBasePath/$cp"
+        val lp = "$localBasePath$cp"
         getfile(localBasePath, from, mtime, lp)
     }
 
@@ -205,8 +208,9 @@ class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnect
             if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
             val javaPath = toJavaPathSeparator(cc.toString())
             val fixedPath = java.text.Normalizer.normalize(javaPath, java.text.Normalizer.Form.NFC)
-            var strippedPath: String = if (fixedPath == remoteBasePath) "/" else fixedPath.substring(remoteBasePath.length)
-            if (Files.isDirectory(cc) && strippedPath != "/") strippedPath += "/"
+            logger.debug("javap=$javaPath fp=$fixedPath")
+            var strippedPath: String = if (fixedPath == remoteBasePath) "" else fixedPath.substring(remoteBasePath.length - 1)
+            if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
             if (!vf.getFileName().matches(filterregexp.toRegex())) {
                 if (debugslow) Thread.sleep(500)
@@ -219,7 +223,7 @@ class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnect
             }
         }
 
-        val sp = Paths.get(remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder)
+        val sp = Paths.get(remoteBasePath + subfolder)
         if (Files.exists(sp)) {
             parseContent(sp, goDeeper = true)
         }
@@ -235,7 +239,7 @@ class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnect
 }
 
 
-class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnection(protocol, remoteFolder) {
+class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
 
@@ -250,8 +254,7 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
         private var lastTime: Long = 0
 
         override fun directory(name: String) =
-                MyTransferListener("$relPath$name/")
-
+                MyTransferListener("$relPath$name/") // TODO
 
         override fun file(name: String, size: Long): Listener {
             bytesTotal = size
@@ -281,37 +284,36 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
         val (cp, isdir) = checkIsDir(what)
         if (isdir) {
             try {
-                sftpc.rmdir("$remoteBasePath/$cp")
+                sftpc.rmdir("$remoteBasePath$cp")
             } catch (e: IOException) { // unfortunately only "Failure" ; checking for content would be slow
-                val xx = sftpc.ls("$remoteBasePath/$cp")
+                val xx = sftpc.ls("$remoteBasePath$cp")
                 if (xx.isNotEmpty()) {
                     val tmp = mutableListOf<RemoteResourceInfo>()
                     for (obj in xx) {
                         val lse = obj as RemoteResourceInfo
                         if (lse.name != "." && lse.name != "..") tmp += lse
-
                     }
                     if (runUIwait {
                                 dialogOkCancel("Warning", "Directory \n $cp \n not empty, DELETE ALL?", "Content:\n" +
                                         tmp.asSequence().map { it.name }.joinToString("\n"))
                             }) {
-                        tmp.forEach { sftpc.rm(remoteBasePath + "/" + cp + "/" + it.name) }
-                        sftpc.rmdir("$remoteBasePath/$cp")
+                        tmp.forEach { sftpc.rm(remoteBasePath + cp + "/" + it.name) }
+                        sftpc.rmdir("$remoteBasePath$cp")
                         return
                     }
                 }
             }
         } else {
-            sftpc.rm("$remoteBasePath/$cp")
+            sftpc.rm("$remoteBasePath$cp")
         }
     }
 
     override fun putfile(localBasePath: String, from: String, mtime: Long): Long {
         val (cp, isdir) = checkIsDir(from)
-        val rp = "$remoteBasePath/$cp"
+        val rp = "$remoteBasePath$cp"
 
         fun setAttr(changeperms: Boolean) {
-            val lf = FileSystemFile("$localBasePath/$cp")
+            val lf = FileSystemFile("$localBasePath$cp")
             val fab = FileAttributes.Builder()
             if (changeperms) {
                 val perms = FilePermission.fromMask(lf.permissions)
@@ -337,8 +339,8 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
             mtime // dirs don't need mtime
         } else {
             try {
-                if (!Files.isReadable(Paths.get("$localBasePath/$cp"))) throw IllegalStateException("can't read file $cp")
-                sftpt.upload("$localBasePath/$cp", rp) // use this in place of sftpc.put to not always set file attrs
+                if (!Files.isReadable(Paths.get("$localBasePath$cp"))) throw IllegalStateException("can't read file $cp")
+                sftpt.upload("$localBasePath$cp", rp) // use this in place of sftpc.put to not always set file attrs
                 if (protocol.doSetPermissions.value) setAttr(true)
                 else if (!protocol.cantSetDate.value) setAttr(false)
             } catch (e: Exception) {
@@ -368,7 +370,7 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
             try {
                 // sftpt.download erases local file if it exists also if remote file can't be read
                 val tmpf = createTempFile("sfsync-tempfile", ".dat")
-                sftpt.download("$remoteBasePath/$cp", tmpf.absolutePath)
+                sftpt.download("$remoteBasePath$cp", tmpf.absolutePath)
                 Files.move(tmpf.toPath(), Paths.get(to), StandardCopyOption.REPLACE_EXISTING)
             } catch (e: Exception) {
                 logger.debug("getfile: exception $e")
@@ -383,7 +385,7 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
 
     override fun getfile(localBasePath: String, from: String, mtime: Long) {
         val (cp, _) = checkIsDir(from)
-        val lp = "$localBasePath/$cp"
+        val lp = "$localBasePath$cp"
         getfile(localBasePath, from, mtime, lp)
     }
 
@@ -428,7 +430,7 @@ class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnecti
                 }
             }
         }
-        val sp = remoteBasePath + (if (subfolder.isNotEmpty()) "/" else "") + subfolder.removePrefix("/")
+        val sp = remoteBasePath + subfolder
         logger.debug("searching $sp")
         val sftpsp = sftpexists(sp)
         if (sftpsp != null) { // run for base folder

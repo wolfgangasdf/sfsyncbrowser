@@ -51,7 +51,8 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         val localproto = Protocol(server, SimpleStringProperty("file:///"), SimpleBooleanProperty(false),
                 SimpleStringProperty(""), SimpleBooleanProperty(false),
                 SimpleStringProperty(sync.localfolder.value), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
-        local = LocalConnection(localproto, "")
+        local = LocalConnection(localproto)
+        local!!.assignRemoteBasePath("")
 
         val uri = MyURI(server.getProtocol().protocoluri.value)
         logger.debug("puri = ${server.getProtocol().protocoluri.value}  proto = ${uri.protocol}")
@@ -93,13 +94,13 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         val swUIupdate = StopWatch()
 
         fun acLocRem(vf: VirtualFile, isloc: Boolean, updact: (VirtualFile) -> Unit) {
-            //logger.debug("found loc=$isloc : " + vf)
+            logger.debug("found loc=$isloc : $vf")
             if (swUIupdate.doit(uiUpdateInterval)) updact(vf)
 
             cache.cache.merge(vf.path,
                     SyncEntry(A_UNCHECKED, if (isloc) vf.modTime else 0, if (isloc) vf.size else -1,
                             if (!isloc) vf.modTime else 0, if (!isloc) vf.size else -1,
-                            0, 0, -1, vf.path.endsWith("/"), true)
+                            0, 0, -1, vf.isDir(), true)
             ) { ov, _ ->
                 if (isloc) {
                     ov.lTime = vf.modTime
@@ -140,6 +141,10 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         }
 
         logger.debug("sw: finding files: " + sw.getTimeRestart())
+        fun dumpAll() {
+            cache.cache.iterate { _, path, se -> logger.debug("$path: $se") }
+        }
+
 
         val res = runUIwait {
             logger.debug("state after list: " + taskListLocal.state + "  remote:" + taskListRemote.state)

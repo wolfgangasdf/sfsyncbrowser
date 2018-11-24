@@ -8,8 +8,10 @@ import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
 import store.*
 import tornadofx.*
+import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
+import util.Helpers.relPathRegex
 import util.Helpers.valitextfield
 import java.io.File
 
@@ -59,7 +61,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Protocol") {
                     field("URI and password") { textfield(proto.protocoluri) ; passwordfield(proto.password) }
-                    field("Basefolder") { valitextfield(proto.baseFolder, "(^/$)|(/.*/$)".toRegex(), "/f1/f2 or /") }
+                    field("Basefolder") { valitextfield(proto.baseFolder, absPathRegex, "absolute!") }
                     field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
                     field("Don't set date") { checkbox("", proto.cantSetDate) }
                     field("Tunnel host") { textfield(proto.tunnelHost) ; combobox(proto.tunnelMode, SettingsStore.tunnelModes) }
@@ -80,7 +82,7 @@ class MainView : View("SSyncBrowser") {
         init {
             with(root) {
                 fieldset("Bookmark") {
-                    field("Path") { textfield(bookmark.path) }
+                    field("Path") { valitextfield(bookmark.path, relPathRegex, "relative!") }
                     field {
                         button("Open") { action {
                             openNewWindow(BrowserView(bookmark.server, "", bookmark.path.value))
@@ -103,14 +105,15 @@ class MainView : View("SSyncBrowser") {
                     field("Sync cacheid") { textfield(sync.cacheid) }
                     field("Status") { label(sync.status) }
                     field("Local folder") {
-                        valitextfield(sync.localfolder, "^/.*[^/]$".toRegex(), "/f1/f2 or /")
+                        valitextfield(sync.localfolder, absPathRegex, "absolute!")
                         button("Choose...").setOnAction {
                             val dir = chooseDirectory("Select local folder")
                             if (dir != null) sync.localfolder.set(dir.absolutePath)
                         }
                     }
+
                     field("Remote folder") {
-                        valitextfield(sync.remoteFolder, "(^$)|(^/.*/$)".toRegex(), "/f1/f2 or /")
+                        valitextfield(sync.remoteFolder, relPathRegex, "relative!")
                         button("Choose...").setOnAction {
                             val bv = openNewWindow(BrowserView(sync.server, "", "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
                             bv.selectFolderCallback = { it2 ->

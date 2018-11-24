@@ -21,7 +21,7 @@ enum class BrowserViewMode {
 }
 
 class BrowserView(private val server: Server, val basePath: String, val path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
-        View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}") {
+        View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
     private var currentPath = SimpleStringProperty(path)
 
@@ -150,7 +150,7 @@ class BrowserView(private val server: Server, val basePath: String, val path: St
                 pl += tmpp.removeSuffix("/")
                 tmpp = Helpers.getParentFolder(tmpp)
             }
-            pathButtonFlowPane.add(button("[base]") { action { currentPath.set("/") }})
+            pathButtonFlowPane.add(button("[base]") { action { currentPath.set("") }})
             pl.reversed().forEach { it2 ->
                 pathButtonFlowPane.add(button(Helpers.getFileName(it2)!!) {
                     action { currentPath.set(it2) }

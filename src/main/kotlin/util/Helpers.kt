@@ -79,6 +79,9 @@ object Helpers {
         return null
     }
 
+    val relPathRegex = "(^$)|(^[^/].*/$)".toRegex() // "", "asdf/"
+    val absPathRegex = "(^/$)|(^/.*/$)".toRegex() // "/", "/asdf/"
+
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.
     // after MyWorker etc changes, test all if exceptions propagate as intended!

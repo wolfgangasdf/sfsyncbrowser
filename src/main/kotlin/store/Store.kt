@@ -116,11 +116,12 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
             val proto = protocols[currentProtocol.value]
             logger.info("opening new connection to $proto")
             connection = when {
-                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto, remoteFolder)
-                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto, remoteFolder)
+                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
+                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
                 else -> throw java.lang.Exception("asdf")
             }
         }
+        connection!!.assignRemoteBasePath(remoteFolder)
         return connection!!
     }
     fun closeConnection() {
