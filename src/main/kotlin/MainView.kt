@@ -5,6 +5,7 @@ import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
+import javafx.stage.Modality
 import store.*
 import tornadofx.*
 import util.Helpers.concatObsLists
@@ -116,22 +117,29 @@ class MainView : View("SSyncBrowser") {
     class SubsetSettingsPane(subset: SubSet): View() {
         override val root = Form()
         init {
+            val lvFolders = listview(subset.subfolders).apply {
+                isEditable = true
+                prefHeight = 150.0
+                cellFactory = TextFieldListCell.forListView()
+            }
             with(root) {
                 fieldset("Subset") {
                     field("Name: ") { textfield(subset.title) }
-                    field { listview(subset.subfolders).apply {
-                        isEditable = true
-                        prefHeight = 50.0
-                        cellFactory = TextFieldListCell.forListView()
-                    } }
+                    field { this += lvFolders }
                     field("Exclude filter") { textfield(subset.excludeFilter) }
                     field {
-                        button("Open sync view!") { action {
+                        button("Compare & Sync!") { action {
                             val sv = SyncView(subset.sync.server, subset.sync, subset)
                             openNewWindow(sv)
                         } }
                         button("Add new remote folder") { action {
-                            subset.subfolders += "newrf"
+                            val bv = openNewWindow(BrowserView(subset.sync.server, "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
+                            bv.selectFolderCallback = {
+                                subset.subfolders += it.path
+                            }
+                        } }
+                        button("Remove selected remote folders") { action {
+                            if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)
                         } }
                         button("Remove subset") { action {
                             subset.sync.subsets.remove(subset)

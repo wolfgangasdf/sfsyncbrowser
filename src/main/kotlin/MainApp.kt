@@ -2,6 +2,7 @@
 
 import javafx.scene.Scene
 import javafx.scene.image.Image
+import javafx.stage.Modality
 import javafx.stage.Stage
 import mu.KotlinLogging
 import store.DBSettings
@@ -27,14 +28,14 @@ class Styles : Stylesheet() {
 //    }
 }
 
-fun openNewWindow(view: UIComponent) {
+fun <T: UIComponent> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     val newstage = Stage()
     newstage.title = view.title
     newstage.scene = Scene(view.root)
+    newstage.initModality(m)
     newstage.show()
+    return view
 }
-
-
 
 class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
 
@@ -53,8 +54,6 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
 
     }
 }
-
-
 
 fun initit() {
     Checks.checkComparedFile()

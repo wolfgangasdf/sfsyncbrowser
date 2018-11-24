@@ -16,11 +16,18 @@ import java.nio.file.Files
 
 private val logger = KotlinLogging.logger {}
 
-class BrowserView(private val server: Server, path: String) : View(server.getProtocol().protocoluri.value) {
+enum class BrowserViewMode {
+    NORMAL, SELECTFOLDER
+}
+
+class BrowserView(private val server: Server, path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
+        View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}") {
 
     private var currentPath = SimpleStringProperty(path)
 
     private val files = mutableListOf<VirtualFile>().observable()
+
+    var selectFolderCallback: (f: VirtualFile) -> Unit = {}
 
     private val pathButtonFlowPane = hbox {
         label("Path:")
@@ -47,6 +54,7 @@ class BrowserView(private val server: Server, path: String) : View(server.getPro
              KeyCode.SPACE -> {
                  if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
                      lastpreviewvf = selectedItem
+                     // TODO show progress dialog and allow interruption!
                      getFileIntoTempAndDo(selectedItem!!) { Helpers.previewDocument(it) }
                  }
              }
@@ -96,8 +104,12 @@ class BrowserView(private val server: Server, path: String) : View(server.getPro
         prefHeight = 600.0
         toolbar {
             button("Refresh").setOnAction { updateBrowser() }
-            button("Add bookmark").setOnAction {
+            if (mode==BrowserViewMode.NORMAL) button("Add bookmark").setOnAction {
                 server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value))
+            }
+            if (mode==BrowserViewMode.SELECTFOLDER) button("Select Folder").setOnAction {
+                if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
+                this@BrowserView.close()
             }
         }
         this += pathButtonFlowPane
@@ -138,7 +150,7 @@ class BrowserView(private val server: Server, path: String) : View(server.getPro
                 pl += tmpp.removeSuffix("/")
                 tmpp = Helpers.getParentFolder(tmpp)
             }
-            pathButtonFlowPane.add(button("base") { action { currentPath.set("/") }})
+            pathButtonFlowPane.add(button("[base]") { action { currentPath.set("/") }})
             pl.reversed().forEach { it2 ->
                 pathButtonFlowPane.add(button(Helpers.getFileName(it2)!!) {
                     action { currentPath.set(it2) }
