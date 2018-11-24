@@ -12,9 +12,7 @@ import javafx.geometry.Rectangle2D
 import javafx.scene.control.*
 import javafx.scene.layout.Priority
 import javafx.scene.web.WebView
-import javafx.stage.Modality
-import javafx.stage.Screen
-import javafx.stage.Stage
+import javafx.stage.*
 import mu.KotlinLogging
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
@@ -73,6 +71,13 @@ object Helpers {
 
     fun getFileName(path: String) =
             path.split("/").dropLastWhile { it.isEmpty() }.lastOrNull()
+
+    fun chooseDirectoryRel(title: String? = null, initialDirectory: File, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): File? {
+        val res = chooseDirectory(title, initialDirectory, owner, op)
+        if (res?.startsWith(initialDirectory.path) == true)
+            return res.relativeTo(initialDirectory)
+        return null
+    }
 
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.
@@ -354,4 +359,5 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         th.isDaemon = true
         th.start()
     }
+
 }

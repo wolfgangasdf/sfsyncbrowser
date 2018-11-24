@@ -101,8 +101,8 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
 
 // subfolder should NOT start or end with /
-abstract class GeneralConnection(val protocol: Protocol) {
-    var remoteBasePath: String = protocol.baseFolder.value
+abstract class GeneralConnection(val protocol: Protocol, remoteFolder: String) {
+    val remoteBasePath: String = protocol.baseFolder.value + "/" + remoteFolder
     var filterregex: Regex = Regex(""".*""")
     val debugslow = false
     val interrupted = AtomicBoolean(false)
@@ -141,7 +141,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
 
 }
 
-class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
+class LocalConnection(protocol: Protocol, remoteFolder: String) : GeneralConnection(protocol, remoteFolder) {
 
     override fun cleanUp() {}
 
@@ -235,7 +235,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 }
 
 
-class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
+class SftpConnection(protocol: Protocol, remoteFolder: String) : GeneralConnection(protocol, remoteFolder) {
 
     private val uri = protocol.getmyuri()
 
@@ -612,6 +612,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
 
     init {
+        logger.debug("ini sftp connection remoteBasePath=$remoteBasePath")
         transferListener = MyTransferListener()
         sftpt.transferListener = transferListener
 

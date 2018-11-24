@@ -2,6 +2,8 @@
 
 package synchro
 
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.concurrent.Worker
 import mu.KotlinLogging
 import store.*
@@ -30,11 +32,6 @@ import util.StopWatch
 private val logger = KotlinLogging.logger {}
 
 
-class TransferProtocol(
-        var uri: String,
-        var basefolder: String
-)
-
 class Profile(server: Server, sync: Sync, subfolder: SubSet) {
     //var cache = mutableListOf<VirtualFile>() // was MutableList
 
@@ -51,14 +48,16 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         updateTit("Initialize connections...")
         cache.loadCache()
 
-        local = LocalConnection(server.getProtocol()).apply {// todo it's strange to give remote protocol...
-            remoteBasePath = sync.localfolder.value
-        }
+        val localproto = Protocol(server, SimpleStringProperty("file:///"), SimpleBooleanProperty(false),
+                SimpleStringProperty(""), SimpleBooleanProperty(false),
+                SimpleStringProperty(sync.localfolder.value), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
+        local = LocalConnection(localproto, "")
+
         val uri = MyURI(server.getProtocol().protocoluri.value)
         logger.debug("puri = ${server.getProtocol().protocoluri.value}  proto = ${uri.protocol}")
         updateProgr(50, 100, "initialize remote connection...")
 
-        remote = server.getConnection()
+        remote = server.getConnection(sync.remoteFolder.value)
 
         if (Helpers.failat == 1) throw UnsupportedOperationException("fail 1")
         profileInitialized = true
@@ -133,8 +132,8 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         taskListLocal.setOnFailed { error(" local failed!") }
         taskListRemote.setOnFailed { logger.debug(" rem failed!") }
 
-        MyWorker.runTask(taskListLocal)
-        MyWorker.runTask(taskListRemote)
+        tornadofx.runLater { MyWorker.runTask(taskListLocal) }
+        tornadofx.runLater { MyWorker.runTask(taskListRemote) }
 
         while (!(taskListLocal.isDone && taskListRemote.isDone)) { // ignore exceptions / errors!
             Thread.sleep(100)

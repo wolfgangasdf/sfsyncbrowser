@@ -20,7 +20,7 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER
 }
 
-class BrowserView(private val server: Server, path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
+class BrowserView(private val server: Server, val basePath: String, val path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}") {
 
     private var currentPath = SimpleStringProperty(path)
@@ -123,7 +123,7 @@ class BrowserView(private val server: Server, path: String, mode: BrowserViewMod
             updateTit("Downloading file $vf...")
             val rf = Files.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
             logger.debug("downloading into ${rf.toFile().absolutePath}...")
-            server.getConnection().getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
+            server.getConnection("").getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
             rf.toFile()
         }
         taskListLocal.setOnSucceeded { action(taskListLocal.value) }
@@ -134,7 +134,7 @@ class BrowserView(private val server: Server, path: String, mode: BrowserViewMod
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
             val tmpl = mutableListOf<VirtualFile>()
             updateTit("Getting remote file list...")
-            server.getConnection().list(currentPath.value, "", false) { it2 ->
+            server.getConnection(basePath).list(currentPath.value, "", false) { it2 ->
                 if (it2.path != currentPath.value) tmpl.add(it2)
             }
             tmpl
@@ -160,6 +160,7 @@ class BrowserView(private val server: Server, path: String, mode: BrowserViewMod
         MyWorker.runTask(taskListLocal)
     }
     init {
+        logger.debug("opening browser protobp=${server.getProtocol().baseFolder.value} bp=$basePath p=$path")
         currentPath.onChange { if (it != null) {
             updateBrowser()
         } }

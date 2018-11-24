@@ -8,8 +8,10 @@ import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
 import store.*
 import tornadofx.*
+import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
 import util.Helpers.valitextfield
+import java.io.File
 
 class MainView : View("SSyncBrowser") {
 
@@ -33,10 +35,11 @@ class MainView : View("SSyncBrowser") {
                         } }
                         button("Add new sync") { action {
                             server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
-                                SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"), server=server)
+                                SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"),
+                                SimpleStringProperty("syremotefolder"), server=server)
                         } }
                         button("Open browser") { action {
-                            openNewWindow(BrowserView(server, ""))
+                            openNewWindow(BrowserView(server, "", ""))
                         } }
                         button("Remove server") { action {
                             SettingsStore.servers.remove(server)
@@ -56,7 +59,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Protocol") {
                     field("URI and password") { textfield(proto.protocoluri) ; passwordfield(proto.password) }
-                    field("Basefolder") { valitextfield(proto.baseFolder, "(^/$)|(/.*[^/]$)".toRegex(), "/f1/f2 or /") }
+                    field("Basefolder") { valitextfield(proto.baseFolder, "(^/$)|(/.*/$)".toRegex(), "/f1/f2 or /") }
                     field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
                     field("Don't set date") { checkbox("", proto.cantSetDate) }
                     field("Tunnel host") { textfield(proto.tunnelHost) ; combobox(proto.tunnelMode, SettingsStore.tunnelModes) }
@@ -80,7 +83,7 @@ class MainView : View("SSyncBrowser") {
                     field("Path") { textfield(bookmark.path) }
                     field {
                         button("Open") { action {
-                            openNewWindow(BrowserView(bookmark.server, bookmark.path.value))
+                            openNewWindow(BrowserView(bookmark.server, "", bookmark.path.value))
                         } }
                         button("Remove bookmark") { action {
                             bookmark.server.bookmarks.remove(bookmark)
@@ -99,7 +102,22 @@ class MainView : View("SSyncBrowser") {
                     field("Name and type") { textfield(sync.title) ; textfield(sync.type) }
                     field("Sync cacheid") { textfield(sync.cacheid) }
                     field("Status") { label(sync.status) }
-                    field("Local folder") { valitextfield(sync.localfolder, "^/.*[^/]$".toRegex(), "/f1/f2 or /") }
+                    field("Local folder") {
+                        valitextfield(sync.localfolder, "^/.*[^/]$".toRegex(), "/f1/f2 or /")
+                        button("Choose...").setOnAction {
+                            val dir = chooseDirectory("Select local folder")
+                            if (dir != null) sync.localfolder.set(dir.absolutePath)
+                        }
+                    }
+                    field("Remote folder") {
+                        valitextfield(sync.remoteFolder, "(^$)|(^/.*/$)".toRegex(), "/f1/f2 or /")
+                        button("Choose...").setOnAction {
+                            val bv = openNewWindow(BrowserView(sync.server, "", "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
+                            bv.selectFolderCallback = { it2 ->
+                                sync.remoteFolder.set(it2.path)
+                            }
+                        }
+                    }
                     field {
                         button("Add new subset") { action {
                             sync.subsets += SubSet(SimpleStringProperty("ssname"),
@@ -131,14 +149,19 @@ class MainView : View("SSyncBrowser") {
                         button("Compare & Sync!") { action {
                             val sv = SyncView(subset.sync.server, subset.sync, subset)
                             openNewWindow(sv)
+                            sv.runCompare()
                         } }
-                        button("Add new remote folder") { action {
-                            val bv = openNewWindow(BrowserView(subset.sync.server, "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
+                        button("Add new folder (remote)") { action {
+                            val bv = openNewWindow(BrowserView(subset.sync.server, subset.sync.remoteFolder.value, "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
                             bv.selectFolderCallback = {
                                 subset.subfolders += it.path
                             }
                         } }
-                        button("Remove selected remote folders") { action {
+                        button("Add new folder (local)") { action {
+                            val dir = chooseDirectoryRel("Select local folder", File(subset.sync.localfolder.value)) // TODO ini dir
+                            if (dir != null) subset.subfolders += dir.path // TODO rel to ini
+                        } }
+                        button("Remove selected folder") { action {
                             if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)
                         } }
                         button("Remove subset") { action {
@@ -212,7 +235,7 @@ class MainView : View("SSyncBrowser") {
             val src = ttv.selectedValue
             if (src is BrowserBookmark) {
                 if (me.clickCount == 2) {
-                    openNewWindow(BrowserView(src.server, src.path.value))
+                    openNewWindow(BrowserView(src.server, "", src.path.value))
                     me.consume()
                 }
             }

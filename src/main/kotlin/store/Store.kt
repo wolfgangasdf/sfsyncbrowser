@@ -78,7 +78,7 @@ object DBSettings {
 
 ///////////////////////// settings
 
-class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty,
+class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
            val cacheid: StringProperty = SimpleStringProperty(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList() ) {
     override fun toString() = "[Sync] ${title.value}"
@@ -111,13 +111,13 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
     }
     private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"
-    fun getConnection(): GeneralConnection {
+    fun getConnection(remoteFolder: String): GeneralConnection {
         if (connection?.isAlive() != true) {
             val proto = protocols[currentProtocol.value]
             logger.info("opening new connection to $proto")
             connection = when {
-                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
-                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
+                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto, remoteFolder)
+                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto, remoteFolder)
                 else -> throw java.lang.Exception("asdf")
             }
         }
@@ -164,6 +164,7 @@ object SettingsStore {
                 props["sy.$idx.$idx2.title"] = sync.title.value
                 props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
                 props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
+                props["sy.$idx.$idx2.remoteFolder"] = sync.remoteFolder.value
                 props["sy.$idx.$idx2.subsets"] = sync.subsets.size.toString()
                 sync.subsets.forEachIndexed { iss, subSet ->
                     props["ss.$idx.$idx2.$iss.title"] = subSet.title.value
@@ -208,7 +209,7 @@ object SettingsStore {
                     if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
-                                SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
+                                SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
                             val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
                             for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!

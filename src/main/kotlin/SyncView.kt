@@ -67,10 +67,10 @@ object CF {
 }
 
 // TODO add all the logic from FilesView.scala.
-class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("Sync view") {
+class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
     val id = UUID.randomUUID()!!
 
-    var profile = Profile(server, sync, subset)
+    private var profile = Profile(server, sync, subset)
 
     private var syncEnabled = false
 
@@ -92,7 +92,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
     }
 
 
-    private fun runCompare() = {
+    fun runCompare() {
         logger.info("Compare...")
         btSync.isDisable = true
         val ctask = MyTask<Unit> {
@@ -109,7 +109,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
-                        runSynchronize()
+                        // TODO re-enable if safe! runSynchronize()
                     } else {
                         logger.info("Finished compare")
                         updateSyncButton(allow = true)
@@ -121,7 +121,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
             }
             profile.taskIni.setOnFailed { handleFailed(profile.taskIni) }
             profile.taskIni.setOnCancelled { handleCancelled() }
-            MyWorker.runTask(profile.taskIni)
+            runUIwait { MyWorker.runTask(profile.taskIni) }
 
             updateProgr(100, 100, "ended!")
         }
@@ -142,7 +142,7 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
         MyWorker.runTask(profile.taskSynchronize)
     }
 
-    fun updateSyncButton(allow: Boolean): Boolean {
+    private fun updateSyncButton(allow: Boolean): Boolean {
         syncEnabled = allow
         return updateSyncButton()
     }
@@ -165,12 +165,14 @@ class SyncView(val server: Server, val sync: Sync, val subset: SubSet) : View("S
 
 
 
-    val btSync = button("Sync!") { action {
+    private val btSync = button("Sync!") { action {
         logger.info("sync!")
+        // TODO
     }}
 
-    val btCompare = button("Compare!") { action {
+    private val btCompare = button("Compare!") { action {
         logger.info("compare!")
+        // TODO
     }}
 
     override val root = vbox {
