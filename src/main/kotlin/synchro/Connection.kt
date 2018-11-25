@@ -80,9 +80,11 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
-    // TODO asdf what is with "/"? should not exist! but then browser doesn't work anymore.
-    fun getFileName(): String = if (path == "/") "/" else path.split("/").dropLastWhile { it.isEmpty() }.last() + (if (isDir()) "/" else "")
+    // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
+    fun getFileName(): String = File(path).name
+    fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension
+    fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
 
     override fun toString(): String = "[$path]:$modTime,$size"
 
@@ -212,7 +214,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             var strippedPath: String = if (fixedPath == remoteBasePath) "" else fixedPath.substring(remoteBasePath.length - 1)
             if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
-            if (!vf.getFileName().matches(filterregexp.toRegex())) {
+            if (vf.isNotFiltered(filterregexp)) {
                 if (debugslow) Thread.sleep(500)
                 action(vf)
                 if (Files.isDirectory(cc) && goDeeper) {
@@ -394,13 +396,13 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         try {
             resls = sftpc.stat(sp) // throws exception if not
         } catch (e: SFTPException) {
-            if (e.statusCode == StatusCode.NO_SUCH_FILE) logger.debug(e.message) else throw(e)
+            if (e.statusCode == StatusCode.NO_SUCH_FILE) logger.debug("no such file: ${e.message}") else throw(e)
         }
         return resls
     }
 
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit) {
-        logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
+        logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive fil=$filterregexp) in thread ${Thread.currentThread().id}")
 
         fun vfFromSftp(fullFilePath: String, attrs: FileAttributes): VirtualFile {
             return VirtualFile().apply {
@@ -414,7 +416,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
         fun doaction(rripath: String, rriattributes: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
             val vf = vfFromSftp(rripath, rriattributes)
-            if (!vf.getFileName().matches(filterregexp.toRegex())) {
+            if (vf.isNotFiltered(filterregexp)) {
                 action(vf)
                 if (isDirectoryx(rriattributes) && (recursive || parsealways))  parseContentFun(rripath)
             }
@@ -431,8 +433,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
         }
         val sp = remoteBasePath + subfolder
-        logger.debug("searching $sp")
         val sftpsp = sftpexists(sp)
+        logger.debug("list sftp:$sp sftpsp:$sftpsp")
         if (sftpsp != null) { // run for base folder
             doaction(sp, sftpsp, true) { parseContent(it) }
         }

@@ -20,7 +20,7 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER
 }
 
-class BrowserView(private val server: Server, val basePath: String, val path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
+class BrowserView(private val server: Server, private val basePath: String, path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
     private var currentPath = SimpleStringProperty(path)
@@ -37,7 +37,7 @@ class BrowserView(private val server: Server, val basePath: String, val path: St
     private var lastpreviewvf: VirtualFile? = null
 
     private val fileTableView = tableview(files) {
-        column("title", VirtualFile::getFileName).remainingWidth()
+        column("title", VirtualFile::getFileNameBrowser).remainingWidth()
         column("size", VirtualFile::size)
         column("perms", VirtualFile::permissions)
     }.apply {

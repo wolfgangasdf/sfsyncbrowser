@@ -6,6 +6,7 @@ import javafx.event.Event
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
+import mu.KotlinLogging
 import store.*
 import tornadofx.*
 import util.Helpers.absPathRegex
@@ -14,6 +15,8 @@ import util.Helpers.concatObsLists
 import util.Helpers.relPathRegex
 import util.Helpers.valitextfield
 import java.io.File
+
+private val logger = KotlinLogging.logger {}
 
 class MainView : View("SSyncBrowser") {
 
@@ -108,7 +111,7 @@ class MainView : View("SSyncBrowser") {
                         valitextfield(sync.localfolder, absPathRegex, "absolute!")
                         button("Choose...").setOnAction {
                             val dir = chooseDirectory("Select local folder")
-                            if (dir != null) sync.localfolder.set(dir.absolutePath)
+                            if (dir != null) if (dir.isDirectory) sync.localfolder.set(dir.absolutePath + "/")
                         }
                     }
 
@@ -161,8 +164,8 @@ class MainView : View("SSyncBrowser") {
                             }
                         } }
                         button("Add new folder (local)") { action {
-                            val dir = chooseDirectoryRel("Select local folder", File(subset.sync.localfolder.value)) // TODO ini dir
-                            if (dir != null) subset.subfolders += dir.path // TODO rel to ini
+                            val dir = chooseDirectoryRel("Select local folder", File(subset.sync.localfolder.value))
+                            if (dir != null) subset.subfolders += dir.path + "/"
                         } }
                         button("Remove selected folder") { action {
                             if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)
@@ -234,6 +237,7 @@ class MainView : View("SSyncBrowser") {
     }
 
     init {
+        logger.info("Initialize MainView...")
         ttv.setOnMouseClicked { me ->
             val src = ttv.selectedValue
             if (src is BrowserBookmark) {
@@ -257,7 +261,6 @@ class MainView : View("SSyncBrowser") {
                 }
                 root += settingsview
             }
-
         }
     }
 }
