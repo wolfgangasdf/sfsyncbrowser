@@ -7,6 +7,7 @@ import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import mu.KotlinLogging
 import store.DBSettings.getCacheFilename
+import synchro.*
 import synchro.Actions.ALLACTIONS
 import synchro.Actions.A_CACHEONLY
 import synchro.Actions.A_ISEQUAL
@@ -15,10 +16,6 @@ import synchro.Actions.A_RMREMOTE
 import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
-import synchro.GeneralConnection
-import synchro.LocalConnection
-import synchro.MyURI
-import synchro.SftpConnection
 import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
@@ -82,6 +79,9 @@ object DBSettings {
         }
     }
 
+    fun shutdown() {
+        SettingsStore.servers.forEach { it.closeConnection() }
+    }
 }
 
 ///////////////////////// settings
@@ -251,7 +251,7 @@ class SyncEntry2(var path: String, var se: SyncEntry) {
     override fun toString(): String = "[path=$path action=[${CF.amap[se.action]}] lTime=${se.lTime} lSize=${se.lSize} rTime=${se.rTime} rSize=${se.rSize} lcTime=${se.lcTime} rcTime=${se.rcTime} cSize=${se.cSize} rel=${se.relevant}"
     fun toStringNice(): String =
             """
-     |Path: TODO
+     |Path: $path (${(if (se.isDir) "dir" else "file")})
      |Local : ${se.detailsLocal().value}
      |Remote: ${se.detailsRemote().value}
      |LCache : ${se.detailsLCache().value}
@@ -287,7 +287,7 @@ class SyncEntry(var action: Int,
             if (cSize != -1L) dformat().format(java.util.Date(lcTime)) + "(" + cSize + ")" else "none")
 
     //  fun isDir = path.endsWith("/")
-    private fun isEqual(): Boolean =
+    fun isEqual(): Boolean =
             if (isDir) {
                 lSize != -1L && rSize != -1L
             } else {
@@ -427,7 +427,7 @@ class Cache(private val cacheid: String) {
                 sett = splitsetting(sett[1])
                 val size = sett.first().toLong()
                 val path = sett[1] // this is safe, also commas in filename ok
-                val vf = SyncEntry(A_UNKNOWN, -1, -1, -1, -1, lcTime, rcTime, size, path.endsWith("/"), false)
+                val vf = SyncEntry(A_UNKNOWN, -1, -1, -1, -1, lcTime, rcTime, size, VirtualFile.isDir(path), false)
                 cache[path] = vf
             }
         } else {
@@ -459,7 +459,6 @@ class Cache(private val cacheid: String) {
         observableListSleep = true
         observableList.clear()
 
-        // fill obslist
         cache.iterate { _, path, se ->
             if (se.relevant && filterActions.contains(se.action)) {
                 observableList.add(SyncEntry2(path, se))

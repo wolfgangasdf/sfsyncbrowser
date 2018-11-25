@@ -9,10 +9,9 @@ import store.Server
 import synchro.VirtualFile
 import tornadofx.*
 import util.Helpers
+import util.Helpers.getFileIntoTempAndDo
 import util.MyTask
 import util.MyWorker
-import java.io.File
-import java.nio.file.Files
 
 private val logger = KotlinLogging.logger {}
 
@@ -55,7 +54,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                  if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
                      lastpreviewvf = selectedItem
                      // TODO show progress dialog and allow interruption!
-                     getFileIntoTempAndDo(selectedItem!!) { Helpers.previewDocument(it) }
+                     getFileIntoTempAndDo(server, selectedItem!!) { Helpers.previewDocument(it) }
                  }
              }
             else -> {}
@@ -115,18 +114,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         this += pathButtonFlowPane
         this += fileTableView
         fileTableView.smartResize()
-    }
-
-    private fun getFileIntoTempAndDo(vf: VirtualFile, action: (f: File) -> Unit) {
-        val taskListLocal = MyTask<File> {
-            updateTit("Downloading file $vf...")
-            val rf = Files.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
-            logger.debug("downloading into ${rf.toFile().absolutePath}...")
-            server.getConnection("").getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
-            rf.toFile()
-        }
-        taskListLocal.setOnSucceeded { action(taskListLocal.value) }
-        MyWorker.runTask(taskListLocal)
     }
 
     private fun updateBrowser() {

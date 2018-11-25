@@ -85,7 +85,11 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
     override fun toString(): String = "[$path]:$modTime,$size"
 
-    fun isDir(): Boolean = path.endsWith("/") || path == ""
+    companion object {
+        fun isDir(p: String): Boolean = p.endsWith("/") || p == ""
+    }
+
+    fun isDir(): Boolean = isDir(path)
     fun isFile(): Boolean = !isDir()
 
     override fun equals(other: Any?): Boolean {
@@ -101,7 +105,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
-    protected var remoteBasePath: String = protocol.baseFolder.value
+    var remoteBasePath: String = protocol.baseFolder.value
     protected val debugslow = false
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)

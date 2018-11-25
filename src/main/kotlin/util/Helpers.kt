@@ -14,6 +14,8 @@ import javafx.scene.layout.Priority
 import javafx.scene.web.WebView
 import javafx.stage.*
 import mu.KotlinLogging
+import store.Server
+import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
@@ -21,7 +23,11 @@ import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.ByteBuffer
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
@@ -47,6 +53,14 @@ object Helpers {
         return "%.1f%s".format(num, ext)
     }
 
+    fun revealFile(file: java.io.File) {
+        when {
+            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("open", "-R", file.path))
+            Helpers.isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.path}")
+            Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
+            else -> error("not supported OS, tell me how to do it!")
+        }
+    }
 
     fun openURL(url: String) {
         if (Desktop.isDesktopSupported() && url != "") {
@@ -55,6 +69,23 @@ object Helpers {
                 desktop.browse(URI(url))
             }
         }
+    }
+
+    fun readFileToString(fn: Path): String {
+        val enc = Files.readAllBytes(fn)
+        return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(enc)).toString()
+    }
+
+    fun getFileIntoTempAndDo(server: Server, vf: VirtualFile, action: (f: File) -> Unit) {
+        val taskGetFile = MyTask<File> {
+            updateTit("Downloading file $vf...")
+            val rf = Files.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
+            logger.debug("downloading into ${rf.toFile().absolutePath}...")
+            server.getConnection("").getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
+            rf.toFile()
+        }
+        taskGetFile.setOnSucceeded { action(taskGetFile.value) }
+        MyWorker.runTask(taskGetFile)
     }
 
     fun toHex(i: Int): String {
@@ -364,3 +395,4 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     }
 
 }
+

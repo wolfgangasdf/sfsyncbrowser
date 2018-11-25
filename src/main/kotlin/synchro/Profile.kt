@@ -29,15 +29,13 @@ import util.StopWatch
 
 private val logger = KotlinLogging.logger {}
 
-class Profile(server: Server, sync: Sync, subfolder: SubSet) {
-    //var cache = mutableListOf<VirtualFile>() // was MutableList
+class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
 
     var cache = Cache(sync.cacheid.value)
-
     var local: GeneralConnection? = null
     var remote: GeneralConnection? = null
     private val uiUpdateInterval = 0.5
-    private var profileInitialized = false
+    var profileInitialized = false
 
     val taskIni = MyTask<Unit> {
         updateTit("Initialize connections...")
@@ -175,8 +173,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
                 when (se.action) {
                     A_USELOCAL -> totalTransferSize += se.lSize
                     A_USEREMOTE -> totalTransferSize += se.rSize
-                    else -> {
-                    }
+                    else -> {}
                 }
             }
         }
@@ -258,77 +255,58 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
             when (state) {
                 1 -> // delete
                     cache.cache.iterate(reversed = true) { _, path, se ->
-                        {
-                            if (local!!.interrupted.get() || remote!!.interrupted.get()) throw InterruptedException("profile: connections interrupted")
-                            if (se.relevant && listOf(A_RMBOTH, A_RMLOCAL, A_RMREMOTE).contains(se.action)) {
-                                dosync(path, se)
-                            }
+                        if (local!!.interrupted.get() || remote!!.interrupted.get()) throw InterruptedException("profile: connections interrupted")
+                        if (se.relevant && listOf(A_RMBOTH, A_RMLOCAL, A_RMREMOTE).contains(se.action)) {
+                            dosync(path, se)
                         }
                     }
                 else -> // put/get and others
                     cache.cache.iterate { _, path, se ->
-                        {
-                            if (local!!.interrupted.get() || remote!!.interrupted.get()) throw InterruptedException("profile: connections interrupted")
-                            if (se.relevant) dosync(path, se)
-                        }
+                        if (local!!.interrupted.get() || remote!!.interrupted.get()) throw InterruptedException("profile: connections interrupted")
+                        if (se.relevant) dosync(path, se)
                     }
             }
             // update cache: remove removed/cacheonly files
-            cache.cache.iterate { it, _, se ->
-                {
-                    if (se.delete) it.remove()
-                }
-            }
+            cache.cache.iterate { it, _, se -> if (se.delete) it.remove() }
         }
         if (syncLog != "") throw Exception("Exception(s) during synchronize:\n$syncLog")
     }
 
-    // init action to make local as remote
     fun iniLocalAsRemote() {
         cache.cache.iterate { _, _, se ->
-            {
-                if (se.relevant && se.action != A_ISEQUAL) {
-                    se.action = when (se.action) {
-                        A_RMREMOTE -> A_USEREMOTE
-                        A_USELOCAL -> if (se.rSize > -1) A_USEREMOTE else A_RMLOCAL
-                        A_UNKNOWN -> if (se.rSize > -1) A_USEREMOTE else A_RMLOCAL
-                        else -> se.action
-                    }
+            if (se.relevant && se.action != A_ISEQUAL) {
+                se.action = when (se.action) {
+                    A_RMREMOTE -> A_USEREMOTE
+                    A_USELOCAL -> if (se.rSize > -1) A_USEREMOTE else A_RMLOCAL
+                    A_UNKNOWN -> if (se.rSize > -1) A_USEREMOTE else A_RMLOCAL
+                    else -> se.action
                 }
             }
         }
     }
 
-    // init action to make local as remote
     fun iniRemoteAsLocal() {
         cache.cache.iterate { _, _, se ->
-            {
-                if (se.relevant && se.action != A_ISEQUAL) {
-                    se.action = when (se.action) {
-                        A_RMLOCAL -> A_USELOCAL
-                        A_USEREMOTE -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
-                        A_UNKNOWN -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
-                        else -> se.action
-                    }
+            if (se.relevant && se.action != A_ISEQUAL) {
+                se.action = when (se.action) {
+                    A_RMLOCAL -> A_USELOCAL
+                    A_USEREMOTE -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
+                    A_UNKNOWN -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
+                    else -> se.action
                 }
             }
         }
     }
 
-    // cleanup (transfers must be stopped before)
+    // cleanup (transfers must be stopped before, connection is kept alive here.)
     val taskCleanup = MyTask<Unit> {
         updateTit("Cleanup profile...")
         updateProgr(1, 100, "Save cache...")
         cache.saveCache()
         updateProgr(50, 100, "Cleanup...")
-        remote?.cleanUp()
         local?.cleanUp()
-        remote = null
         local = null
-
         updateProgr(100, 100, "done!")
     }
-
-
 }
 

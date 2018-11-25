@@ -1,5 +1,7 @@
 
+import diffmatchpatch.diff_match_patch
 import javafx.scene.control.Button
+import javafx.scene.paint.Color
 import mu.KotlinLogging
 import store.Server
 import store.SubSet
@@ -21,9 +23,13 @@ import synchro.Actions.A_USEREMOTE
 import synchro.Profile
 import tornadofx.*
 import util.Helpers.dialogMessage
+import util.Helpers.readFileToString
+import util.Helpers.revealFile
 import util.Helpers.runUIwait
 import util.MyTask
 import util.MyWorker
+import java.nio.file.Files
+import java.nio.file.Paths
 
 private val logger = KotlinLogging.logger {}
 
@@ -31,36 +37,36 @@ private val logger = KotlinLogging.logger {}
 object CF {
     val amap = mapOf(
             A_MERGE to "M",
-    A_ISEQUAL to "==",
-    A_RMLOCAL to "<-rm",
-    A_RMREMOTE to "rm->",
-    A_UNKNOWN to "?",
-    A_USELOCAL to "->",
-    A_USEREMOTE to "<-",
-    A_CACHEONLY to "C",
-    A_RMBOTH to "<-rm->",
-    A_UNCHECKED to "???",
-    A_SYNCERROR to "SE!",
-    A_SKIP to "skip"
+            A_ISEQUAL to "==",
+            A_RMLOCAL to "<-rm",
+            A_RMREMOTE to "rm->",
+            A_UNKNOWN to "?",
+            A_USELOCAL to "->",
+            A_USEREMOTE to "<-",
+            A_CACHEONLY to "C",
+            A_RMBOTH to "<-rm->",
+            A_UNCHECKED to "???",
+            A_SYNCERROR to "SE!",
+            A_SKIP to "skip"
     )
     private fun stringToAction(actionString: String): Int {
         val x = amap.entries.associate{(k,v)-> v to k}
         return x[actionString]!!
     }
-    fun stringToColor(actionString: String): String {
-        val cmap = mapOf( // http://docs.oracle.com/javafx/2/api/javafx/scene/doc-files/cssref.html#typecolor
-                A_MERGE to "salmon",
-        A_ISEQUAL to "white",
-        A_RMLOCAL to "salmon",
-        A_RMREMOTE to "salmon",
-        A_UNKNOWN to "red",
-        A_USELOCAL to "lightgreen",
-        A_USEREMOTE to "lightgreen",
-        A_CACHEONLY to "salmon",
-        A_RMBOTH to "salmon",
-        A_UNCHECKED to "red",
-        A_SYNCERROR to "red",
-        A_SKIP to "salmon"
+    fun stringToColor(actionString: String): Color {
+        val cmap = mapOf(
+                A_MERGE to Color.SALMON,
+                A_ISEQUAL to Color.WHITE,
+                A_RMLOCAL to Color.SALMON,
+                A_RMREMOTE to Color.SALMON,
+                A_UNKNOWN to Color.RED,
+                A_USELOCAL to Color.LIGHTGREEN,
+                A_USEREMOTE to Color.LIGHTGREEN,
+                A_CACHEONLY to Color.SALMON,
+                A_RMBOTH to Color.SALMON,
+                A_UNCHECKED to Color.RED,
+                A_SYNCERROR to Color.RED,
+                A_SKIP to Color.SALMON
         )
         val a = stringToAction(actionString)
         return cmap[a]!!
@@ -98,7 +104,6 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
             updateProgr(0, 100, "Initialize local and remote...")
             profile.taskIni.setOnSucceeded {
                 updateProgr(50, 100, "Run comparison...")
-
                 profile.taskCompFiles.setOnSucceeded {
                     val haveChanges = profile.taskCompFiles.get()
                     btCompare.isDisable = false
@@ -107,7 +112,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
-                        // TODO re-enable if safe! runSynchronize()
+                        runSynchronize()
                     } else {
                         logger.info("Finished compare")
                         updateSyncButton(allow = true)
@@ -126,7 +131,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         MyWorker.runTask(ctask)
     }
 
-    fun runSynchronize() {
+    private fun runSynchronize() {
         profile.taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
             MyWorker.runTask(profile.taskCleanup)
@@ -144,25 +149,28 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         syncEnabled = allow
         return updateSyncButton()
     }
-    // returns true if can synchronize
-    private fun updateSyncButton(): Boolean {
+
+    private fun updateSyncButton(): Boolean { // returns true if can synchronize
         logger.debug("update sync button")
         val canSync = if (syncEnabled) profile.cache.canSync() else false
-        //noinspection FieldFromDelayedInit
         btSync.isDisable = !canSync
         return canSync
     }
 
-    private val btSync = button("Sync!") { action {
-        logger.info("sync!")
-        // TODO
-    }}
+    private val btSync: Button = button("Sync!").apply {
+        setOnAction {
+            btCompare.isDisable = true
+            this.isDisable = true
+            runSynchronize()
+        }
+        isDisable = true
+    }
 
     private val btCompare = button("Compare!") { action {
-        logger.info("compare!")
-        // TODO
+        btSync.isDisable = true
+        this.isDisable = true
+        runCompare()
     }}
-
 
     private val fileTableView = tableview(profile.cache.observableList) {
         isEditable = false
@@ -171,12 +179,29 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         }
         readonlyColumn("Status", SyncEntry2::se).cellFormat {
             text = it.status().value
-            // TODO style =
+            style {
+                backgroundColor = multi(CF.stringToColor(it.status().value))
+                textFill = Color.BLACK
+            }
         }
         readonlyColumn("Remote", SyncEntry2::se).cellFormat {
             text = it.detailsRemote().value
         }
-        readonlyColumn("Path", SyncEntry2::path).remainingWidth() // TODO tooltip
+        readonlyColumn("Path", SyncEntry2::path).remainingWidth().cellFormat {
+            text = it
+            tooltip {
+                setOnShowing {
+                    logger.debug("loading tooltip")
+                    text = rowItem.toStringNice()
+                    style = "-fx-font-family: \"Courier New\";"
+                }
+            }
+        }
+
+        selectionModel.selectedItems.onChange {
+            updateActionButtons()
+        }
+        multiSelect(true)
     }
 
     private object AdvActions {
@@ -190,7 +215,10 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         promptText = "Advanced..."
         setOnAction {
             when (this.value) {
-                AdvActions.debug -> logger.debug("SE: " + fileTableView.selectedItem)
+                AdvActions.debug ->  {
+                    logger.debug("SE: " + fileTableView.selectedItem)
+                    profile.cache.dumpAll()
+                }
                 AdvActions.asRemote -> {
                     profile.iniLocalAsRemote()
                     profile.cache.updateObservableBuffer()
@@ -205,8 +233,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
                     val se2 = fileTableView.selectedItem
                     if (se2 != null) {
                         if (se2.se.lSize >= 0) {
-                            // TODO (don't expose rbp but construct is here again!???
-                            // revealFile(Paths.get(profile.local!!.remoteBasePath + "/" + se2.path).toFile)
+                             revealFile(Paths.get(profile.local!!.remoteBasePath + "/" + se2.path).toFile())
                         }
                     }
                 }
@@ -220,7 +247,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         b.setOnAction {
             for (idx in fileTableView.selectionModel.selectedItems) {
                 idx.se.action = action
-                fileTableView.refresh() // TODO needed?
+                fileTableView.refresh()
             }
             // advance
             fileTableView.selectionModel.clearAndSelect(fileTableView.selectionModel.selectedIndices.max()?:0 + 1)
@@ -237,34 +264,35 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
     private val btSkip = createActionButton("Skip", A_SKIP)
     private val btRmBoth = createActionButton("Delete both", A_RMBOTH)
 
-    fun updateActionButtons() {
-        // TODO
-//        debug("update action buttons")
-//        List(btRmLocal, btUseLocal, btMerge, btSkip, btRmBoth, btUseRemote, btRmRemote).foreach(bb => bb.setDisable(true))
-//        var allEqual = true
-//        var allowAction = true
-//        var legal = true // all have same file exist status
-//        var existCheck: (Boolean, Boolean) = null // (alllocalexists, allremoteexists)
-//        for (se2 <- tv.selectionModel().getSelectedItems) {
-//            if (existCheck == null)
-//                existCheck = (se2.se.lSize != -1, se2.se.rSize != -1)
-//            else
-//            if (existCheck != (se2.se.lSize != -1, se2.se.rSize != -1)) legal = false
-//            if (!se2.se.isEqual) allEqual = false
-//            if (se2.se.action == A_UNCHECKED || se2.se.action == A_CACHEONLY) allowAction = false
-//        }
-//        if (allowAction) {
-//            btSkip.setDisable(false)
-//            if (legal) {
-//                if (allEqual) {
-//                    if (existCheck == (true,true)) btRmBoth.setDisable(false)
-//                } else {
-//                    if (existCheck == (true,true)) List(btUseLocal,btUseRemote,btMerge,btRmBoth).foreach(bb=>bb.setDisable(false))
-//                    else if (existCheck == (true,false)) List(btUseLocal,btRmLocal).foreach(bb => bb.setDisable(false))
-//                    else if (existCheck == (false,true)) List(btUseRemote,btRmRemote).foreach(bb => bb.setDisable(false))
-//                }
-//            }
-//        }
+    private fun updateActionButtons() {
+        logger.debug("update action buttons")
+        listOf(btRmLocal, btUseLocal, btMerge, btSkip, btRmBoth, btUseRemote, btRmRemote).forEach { it.isDisable = true }
+        var allEqual = true
+        var allowAction = true
+        var legal = true // all have same file exist status
+        var existCheck: Pair<Boolean, Boolean>? = null // (alllocalexists, allremoteexists)
+        for (se2 in fileTableView.selectionModel.selectedItems) {
+            if (existCheck == null)
+                existCheck = Pair(se2.se.lSize != -1L, se2.se.rSize != -1L)
+            else
+            if (existCheck != Pair(se2.se.lSize != -1L, se2.se.rSize != -1L)) legal = false
+            if (!se2.se.isEqual()) allEqual = false
+            if (se2.se.action == A_UNCHECKED || se2.se.action == A_CACHEONLY) allowAction = false
+        }
+        if (allowAction) {
+            btSkip.isDisable = false
+            if (legal) {
+                if (allEqual) {
+                    if (existCheck == Pair(true,true)) btRmBoth.isDisable = false
+                } else {
+                    when (existCheck) {
+                        Pair(true,true) -> listOf(btUseLocal,btUseRemote,btMerge,btRmBoth).forEach { it.isDisable = false }
+                        Pair(true,false) -> listOf(btUseLocal,btRmLocal).forEach { it.isDisable = false }
+                        Pair(false,true) -> listOf(btUseRemote,btRmRemote).forEach { it.isDisable = false }
+                    }
+                }
+            }
+        }
     }
 
     private object Filters {
@@ -288,43 +316,34 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
             profile.cache.updateObservableBuffer()
         }
         selectionModel.select(Filters.all)
-        profile.cache.filterActions = Filters.getFilter(this.value) // TODO dupli code, solve.
     }
 
-    private val btDiff = Button("Quick diff").apply {
-        // TODO
-//        onAction = (_: ActionEvent) => {
-//        if (profile != null) if (profile.profileInitialized) {
-//            val se2 = tv.selectionModel().getSelectedItem
-//            if (se2 != null) {
-//                if (se2.se.lSize + se2.se.rSize < 100000) {
-//                    val lf = Files.createTempFile("sfsync-localfile", ".tmp")
-//                    val rf = Files.createTempFile("sfsync-remotefile", ".tmp")
-//                    profile.local.getfile(se2.path, se2.se.lTime, lf.toString)
-//                    profile.remote.getfile(se2.path, se2.se.rTime, rf.toString)
-//                    val lfc = readFileToString(lf)
-//                    val rfc = readFileToString(rf)
-//                    val diff = new diff_match_patch {
-//                        Diff_Timeout = 10
-//                    }
-//                    // debug("lfc:\n" + lfc)
-//                    // debug("rfc:\n" + rfc)
-//                    val (d, msg) = if (se2.se.action == A_USELOCAL)
-//                        (diff.diff_main(rfc, lfc), "Changes remote -> local:")
-//                    else (diff.diff_main(lfc, rfc), "Changes local -> remote:")
-//                    diff.diff_cleanupSemantic(d)
-//                    val res = diff.diff_prettyHtml(d)
-//                    dialogMessage(AlertType.Information, "Quick diff", msg, res)
-//                }
-//            }
-//        }
-//        debug("SE: " + tv.selectionModel().getSelectedItem)
-//    }
-    }
+    private val btDiff = Button("Quick diff").apply { setOnAction {
+        if (profile.profileInitialized) {
+            val se2 = fileTableView.selectedItem
+            if (se2 != null) {
+                if (se2.se.lSize + se2.se.rSize < 100000) {
+                    val lf = Files.createTempFile("sfsync-localfile", ".tmp")
+                    val rf = Files.createTempFile("sfsync-remotefile", ".tmp")
+                    profile.local!!.getfile("", se2.path, se2.se.lTime, lf.toString())
+                    profile.remote!!.getfile("", se2.path, se2.se.rTime, rf.toString())
+                    val lfc = readFileToString(lf)
+                    val rfc = readFileToString(rf)
+                    val diff = diff_match_patch().apply {
+                        Diff_Timeout = 10.0f
+                    }
+                    val d = diff.diff_main(lfc, rfc)
+                    diff.diff_cleanupSemantic(d)
+                    val res = diff.diff_prettyHtml(d)
+                    dialogMessage("Quick diff", "Changes local -> remote", res)
+                }
+            }
+        }
+    } }
 
 
     override val root = vbox {
-        prefWidth = 800.0
+        prefWidth = 1200.0
         prefHeight = 600.0
         toolbar {
             this += btCompare

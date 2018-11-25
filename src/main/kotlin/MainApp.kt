@@ -44,6 +44,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
         logger.info("*************** stop app")
         SettingsStore.saveSettings()
         DBSettings.releaseLock()
+        DBSettings.shutdown()
         System.exit(0)
     }
 
