@@ -113,7 +113,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
         }
         this += pathButtonFlowPane
-        label("Files:")
         this += fileTableView
         fileTableView.smartResize()
     }

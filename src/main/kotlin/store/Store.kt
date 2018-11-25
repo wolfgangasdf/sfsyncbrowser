@@ -1,4 +1,3 @@
-@file:Suppress("unused") // TODO
 package store
 
 import CF
@@ -7,6 +6,7 @@ import javafx.beans.property.*
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import mu.KotlinLogging
+import store.DBSettings.getCacheFilename
 import synchro.Actions.ALLACTIONS
 import synchro.Actions.A_CACHEONLY
 import synchro.Actions.A_ISEQUAL
@@ -58,7 +58,7 @@ object DBSettings {
         }
     }
 
-    private val lockFile = java.io.File("$settpath/SSB.lock")
+    val lockFile = java.io.File("$settpath/SSB.lock")
 
     val knownHostsFile = java.io.File("$settpath/known_hosts")
 
@@ -66,13 +66,21 @@ object DBSettings {
         knownHostsFile.createNewFile()
     }
 
-    fun dbpath(name: String): String = "$dbdir/$name"
-
     fun getSettingPath(): String = "$settpath/ssyncbrowser.properties"
 
     fun getLock(): Boolean = lockFile.createNewFile()
 
     fun releaseLock(): Boolean = lockFile.delete()
+
+    fun getCacheFilename(cacheid: String) = "$dbdir/$cacheid-cache.txt"
+
+    fun clearCacheFile(cacheid: String) {
+        logger.info("delete cache database $cacheid")
+        val fff = Paths.get(getCacheFilename(cacheid))
+        if (Files.exists(fff)) {
+            Files.delete(fff)
+        }
+    }
 
 }
 
@@ -93,8 +101,7 @@ class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPer
 
 class SubSet(val title: StringProperty, val status: StringProperty, val excludeFilter: StringProperty,
              val subfolders: ObservableList<String> = getSortedFilteredList(),
-             val sync: Sync,
-             val type: StringProperty = SimpleStringProperty("subset")) {
+             val sync: Sync) {
     override fun toString() = "[SubSet] ${title.value}"
 }
 
@@ -250,7 +257,6 @@ class SyncEntry2(var path: String, var se: SyncEntry) {
      |LCache : ${se.detailsLCache().value}
      |RCache : ${se.detailsRCache().value} (${se.hasCachedParent})
     """.trimMargin()
-
 }
 
 // if path endswith '/', it's a dir!!!
@@ -261,7 +267,6 @@ class SyncEntry(var action: Int,
                 var lcTime: Long, var rcTime: Long, var cSize: Long,
                 var isDir: Boolean,
                 var relevant: Boolean,
-                var selected: Boolean = false,
                 var delete: Boolean = false
 ) {
     var hasCachedParent = false // only used for folders!
@@ -363,7 +368,7 @@ class Cache(private val cacheid: String) {
     private val cacheversion = "V1"
     var cache = MyTreeMap<String, SyncEntry>()
     private var observableListSleep = false
-    private var observableList = FXCollections.emptyObservableList<SyncEntry2>()!!
+    var observableList = FXCollections.observableArrayList<SyncEntry2>()!!
 
     init {
         observableList.onChange { op ->
@@ -379,11 +384,10 @@ class Cache(private val cacheid: String) {
         }
     }
 
+    @Suppress("unused")
     fun dumpAll() {
         cache.iterate { _, path, se -> logger.debug("$path: $se") }
     }
-
-    private fun getCacheFilename(name: String) = "" + DBSettings.dbpath(name) + "-cache.txt"
 
     private fun iniCache() {
         cache = MyTreeMap()
@@ -447,18 +451,8 @@ class Cache(private val cacheid: String) {
         logger.info("cache database saved!")
     }
 
-    fun clearCacheFile() {
-        logger.info("delete cache database $cacheid")
-        val fff = Paths.get(getCacheFilename(cacheid))
-        if (Files.exists(fff)) {
-            Files.delete(fff)
-        }
-        cache.clear()
-        observableList.clear()
-    }
-
     // for listview
-    private var filterActions = ALLACTIONS
+    var filterActions = ALLACTIONS
 
     fun updateObservableBuffer() {
         logger.debug("update obs buffer...")
@@ -472,7 +466,7 @@ class Cache(private val cacheid: String) {
             } else true
         }
         observableListSleep = false
-        logger.debug("update obs buffer done!")
+        logger.debug("update obs buffer done! ${observableList.size}")
     }
 
     fun canSync(): Boolean {

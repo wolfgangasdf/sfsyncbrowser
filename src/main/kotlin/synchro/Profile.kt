@@ -1,4 +1,4 @@
-@file:Suppress("unused", "ConstantConditionIf") // TODO
+@file:Suppress("ConstantConditionIf")
 
 package synchro
 
@@ -27,10 +27,7 @@ import util.MyTask
 import util.MyWorker
 import util.StopWatch
 
-//import javafx.concurrent as jfxc
-
 private val logger = KotlinLogging.logger {}
-
 
 class Profile(server: Server, sync: Sync, subfolder: SubSet) {
     //var cache = mutableListOf<VirtualFile>() // was MutableList
@@ -41,8 +38,6 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
     var remote: GeneralConnection? = null
     private val uiUpdateInterval = 0.5
     private var profileInitialized = false
-
-    class ProfileAbortedException(message: String = "", cause: Throwable = Throwable()) : RuntimeException(message, cause)
 
     val taskIni = MyTask<Unit> {
         updateTit("Initialize connections...")
@@ -67,7 +62,6 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
 
 
     val taskCompFiles = MyTask<Boolean> {
-
         updateTit("CompareFiles...")
         val sw = StopWatch() // for timing meas
 
@@ -141,10 +135,7 @@ class Profile(server: Server, sync: Sync, subfolder: SubSet) {
         }
 
         logger.debug("sw: finding files: " + sw.getTimeRestart())
-        fun dumpAll() {
-            cache.cache.iterate { _, path, se -> logger.debug("$path: $se") }
-        }
-
+        // cache.dumpAll()
 
         val res = runUIwait {
             logger.debug("state after list: " + taskListLocal.state + "  remote:" + taskListRemote.state)

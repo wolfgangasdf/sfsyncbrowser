@@ -1,4 +1,3 @@
-@file:Suppress("unused") // TODO
 
 import javafx.scene.Scene
 import javafx.scene.image.Image
@@ -8,6 +7,8 @@ import mu.KotlinLogging
 import store.DBSettings
 import store.SettingsStore
 import tornadofx.*
+import util.Helpers
+import util.Helpers.dialogMessage
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,7 +31,6 @@ class Styles : Stylesheet() {
 
 fun <T: UIComponent> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     val newstage = Stage()
-//    newstage.title = view.title
     newstage.titleProperty().bind(view.titleProperty)
     newstage.scene = Scene(view.root)
     newstage.initModality(m)
@@ -48,11 +48,14 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
     }
 
     init {
+        if (!DBSettings.getLock()) {
+            Helpers.runUIwait { dialogMessage("SFSync Error", "Lock file exists", "Is another Sfsync instance running?<br>If not, remove " + DBSettings.lockFile.absolutePath) }
+            System.exit(1)
+        }
         addStageIcon(Image(resources["/icons/icon_16x16.png"]))
         addStageIcon(Image(resources["/icons/icon_32x32.png"]))
         addStageIcon(Image(resources["/icons/icon_256x256.png"]))
         initit()
-
     }
 }
 

@@ -105,7 +105,12 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Sync") {
                     field("Name and type") { textfield(sync.title) ; textfield(sync.type) }
-                    field("Sync cacheid") { textfield(sync.cacheid) }
+                    field("Cacheid") {
+                        textfield(sync.cacheid)
+                        button("Delete cache!").setOnAction {
+                            DBSettings.clearCacheFile(sync.cacheid.value)
+                        }
+                    }
                     field("Status") { label(sync.status) }
                     field("Local folder") {
                         valitextfield(sync.localfolder, absPathRegex, "absolute!")

@@ -1,4 +1,4 @@
-@file:Suppress("unused", "MemberVisibilityCanBePrivate", "ConstantConditionIf") // TODO
+@file:Suppress("ConstantConditionIf")
 
 package synchro
 
@@ -45,10 +45,10 @@ import kotlin.math.max
 
 private val logger = KotlinLogging.logger {}
 
-class MyURI(var protocol: String, var username: String, var host: String, var port: String) {
+class MyURI(var protocol: String, var username: String, var host: String, private var port: String) {
     constructor() : this("", "", "", "")
 
-    fun parseString(s: String): Boolean {
+    private fun parseString(s: String): Boolean {
         val regexinetres = """(\S+)://(\S+)@(\S+):(\S+)""".toRegex().find(s)
         return when {
             s == "file:///" -> { protocol = "file"; true }
@@ -64,8 +64,6 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
         }
     }
 
-    fun toURIString(): String = "$protocol://$username@$host:$port"
-
     override fun toString(): String = "$protocol,$username,$host,$port"
 
     constructor(s: String) : this() {
@@ -74,9 +72,8 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
     }
 }
 
-// path below basepath with a leading "/" TODO this should be without!!!!
-// if ends on "/", is dir!
-class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: String = "") : Comparable<VirtualFile> { // TODO was Ordered in scala
+// if ends on "/", is dir except for "" which is also dir (basepath)
+class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: String = "") : Comparable<VirtualFile> {
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
@@ -88,15 +85,15 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
     override fun toString(): String = "[$path]:$modTime,$size"
 
-    fun isDir(): Boolean = path.endsWith("/")
-    fun isFile(): Boolean = !path.endsWith("/")
+    fun isDir(): Boolean = path.endsWith("/") || path == ""
+    fun isFile(): Boolean = !isDir()
 
     override fun equals(other: Any?): Boolean {
-        if (other is VirtualFile) if (this.hashCode() == other.hashCode()) return true
+        if (other is VirtualFile) if (this.path == other.path && this.modTime == other.modTime && this.size == other.size) return true
         return false
     }
 
-    override fun hashCode(): Int = path.hashCode() + modTime.hashCode() + size.hashCode() // TODO this is crap
+    override fun hashCode(): Int = (path + modTime.toString() + size.toString()).hashCode()
 
     override fun compareTo(other: VirtualFile): Int = path.compareTo(other.path)
 }
@@ -105,7 +102,6 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
     protected var remoteBasePath: String = protocol.baseFolder.value
-    protected var filterregex: Regex = Regex(""".*""")
     protected val debugslow = false
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)
@@ -202,7 +198,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     // include the subfolder but root "/" is not allowed!
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
-        // scalax.io is horribly slow, there is an issue filed
         fun parseContent(cc: Path, goDeeper: Boolean) {
             // on mac 10.8 with oracle java 7, filenames are encoded with strange 'decomposed unicode'. grr
             // this is in addition to the bug that LC_CTYPE is not set. grrr
@@ -210,8 +205,9 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
             val javaPath = toJavaPathSeparator(cc.toString())
             val fixedPath = java.text.Normalizer.normalize(javaPath, java.text.Normalizer.Form.NFC)
-            logger.debug("javap=$javaPath fp=$fixedPath")
-            var strippedPath: String = if (fixedPath == remoteBasePath) "" else fixedPath.substring(remoteBasePath.length - 1)
+            // fixedPath is without trailing "/" for dirs!
+            logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
+            var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
             if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
             if (vf.isNotFiltered(filterregexp)) {
@@ -256,7 +252,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         private var lastTime: Long = 0
 
         override fun directory(name: String) =
-                MyTransferListener("$relPath$name/") // TODO
+                MyTransferListener("$relPath$name/")
 
         override fun file(name: String, size: Long): Listener {
             bytesTotal = size
@@ -411,6 +407,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 size = attrs.size
                 permissions = permToString(attrs.permissions)
                 if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
+                if (path == "/") path = ""
             }
         }
 
@@ -463,17 +460,15 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // https://stackoverflow.com/a/16023513
-    class PortForwardedSftp(val hostsftp: String, val hosttunnel: String, val tunnelmode: Int, val username: String, val password: String) {
+    class PortForwardedSftp(private val hostsftp: String, private val hosttunnel: String, private val tunnelmode: Int,
+                            private val username: String, private val password: String) {
 
-        val startPort = 2222
+        private val startPort = 2222
 
-        class PortForwarder(val sshClient: SSHClient, val remoteAddress: InetSocketAddress, val localSocket: ServerSocket) : Thread(), Closeable {
+        class PortForwarder(private val sshClient: SSHClient, private val remoteAddress: InetSocketAddress, private val localSocket: ServerSocket) : Thread(), Closeable {
             val latch = CountDownLatch(1)
 
-            private fun buildName(remoteAddress: InetSocketAddress, localPort: Int) =
-                "SSH local port forward thread [$localPort:$remoteAddress]"
-
-            var forwarder: LocalPortForwarder? = null
+            private var forwarder: LocalPortForwarder? = null
             override fun run() {
                 val params = LocalPortForwarder.Parameters("127.0.0.1", localSocket.localPort,
                         remoteAddress.hostName, remoteAddress.port)
@@ -491,8 +486,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         class TunnelPortManager {
-            val maxPort = 65536
-            val portsHandedOut = HashSet<Int>()
+            private val maxPort = 65536
+            private val portsHandedOut = HashSet<Int>()
 
             fun leaseNewPort(startFrom: Int): ServerSocket {
                 for (port in startFrom..maxPort) {
@@ -508,12 +503,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 throw IllegalStateException("Could not find a single free port in the range [$startFrom-$maxPort]...")
             }
 
-            @Synchronized
-            fun returnPort(socket: ServerSocket) {
-                portsHandedOut.remove(socket.localPort)
-            }
+//            @Synchronized
+//            fun returnPort(socket: ServerSocket) {
+//                portsHandedOut.remove(socket.localPort)
+//            }
 
-            fun isLeased(port: Int) = portsHandedOut.contains(port)
+            private fun isLeased(port: Int) = portsHandedOut.contains(port)
 
             private fun tryBind(localPort: Int): ServerSocket? {
                 return try {
@@ -527,7 +522,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
         }
 
-        fun startForwarder(forwarderThread: PortForwarder): PortForwarder {
+        private fun startForwarder(forwarderThread: PortForwarder): PortForwarder {
             forwarderThread.start()
             try {
                 forwarderThread.latch.await()
@@ -538,7 +533,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
 
-        fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
+        private fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
             val ssh = SSHClient()
             ssh.addHostKeyVerifier(MyHostKeyVerifier())
             ssh.connect(hostname, port)
@@ -562,7 +557,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             return ssh
         }
 
-        fun connect(): SSHClient {
+        private fun connect(): SSHClient {
             var usetunnel = tunnelmode == 1
             if (tunnelmode == 2) {
                 try {
@@ -605,12 +600,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         init {
             sshClient.startSession()
         }
-        val sftpClient = sshClient.newSFTPClient()!!
+        private val sftpClient = sshClient.newSFTPClient()!!
     }
 
 
 
-    val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
+    private val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
     private val sftpc = pfsftp.sshClient.newSFTPClient()
     private val sftpt = sftpc.fileTransfer
 

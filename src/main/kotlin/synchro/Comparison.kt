@@ -72,7 +72,7 @@ object Comparison {
             if (se.relevant && !se.isDir) {
                 if (se.cSize == -1L) { // only get parent folder for unknown files, faster!
                     val parent = getParentFolder(path)
-                    if (!cache.cache[parent]!!.hasCachedParent) {
+                    if (cache.cache[parent]?.hasCachedParent == false) {
                         se.compareSetAction(newcache = true) // test
                     } else {
                         se.compareSetAction(newcache = false)
