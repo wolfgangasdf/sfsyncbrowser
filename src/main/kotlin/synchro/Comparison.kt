@@ -45,12 +45,10 @@ object Comparison {
                 var doit = true
                 while (!haveCachedParentDir && doit) {
                     tmpf = getParentFolder(tmpf)
-                    if (tmpf != "/") {
-                        if (cache.cache.containsKey(tmpf))
-                            if (cache.cache[tmpf]!!.cSize != -1L) haveCachedParentDir = true
-                    } else {
-                        doit = false
-                    }
+                    if (tmpf == "/") tmpf = ""
+                    if (cache.cache.containsKey(tmpf))
+                        if (cache.cache[tmpf]!!.cSize != -1L) haveCachedParentDir = true
+                    if (tmpf == "") doit = false
                 }
                 se.hasCachedParent = haveCachedParentDir
                 se.compareSetAction(newcache = !haveCachedParentDir) // compare

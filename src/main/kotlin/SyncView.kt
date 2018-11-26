@@ -28,8 +28,8 @@ import util.Helpers.revealFile
 import util.Helpers.runUIwait
 import util.MyTask
 import util.MyWorker
+import java.io.File
 import java.nio.file.Files
-import java.nio.file.Paths
 
 private val logger = KotlinLogging.logger {}
 
@@ -73,7 +73,7 @@ object CF {
     }
 }
 
-class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
+class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $server $sync $subset") {
     private var profile = Profile(server, sync, subset)
 
     private var syncEnabled = false
@@ -134,6 +134,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
     private fun runSynchronize() {
         profile.taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
+            profile.taskCleanup.setOnSucceeded { this.close() }
             MyWorker.runTask(profile.taskCleanup)
         }
         profile.taskSynchronize.setOnFailed { handleFailed(profile.taskSynchronize) }
@@ -211,6 +212,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
         const val revealLocal = "Reveal local file"
         fun getList() = listOf(debug, asRemote, asLocal, revealLocal)
     }
+    // TODO change to contextmenu or ListMenu
     private val cbAdvanced = combobox(null, AdvActions.getList()) {
         promptText = "Advanced..."
         setOnAction {
@@ -233,7 +235,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view") {
                     val se2 = fileTableView.selectedItem
                     if (se2 != null) {
                         if (se2.se.lSize >= 0) {
-                             revealFile(Paths.get(profile.local!!.remoteBasePath + "/" + se2.path).toFile())
+                             revealFile(File(profile.local!!.remoteBasePath + "/" + se2.path))
                         }
                     }
                 }

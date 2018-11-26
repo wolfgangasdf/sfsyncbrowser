@@ -206,7 +206,6 @@ class MainView : View("SSyncBrowser") {
     }
 
     private val ttv = treeview<Any> {
-
         root = TreeItem<Any>("root")
         populate({ ite -> MyTreeItem(ite)}) { parent ->
             val value = parent.value
@@ -220,13 +219,12 @@ class MainView : View("SSyncBrowser") {
         root.isExpanded = true
         isShowRoot = false
         root.children.forEach { it.isExpanded = true ; it.children.forEach { it2 -> it2.isExpanded = true }}
-        useMaxHeight = true
+        prefHeight = 350.0
         useMaxWidth = true
     }
 
     override val root = vbox {
         prefWidth = 800.0
-        prefHeight = 600.0
         label("conns")
         this += ttv
         hbox {
@@ -265,6 +263,7 @@ class MainView : View("SSyncBrowser") {
                     else -> SettingsViewPlaceholder()
                 }
                 root += settingsview
+                FX.primaryStage.sizeToScene() // rescale stage to show full scene
             }
         }
     }
