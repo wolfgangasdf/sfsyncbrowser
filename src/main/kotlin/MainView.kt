@@ -68,7 +68,6 @@ class MainView : View("SSyncBrowser") {
                     field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
                     field("Don't set date") { checkbox("", proto.cantSetDate) }
                     field("Tunnel host") { textfield(proto.tunnelHost) ; combobox(proto.tunnelMode, SettingsStore.tunnelModes) }
-                    println("tmode=${proto.tunnelMode.value}")
                     field {
                         button("Remove protocol") { action {
                             proto.server.protocols.remove(proto)
@@ -145,6 +144,14 @@ class MainView : View("SSyncBrowser") {
 
     class SubsetSettingsPane(subset: SubSet): View() {
         override val root = Form()
+        companion object {
+            fun compSync(subset: SubSet) {
+                val sv = SyncView(subset.sync.server, subset.sync, subset)
+                openNewWindow(sv)
+                sv.runCompare()
+
+            }
+        }
         init {
             val lvFolders = listview(subset.subfolders).apply {
                 isEditable = true
@@ -158,9 +165,7 @@ class MainView : View("SSyncBrowser") {
                     field("Exclude filter") { textfield(subset.excludeFilter) }
                     field {
                         button("Compare & Sync!") { action {
-                            val sv = SyncView(subset.sync.server, subset.sync, subset)
-                            openNewWindow(sv)
-                            sv.runCompare()
+                            compSync(subset)
                         } }
                         button("Add new folder (remote)") { action {
                             val bv = openNewWindow(BrowserView(subset.sync.server, subset.sync.remoteFolder.value, "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
@@ -214,6 +219,20 @@ class MainView : View("SSyncBrowser") {
                 value is Server -> concatObsLists(value.protocols, value.syncs, value.bookmarks)
                 value is Sync -> value.subsets.sorted()
                 else -> null
+            }
+        }
+        cellFormat { tit ->
+            graphic = hbox {
+                label(tit.toString()) {
+                    isEditable = false
+                }
+                when (tit) {
+                    is Server -> button("Open browser").setOnAction { openNewWindow(BrowserView(tit, "", "")) }
+                    is BrowserBookmark -> button("Open browser").setOnAction { openNewWindow(BrowserView(tit.server, "", tit.path.value)) }
+                    // is Sync -> button("Compare & sync") TODO sync all?
+                    is SubSet -> button("Compare & sync").setOnAction { SubsetSettingsPane.compSync(tit) }
+                }
+
             }
         }
         root.isExpanded = true

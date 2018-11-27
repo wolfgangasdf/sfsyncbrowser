@@ -205,42 +205,28 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
         multiSelect(true)
     }
 
-    private object AdvActions {
-        const val debug = "Debug info"
-        const val asRemote = "Make local as remote"
-        const val asLocal = "Make remote as local"
-        const val revealLocal = "Reveal local file"
-        fun getList() = listOf(debug, asRemote, asLocal, revealLocal)
-    }
-    // TODO change to contextmenu or ListMenu
-    private val cbAdvanced = combobox(null, AdvActions.getList()) {
-        promptText = "Advanced..."
-        setOnAction {
-            when (this.value) {
-                AdvActions.debug ->  {
-                    logger.debug("SE: " + fileTableView.selectedItem)
-                    profile.cache.dumpAll()
-                }
-                AdvActions.asRemote -> {
-                    profile.iniLocalAsRemote()
-                    profile.cache.updateObservableBuffer()
-                    updateSyncButton()
-                }
-                AdvActions.asLocal -> {
-                    profile.iniRemoteAsLocal()
-                    profile.cache.updateObservableBuffer()
-                    updateSyncButton()
-                }
-                AdvActions.revealLocal -> {
-                    val se2 = fileTableView.selectedItem
-                    if (se2 != null) {
-                        if (se2.se.lSize >= 0) {
-                             revealFile(File(profile.local!!.remoteBasePath + "/" + se2.path))
-                        }
-                    }
+    private val mbAdvanced = menubutton("Advanced...") {
+        item("Debug info").setOnAction {
+            logger.debug("SE: " + fileTableView.selectedItem)
+            // profile.cache.dumpAll()
+        }
+        item("Make local as remote").setOnAction {
+            profile.iniLocalAsRemote()
+            profile.cache.updateObservableBuffer()
+            updateSyncButton()
+        }
+        item("Make remote as local").setOnAction {
+            profile.iniRemoteAsLocal()
+            profile.cache.updateObservableBuffer()
+            updateSyncButton()
+        }
+        item("Reveal local file").setOnAction {
+            val se2 = fileTableView.selectedItem
+            if (se2 != null) {
+                if (se2.se.lSize >= 0) {
+                    revealFile(File(profile.local!!.remoteBasePath + "/" + se2.path))
                 }
             }
-            println("act: " + it.toString())
         }
     }
 
@@ -358,7 +344,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
         fileTableView.smartResize()
         this += hbox {
             children.addAll(listOf(cFilter,btRmLocal, btUseLocal, btMerge,
-            btSkip, btRmBoth, btUseRemote, btRmRemote, btDiff, cbAdvanced))
+            btSkip, btRmBoth, btUseRemote, btRmRemote, btDiff, mbAdvanced))
         }
     }
 

@@ -361,7 +361,6 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     }
 
     private fun cleanup() {
-        println("cleanup!!!")
         /*if (taskList.isNotEmpty()) runLater {*/
             var iii = 0
             while (iii < taskList.size) {
@@ -372,7 +371,6 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
                 }
             }
             if (taskList.isEmpty()) {
-                println("close worker!")
                 this@MyWorker.hide()
             }
         //}

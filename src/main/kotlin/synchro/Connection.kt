@@ -567,7 +567,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 try {
                     val addr = InetAddress.getByName(hostsftp)
                     usetunnel = !addr.isReachable(500)
-                } catch (e: UnknownHostException) { println("unknown host, assume not reachable!")}
+                } catch (e: UnknownHostException) { logger.info("unknown host, assume not reachable!")}
             }
 
             return if (usetunnel) {
@@ -593,7 +593,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             sftpClient.close()
             if (forwarderThread != null) forwarderThread!!.close()
             if (sshClient.isConnected) sshClient.disconnect()
-            println("closed!")
+            logger.info("Sftp closed!")
         }
 
         private var forwarderThread: PortForwarder? = null
