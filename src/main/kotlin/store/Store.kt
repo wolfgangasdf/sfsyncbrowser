@@ -20,6 +20,7 @@ import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
+import util.SSP
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -87,7 +88,7 @@ object DBSettings {
 ///////////////////////// settings
 
 class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
-           val cacheid: StringProperty = SimpleStringProperty(java.util.Date().time.toString()), val server: Server,
+           val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList() ) {
     override fun toString() = "[Sync] ${title.value}"
 }
@@ -199,13 +200,13 @@ object SettingsStore {
             propsx.load(fr)
             val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
             if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
-            fun p2sp(key: String) = SimpleStringProperty(props.getOrDefault(key, ""))
+            fun p2sp(key: String) = SSP(props.getOrDefault(key, ""))
             fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
             fun p2ip(key: String) = SimpleIntegerProperty(props.getOrDefault(key, "0").toInt())
             try {
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
-                            SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"))
+                            SSP(""), p2ip("se.$idx.currentProtocol"))
                     for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "0").toInt()) {
                         server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
@@ -217,7 +218,7 @@ object SettingsStore {
                     if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
-                                SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
+                                SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
                             val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
                             for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!
@@ -272,18 +273,18 @@ class SyncEntry(var action: Int,
     var hasCachedParent = false // only used for folders!
     private fun sameTime(t1: Long, t2: Long): Boolean = Math.abs(t1 - t2) < 2000 // in milliseconds
 
-    fun status() = SimpleStringProperty(this, "status", CF.amap[action])
+    fun status() = SSP(this, "status", CF.amap[action])
     private fun dformat() = java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
-    fun detailsLocal() = SimpleStringProperty(this, "detailsl",
+    fun detailsLocal() = SSP(this, "detailsl",
             if (lSize != -1L) dformat().format(java.util.Date(lTime)) + "(" + lSize + ")" else "none")
 
-    fun detailsRemote() = SimpleStringProperty(this, "detailsr",
+    fun detailsRemote() = SSP(this, "detailsr",
             if (rSize != -1L) dformat().format(java.util.Date(rTime)) + "(" + rSize + ")" else "none")
 
-    fun detailsRCache() = SimpleStringProperty(this, "detailsrc",
+    fun detailsRCache() = SSP(this, "detailsrc",
             if (cSize != -1L) dformat().format(java.util.Date(rcTime)) + "(" + cSize + ")" else "none")
 
-    fun detailsLCache() = SimpleStringProperty(this, "detailslc",
+    fun detailsLCache() = SSP(this, "detailslc",
             if (cSize != -1L) dformat().format(java.util.Date(lcTime)) + "(" + cSize + ")" else "none")
 
     //  fun isDir = path.endsWith("/")

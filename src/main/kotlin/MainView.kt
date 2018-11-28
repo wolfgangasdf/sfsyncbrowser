@@ -1,8 +1,8 @@
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
-import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
+import javafx.geometry.Pos
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
@@ -14,9 +14,24 @@ import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
 import util.Helpers.relPathRegex
 import util.Helpers.valitextfield
+import util.SSP
 import java.io.File
 
 private val logger = KotlinLogging.logger {}
+
+class Styles : Stylesheet() {
+    companion object {
+        val thinbutton by cssclass()
+    }
+
+    init {
+        thinbutton {
+            fontSize = 0.8.em
+            padding = box(2.0.px)
+        }
+        logger.info("Loaded stylesheet!")
+    }
+}
 
 class MainView : View("SSyncBrowser") {
 
@@ -34,14 +49,14 @@ class MainView : View("SSyncBrowser") {
                     field("Protocol") { combobox<Protocol>(server.proto, server.protocols) }
                     field {
                         button("Add new protocol") { action {
-                            server.protocols += Protocol(server, SimpleStringProperty("sftp:user@//"), SimpleBooleanProperty(false),
-                                    SimpleStringProperty(""), SimpleBooleanProperty(false),
-                                    SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
+                            server.protocols += Protocol(server, SSP("sftp:user@//"), SimpleBooleanProperty(false),
+                                    SSP(""), SimpleBooleanProperty(false),
+                                    SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0]))
                         } }
                         button("Add new sync") { action {
-                            server.syncs += Sync(SimpleStringProperty("sytype"), SimpleStringProperty("syname"),
-                                SimpleStringProperty("systatus"), SimpleStringProperty("sylocalfolder"),
-                                SimpleStringProperty("syremotefolder"), server=server)
+                            server.syncs += Sync(SSP("sytype"), SSP("syname"),
+                                SSP("systatus"), SSP("sylocalfolder"),
+                                SSP("syremotefolder"), server=server)
                         } }
                         button("Open browser") { action {
                             openNewWindow(BrowserView(server, "", ""))
@@ -130,8 +145,8 @@ class MainView : View("SSyncBrowser") {
                     }
                     field {
                         button("Add new subset") { action {
-                            sync.subsets += SubSet(SimpleStringProperty("ssname"),
-                                    SimpleStringProperty("ssstatus"), SimpleStringProperty("ssexcl"), sync = sync)
+                            sync.subsets += SubSet(SSP("ssname"),
+                                    SSP("ssstatus"), SSP("ssexcl"), sync = sync)
                         } }
                         button("Remove sync") { action {
                             sync.server.syncs.remove(sync)
@@ -222,15 +237,23 @@ class MainView : View("SSyncBrowser") {
             }
         }
         cellFormat { tit ->
-            graphic = hbox {
+            graphic = hbox(20, Pos.CENTER_LEFT) {
                 label(tit.toString()) {
                     isEditable = false
                 }
                 when (tit) {
-                    is Server -> button("Open browser").setOnAction { openNewWindow(BrowserView(tit, "", "")) }
-                    is BrowserBookmark -> button("Open browser").setOnAction { openNewWindow(BrowserView(tit.server, "", tit.path.value)) }
-                    // is Sync -> button("Compare & sync") TODO sync all?
-                    is SubSet -> button("Compare & sync").setOnAction { SubsetSettingsPane.compSync(tit) }
+                    is Server -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
+                        openNewWindow(BrowserView(tit, "", ""))
+                    }
+                    is BrowserBookmark -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
+                        openNewWindow(BrowserView(tit.server, "", tit.path.value))
+                    }
+                    is Sync -> button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
+                        // TODO what is with excludefilters? SubsetSettingsPane.compSync(SubSet(SSP("all"), SSP(""), SSP))
+                    }
+                    is SubSet -> button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
+                        SubsetSettingsPane.compSync(tit)
+                    }
                 }
 
             }
@@ -248,7 +271,7 @@ class MainView : View("SSyncBrowser") {
         this += ttv
         hbox {
             button("Add server") { action {
-                SettingsStore.servers += Server(SimpleStringProperty("name"), SimpleStringProperty("status"),
+                SettingsStore.servers += Server(SSP("name"), SSP("status"),
                         SimpleIntegerProperty(-1))
             } }
             button("save sett") { action {

@@ -3,7 +3,6 @@
 package synchro
 
 import javafx.beans.property.SimpleBooleanProperty
-import javafx.beans.property.SimpleStringProperty
 import javafx.concurrent.Worker
 import mu.KotlinLogging
 import store.*
@@ -19,13 +18,9 @@ import synchro.Actions.A_UNCHECKED
 import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
-import util.Helpers
+import util.*
 import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
-
-import util.MyTask
-import util.MyWorker
-import util.StopWatch
 
 private val logger = KotlinLogging.logger {}
 
@@ -41,9 +36,9 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
         updateTit("Initialize connections...")
         cache.loadCache()
 
-        val localproto = Protocol(server, SimpleStringProperty("file:///"), SimpleBooleanProperty(false),
-                SimpleStringProperty(""), SimpleBooleanProperty(false),
-                SimpleStringProperty(sync.localfolder.value), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
+        val localproto = Protocol(server, SSP("file:///"), SimpleBooleanProperty(false),
+                SSP(""), SimpleBooleanProperty(false),
+                SSP(sync.localfolder.value), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0]))
         local = LocalConnection(localproto)
         local!!.assignRemoteBasePath("")
 

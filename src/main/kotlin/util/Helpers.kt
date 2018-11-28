@@ -3,6 +3,7 @@
 package util
 
 import javafx.application.Platform
+import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -36,6 +37,8 @@ import kotlin.math.floor
 
 
 private val logger = KotlinLogging.logger {}
+
+typealias SSP = SimpleStringProperty
 
 object Helpers {
     fun isMac() = System.getProperty("os.name").toLowerCase().contains("mac")
