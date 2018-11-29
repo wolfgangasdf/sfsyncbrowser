@@ -3,6 +3,7 @@
 package synchro
 
 import javafx.application.Platform
+import javafx.scene.control.Alert
 import mu.KotlinLogging
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.KeyType
@@ -551,7 +552,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 if (pw != "") {
                     ssh.authPassword(username, pw)
                 } else {
-                    runUIwait { dialogMessage("SSH", "Public key auth failed, require password.", "") }
+                    runUIwait { dialogMessage(Alert.AlertType.ERROR, "SSH", "Public key auth failed, require password.", "") }
                     throw UserAuthException("No password")
                 }
             }

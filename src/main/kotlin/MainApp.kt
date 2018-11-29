@@ -1,5 +1,6 @@
 
 import javafx.scene.Scene
+import javafx.scene.control.Alert
 import javafx.scene.image.Image
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
@@ -40,7 +41,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
     init {
         reloadStylesheetsOnFocus() // works only if run in debug mode! remove in production?
         if (!DBSettings.getLock()) {
-            Helpers.runUIwait { dialogMessage("SFSync Error", "Lock file exists", "Is another Sfsync instance running?<br>If not, remove " + DBSettings.lockFile.absolutePath) }
+            Helpers.runUIwait { dialogMessage(Alert.AlertType.ERROR, "SFSync Error", "Lock file exists", "Is another Sfsync instance running?<br>If not, remove " + DBSettings.lockFile.absolutePath) }
             System.exit(1)
         }
         addStageIcon(Image(resources["/icons/icon_16x16.png"]))

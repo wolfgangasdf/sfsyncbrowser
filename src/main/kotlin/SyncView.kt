@@ -1,5 +1,6 @@
 
 import diffmatchpatch.diff_match_patch
+import javafx.scene.control.Alert
 import javafx.scene.control.Button
 import javafx.scene.paint.Color
 import mu.KotlinLogging
@@ -81,7 +82,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
     private fun handleFailed(task: MyTask<*>) {
         runUIwait {
             logger.info("Failed!")
-            dialogMessage("Error", task.title, task.exception.toString())
+            dialogMessage(Alert.AlertType.ERROR, "Error", task.title, task.exception.toString())
             task.exception.printStackTrace()
             profile.cache.updateObservableBuffer()
             btSync.isDisable = true ; btCompare.isDisable = false
@@ -323,7 +324,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
                     val d = diff.diff_main(lfc, rfc)
                     diff.diff_cleanupSemantic(d)
                     val res = diff.diff_prettyHtml(d)
-                    dialogMessage("Quick diff", "Changes local -> remote", res)
+                    dialogMessage(Alert.AlertType.INFORMATION, "Quick diff", "Changes local -> remote", res)
                 }
             }
         }

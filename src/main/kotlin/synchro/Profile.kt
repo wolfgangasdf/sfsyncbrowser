@@ -68,7 +68,7 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
         // ini files
         cache.cache.iterate { _, path, se ->
             var addit = cacheall
-            if (!cacheall) for (sf in subfolder.subfolders) if (path.startsWith("/$sf/")) addit = true
+            if (!cacheall) for (sf in subfolder.subfolders) if (path.startsWith(sf)) addit = true
             if (addit) {
                 se.action = A_UNCHECKED; se.lSize = -1; se.lTime = -1; se.rSize = -1; se.rTime = -1; se.relevant = true
             } else {

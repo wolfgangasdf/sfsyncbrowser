@@ -3,6 +3,7 @@ import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
+import javafx.scene.control.Alert
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
@@ -12,6 +13,7 @@ import tornadofx.*
 import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
+import util.Helpers.dialogMessage
 import util.Helpers.relPathRegex
 import util.Helpers.valitextfield
 import util.SSP
@@ -249,7 +251,10 @@ class MainView : View("SSyncBrowser") {
                         openNewWindow(BrowserView(tit.server, "", tit.path.value))
                     }
                     is Sync -> button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                        // TODO what is with excludefilters? SubsetSettingsPane.compSync(SubSet(SSP("all"), SSP(""), SSP))
+                        val all = tit.subsets.filter { it2 -> it2.title.value == "all" }
+                        if (all.size == 1) {
+                            SubsetSettingsPane.compSync(all.first())
+                        } else dialogMessage(Alert.AlertType.ERROR, "Error", "You must have exactly one \"all\" subset!", "")
                     }
                     is SubSet -> button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
                         SubsetSettingsPane.compSync(tit)

@@ -216,21 +216,23 @@ object Helpers {
         }.showAndWait().orElse("")
     }
 
-    fun dialogMessage(titletext: String, header: String, htmlmsg: String) {
-        Dialog<Boolean>().apply {
+    fun dialogMessage(type: Alert.AlertType, titletext: String, header: String, htmlmsg: String) {
+        Alert(type).apply {
             //if (stage.owner.nonEmpty) initOwner(stage)
             (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
-            val sp2 = ScrollPane().apply { // optional html message
-                content = WebView().apply {
-                    engine.loadContent(htmlmsg)
+            if (htmlmsg != "") {
+                val sp2 = ScrollPane().apply {
+                    // optional html message
+                    content = WebView().apply {
+                        engine.loadContent(htmlmsg)
+                    }
+                    isFitToWidth = true
+                    isFitToHeight = true
                 }
-                isFitToWidth = true
-                isFitToHeight = true
+                dialogPane.content = sp2
             }
-            dialogPane.content = sp2
-            dialogPane.buttonTypes += listOf(ButtonType.OK).observable()
         }.showAndWait()
     }
 
