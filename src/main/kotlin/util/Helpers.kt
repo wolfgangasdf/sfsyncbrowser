@@ -115,6 +115,8 @@ object Helpers {
 
     val relPathRegex = "(^$)|(^[^/].*/$)".toRegex() // "", "asdf/"
     val absPathRegex = "(^/$)|(^/.*/$)".toRegex() // "/", "/asdf/"
+    val permissionsRegex = "([ugo][+-][rwxa],?)*".toRegex()
+    val permissionsParseRegex = "([ugo])([+-])([rwxa])".toRegex()
 
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.

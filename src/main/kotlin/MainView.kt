@@ -14,7 +14,9 @@ import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
 import util.Helpers.dialogMessage
+import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
+import util.Helpers.revealFile
 import util.Helpers.valitextfield
 import util.SSP
 import java.io.File
@@ -47,7 +49,6 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Server") {
                     field("Name") { textfield(server.title) }
-                    field("Status") { label(server.status) }
                     field("Protocol") { combobox<Protocol>(server.proto, server.protocols) }
                     field {
                         button("Add new protocol") { action {
@@ -57,7 +58,7 @@ class MainView : View("SSyncBrowser") {
                         } }
                         button("Add new sync") { action {
                             server.syncs += Sync(SSP("sytype"), SSP("syname"),
-                                SSP("systatus"), SSP("sylocalfolder"),
+                                SSP(""), SSP("sylocalfolder"),
                                 SSP("syremotefolder"), server=server)
                         } }
                         button("Open browser") { action {
@@ -80,16 +81,26 @@ class MainView : View("SSyncBrowser") {
         init {
             with(root) {
                 fieldset("Protocol") {
-                    field("URI and password") { textfield(proto.protocoluri) ; passwordfield(proto.password) }
-                    field("Basefolder") { valitextfield(proto.baseFolder, absPathRegex, "absolute!") }
-                    field("Set permissions") { checkbox("", proto.doSetPermissions) ; textfield(proto.perms) }
-                    field("Don't set date") { checkbox("", proto.cantSetDate) }
-                    field("Tunnel host") { textfield(proto.tunnelHost) ; combobox(proto.tunnelMode, SettingsStore.tunnelModes) }
+                    field("URI and password") {
+                        textfield(proto.protocoluri) { tooltip("'sftp://user@host:port' or 'file:///") }
+                        passwordfield(proto.password) { tooltip("Leave empty for public key authentification")}
+                    }
+                    field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder'") { } }
+                    field("Set permissions") {
+                        checkbox("", proto.doSetPermissions) { tooltip("Set permissions on files/directories on remote server?") }
+                        valitextfield(proto.perms, permissionsRegex, "Regex: $permissionsRegex") { tooltip("Remote permissions to be applied after uploading files/directories, like 'g+w,o+r'") }
+                    }
+                    field("Don't set date") { checkbox("", proto.cantSetDate) {
+                        tooltip("E.g., on un-rooted Android devices I can't set the file date via sftp,\nselect this and I will keep track of actual remote times.")
+                    } }
+                    field("Tunnel host") {
+                        textfield(proto.tunnelHost) { tooltip("Enter tunnel host:port from which the sftp server is reachable") }
+                        combobox(proto.tunnelMode, SettingsStore.tunnelModes) { tooltip("Choose if tunnel shall be used, or auto (tries to ping sftp host)") }
+                    }
                     field {
                         button("Remove protocol") { action {
                             proto.server.protocols.remove(proto)
                         } }
-
                     }
                 }
             }
@@ -123,21 +134,25 @@ class MainView : View("SSyncBrowser") {
                     field("Name and type") { textfield(sync.title) ; textfield(sync.type) }
                     field("Cacheid") {
                         textfield(sync.cacheid)
-                        button("Delete cache!").setOnAction {
+                        button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
                             DBSettings.clearCacheFile(sync.cacheid.value)
                         }
                     }
-                    field("Status") { label(sync.status) }
                     field("Local folder") {
-                        valitextfield(sync.localfolder, absPathRegex, "absolute!")
+                        valitextfield(sync.localfolder, absPathRegex, "absolute!") { tooltip("Local base folder such as '/localdir'") }
                         button("Choose...").setOnAction {
                             val dir = chooseDirectory("Select local folder")
-                            if (dir != null) if (dir.isDirectory) sync.localfolder.set(dir.absolutePath + "/")
+                            if (dir != null) if (dir.isDirectory) {
+                                sync.localfolder.set(if (dir.absolutePath.endsWith("/")) dir.absolutePath else dir.absolutePath + "/")
+                            }
                         }
+                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value)) }
                     }
 
                     field("Remote folder") {
-                        valitextfield(sync.remoteFolder, relPathRegex, "relative!")
+                        valitextfield(sync.remoteFolder, relPathRegex, "relative!") {
+                            tooltip("Remote base directory below protocol remote base folder such as 'remotebasedir/sub")
+                        }
                         button("Choose...").setOnAction {
                             val bv = openNewWindow(BrowserView(sync.server, "", "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
                             bv.selectFolderCallback = { it2 ->
@@ -148,7 +163,11 @@ class MainView : View("SSyncBrowser") {
                     field {
                         button("Add new subset") { action {
                             sync.subsets += SubSet(SSP("ssname"),
-                                    SSP("ssstatus"), SSP("ssexcl"), sync = sync)
+                                    SSP(""), SSP("ssexcl"), sync = sync)
+                        } }
+                        button("Add <all> subset") { action {
+                            val ss = SubSet(SSP("all"), SSP(""), SSP(""), sync = sync)
+                            ss.subfolders += ""
                         } }
                         button("Remove sync") { action {
                             sync.server.syncs.remove(sync)
@@ -244,20 +263,29 @@ class MainView : View("SSyncBrowser") {
                     isEditable = false
                 }
                 when (tit) {
-                    is Server -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
-                        openNewWindow(BrowserView(tit, "", ""))
+                    is Server -> { button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
+                            openNewWindow(BrowserView(tit, "", ""))
+                        }
+                        label(tit.status)
                     }
+
                     is BrowserBookmark -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
                         openNewWindow(BrowserView(tit.server, "", tit.path.value))
                     }
-                    is Sync -> button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                        val all = tit.subsets.filter { it2 -> it2.title.value == "all" }
-                        if (all.size == 1) {
-                            SubsetSettingsPane.compSync(all.first())
-                        } else dialogMessage(Alert.AlertType.ERROR, "Error", "You must have exactly one \"all\" subset!", "")
+                    is Sync -> {
+                        button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
+                            val all = tit.subsets.filter { it2 -> it2.title.value == "all" }
+                            if (all.size == 1) {
+                                SubsetSettingsPane.compSync(all.first())
+                            } else dialogMessage(Alert.AlertType.ERROR, "Error", "You must have exactly one \"all\" subset!", "")
+                        }
+                        label(tit.status)
                     }
-                    is SubSet -> button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
-                        SubsetSettingsPane.compSync(tit)
+                    is SubSet -> {
+                        button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
+                            SubsetSettingsPane.compSync(tit)
+                        }
+                        label(tit.status)
                     }
                 }
 

@@ -315,14 +315,28 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         val (cp, isdir) = checkIsDir(from)
         val rp = "$remoteBasePath$cp"
 
-        fun setAttr(changeperms: Boolean) {
+        fun setAttr(changeperms: Boolean, rp: String) {
             val lf = FileSystemFile("$localBasePath$cp")
             val fab = FileAttributes.Builder()
             if (changeperms) {
-                val perms = FilePermission.fromMask(lf.permissions)
-//        if (protocol.remGroupWrite.value) perms.add(FilePermission.GRP_W) else perms.remove(FilePermission.GRP_W)
-//        if (protocol.remOthersWrite.value) perms.add(FilePermission.OTH_W) else perms.remove(FilePermission.OTH_W)
-                fab.withPermissions(perms)
+                val perms = sftpc.perms(rp).toMutableList()
+                Helpers.permissionsParseRegex.findAll(protocol.perms.value).forEach { r ->
+                    val whowhat = r.groupValues[1] + r.groupValues[3]
+                    val fp = when(whowhat) {
+                        "ur" -> FilePermission.USR_R
+                        "uw" -> FilePermission.USR_W
+                        "ux" -> FilePermission.USR_X
+                        "gr" -> FilePermission.GRP_R
+                        "gw" -> FilePermission.GRP_W
+                        "gx" -> FilePermission.GRP_X
+                        "or" -> FilePermission.OTH_R
+                        "ow" -> FilePermission.OTH_W
+                        "ox" -> FilePermission.OTH_X
+                        else -> throw Exception("should not happen")
+                    }
+                    if (r.groupValues[2] == "+") perms.add(fp) else perms.remove(fp)
+                }
+                fab.withPermissions(perms.toSet())
             }
             fab.withAtimeMtime(lf.lastAccessTime, lf.lastModifiedTime)
             sftpc.setattr(rp, fab.build())
@@ -338,14 +352,14 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
             checkit(rp)
             sftpc.mkdir(rp)
-            if (protocol.doSetPermissions.value) setAttr(true)
+            if (protocol.doSetPermissions.value) setAttr(true, rp)
             mtime // dirs don't need mtime
         } else {
             try {
                 if (!Files.isReadable(Paths.get("$localBasePath$cp"))) throw IllegalStateException("can't read file $cp")
                 sftpt.upload("$localBasePath$cp", rp) // use this in place of sftpc.put to not always set file attrs
-                if (protocol.doSetPermissions.value) setAttr(true)
-                else if (!protocol.cantSetDate.value) setAttr(false)
+                if (protocol.doSetPermissions.value) setAttr(true, rp)
+                else if (!protocol.cantSetDate.value) setAttr(false, rp)
             } catch (e: Exception) {
                 logger.debug("putfile: exception: $e")
                 if (transferListener!!.bytesTransferred > 0) { // file may be corrupted, but don't delete if nothing transferred
@@ -599,7 +613,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
         private var forwarderThread: PortForwarder? = null
         private val portManager = TunnelPortManager()
-        // TODO: ? Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
+        // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
         val sshClient = connect()
         init {
@@ -620,7 +634,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         transferListener = MyTransferListener()
         sftpt.transferListener = transferListener
 
-        sftpt.preserveAttributes = false // don't set permissions remote! Either by user or not at all.
+        sftpt.preserveAttributes = false // don't set permissions from local, mostly doesn't make sense! Either by user or not at all.
 
         if (Helpers.failat == 2) throw UnsupportedOperationException("fail 2")
     }
