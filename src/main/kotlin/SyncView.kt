@@ -304,7 +304,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
             logger.debug("setting filter to " + profile.cache.filterActions.joinToString(","))
             profile.cache.updateObservableBuffer()
         }
-        selectionModel.select(Filters.all)
+        profile.cache.filterActions = Filters.getFilter(Filters.changes)
     }
 
     private val btDiff = Button("Quick diff").apply { setOnAction {

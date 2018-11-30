@@ -98,6 +98,8 @@ class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPer
                val tunnelHost: StringProperty, val tunnelMode: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
     override fun toString(): String = "[Protocol ${protocoluri.value}]"
+    fun tunnelHostname() = tunnelHost.value.split(":").first()
+    fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }
 
 class SubSet(val title: StringProperty, val status: StringProperty, val excludeFilter: StringProperty,

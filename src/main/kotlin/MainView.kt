@@ -82,7 +82,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Protocol") {
                     field("URI and password") {
-                        textfield(proto.protocoluri) { tooltip("'sftp://user@host:port' or 'file:///") }
+                        textfield(proto.protocoluri) { tooltip("'sftp://user@host[:port]' or 'file:///") }
                         passwordfield(proto.password) { tooltip("Leave empty for public key authentification")}
                     }
                     field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder'") { } }
@@ -94,7 +94,7 @@ class MainView : View("SSyncBrowser") {
                         tooltip("E.g., on un-rooted Android devices I can't set the file date via sftp,\nselect this and I will keep track of actual remote times.")
                     } }
                     field("Tunnel host") {
-                        textfield(proto.tunnelHost) { tooltip("Enter tunnel host:port from which the sftp server is reachable") }
+                        textfield(proto.tunnelHost) { tooltip("Enter tunnel host[:port] from which the sftp server is reachable") }
                         combobox(proto.tunnelMode, SettingsStore.tunnelModes) { tooltip("Choose if tunnel shall be used, or auto (tries to ping sftp host)") }
                     }
                     field {
@@ -163,7 +163,7 @@ class MainView : View("SSyncBrowser") {
                     field {
                         button("Add new subset") { action {
                             sync.subsets += SubSet(SSP("ssname"),
-                                    SSP(""), SSP("ssexcl"), sync = sync)
+                                    SSP(""), SSP(""), sync = sync)
                         } }
                         button("Add <all> subset") { action {
                             val ss = SubSet(SSP("all"), SSP(""), SSP(""), sync = sync)
@@ -203,10 +203,10 @@ class MainView : View("SSyncBrowser") {
                         button("Compare & Sync!") { action {
                             compSync(subset)
                         } }
-                        button("Add new folder (remote)") { action {
-                            val bv = openNewWindow(BrowserView(subset.sync.server, subset.sync.remoteFolder.value, "", BrowserViewMode.SELECTFOLDER), Modality.APPLICATION_MODAL)
-                            bv.selectFolderCallback = {
-                                subset.subfolders += it.path
+                        button("Add new folder(s) (remote)") { action {
+                            val bv = openNewWindow(BrowserView(subset.sync.server, subset.sync.remoteFolder.value, "", BrowserViewMode.SELECTFOLDERS), Modality.APPLICATION_MODAL)
+                            bv.selectFoldersCallback = {
+                                it.forEach { vf -> subset.subfolders += vf.path }
                             }
                         } }
                         button("Add new folder (local)") { action {
@@ -253,7 +253,7 @@ class MainView : View("SSyncBrowser") {
             when {
                 parent == root -> SettingsStore.servers
                 value is Server -> concatObsLists(value.protocols, value.syncs, value.bookmarks)
-                value is Sync -> value.subsets.sorted()
+                value is Sync -> value.subsets
                 else -> null
             }
         }

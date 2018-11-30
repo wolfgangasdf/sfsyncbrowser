@@ -46,8 +46,8 @@ import kotlin.math.max
 
 private val logger = KotlinLogging.logger {}
 
-class MyURI(var protocol: String, var username: String, var host: String, private var port: String) {
-    constructor() : this("", "", "", "")
+class MyURI(var protocol: String, var username: String, var host: String, var port: Int) {
+    constructor() : this("", "", "", -1)
 
     private fun parseString(s: String): Boolean {
         val regexinetres = """(\S+)://(\S+)@(\S+):(\S+)""".toRegex().find(s)
@@ -57,7 +57,7 @@ class MyURI(var protocol: String, var username: String, var host: String, privat
                 val (prot1, userinfo, host1, port1) = regexinetres.destructured
                 protocol = prot1
                 host = host1
-                port = port1
+                port = port1.toInt()
                 username = userinfo
                 true
             }
@@ -479,7 +479,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // https://stackoverflow.com/a/16023513
-    class PortForwardedSftp(private val hostsftp: String, private val hosttunnel: String, private val tunnelmode: Int,
+    class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int, private val hosttunnel: String, private val porttunnel: Int, private val tunnelmode: Int,
                             private val username: String, private val password: String) {
 
         private val startPort = 2222
@@ -588,18 +588,18 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             return if (usetunnel) {
                 if (hosttunnel.isEmpty()) throw Exception("tunnel host must not be empty!")
                 logger.info("making initial connection to $hosttunnel")
-                val sshClient = getSSHClient(username, password, hosttunnel, 22)
+                val sshClient = getSSHClient(username, password, hosttunnel, porttunnel)
                 logger.info("creating connection to $hostsftp")
                 val ss = portManager.leaseNewPort(startPort)
 
-                val sftpAddress = InetSocketAddress(hostsftp, 22)
+                val sftpAddress = InetSocketAddress(hostsftp, portsftp)
 
                 forwarderThread = PortForwarder(sshClient, sftpAddress, ss)
                 forwarderThread = startForwarder(forwarderThread!!)
                 getSSHClient(username, password, "127.0.0.1", ss.localPort)
             } else {
                 logger.info("creating direct connection to $hostsftp")
-                getSSHClient(username, password, hostsftp, 22)
+                getSSHClient(username, password, hostsftp, portsftp)
             }
 
         }
@@ -622,9 +622,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         private val sftpClient = sshClient.newSFTPClient()!!
     }
 
-
-
-    private val pfsftp = PortForwardedSftp(uri.host, protocol.tunnelHost.value, max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
+    private val pfsftp = PortForwardedSftp(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
     private val sftpc = pfsftp.sshClient.newSFTPClient()
     private val sftpt = sftpc.fileTransfer
 

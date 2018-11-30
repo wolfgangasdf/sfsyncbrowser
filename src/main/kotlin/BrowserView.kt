@@ -16,7 +16,7 @@ import util.MyWorker
 private val logger = KotlinLogging.logger {}
 
 enum class BrowserViewMode {
-    NORMAL, SELECTFOLDER
+    NORMAL, SELECTFOLDER, SELECTFOLDERS
 }
 
 class BrowserView(private val server: Server, private val basePath: String, path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
@@ -27,6 +27,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
     private val files = mutableListOf<VirtualFile>().observable()
 
     var selectFolderCallback: (f: VirtualFile) -> Unit = {}
+    var selectFoldersCallback: (fl: List<VirtualFile>) -> Unit = {}
 
     private val pathButtonFlowPane = hbox {
         label("Path:")
@@ -40,6 +41,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         column("size", VirtualFile::size)
         column("perms", VirtualFile::permissions)
     }.apply {
+        multiSelect(mode == BrowserViewMode.SELECTFOLDERS)
         rowFactory = Callback {
             val row = TableRow<VirtualFile>()
             row.setOnMouseClicked { it2 ->
@@ -103,12 +105,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
         prefHeight = 600.0
         toolbar {
             button("Refresh").setOnAction { updateBrowser() }
-            if (mode==BrowserViewMode.NORMAL) button("Add bookmark").setOnAction {
-                server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value))
-            }
-            if (mode==BrowserViewMode.SELECTFOLDER) button("Select Folder").setOnAction {
-                if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
-                this@BrowserView.close()
+            when (mode) {
+                BrowserViewMode.NORMAL -> button("Add bookmark").setOnAction {
+                    server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value)) }
+                BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
+                    if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
+                    this@BrowserView.close() }
+                BrowserViewMode.SELECTFOLDERS -> button("Select Folder(s)").setOnAction {
+                    selectFoldersCallback(fileTableView.selectionModel.selectedItems.filter { vf -> vf.isDir() })
+                    this@BrowserView.close() }
             }
         }
         this += pathButtonFlowPane
@@ -123,6 +128,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             server.getConnection(basePath).list(currentPath.value, "", false) { it2 ->
                 if (it2.path != currentPath.value) tmpl.add(it2)
             }
+            tmpl.sortWith( Comparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) })
             tmpl
         }
         taskListLocal.setOnSucceeded {
@@ -142,6 +148,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     action { currentPath.set(it2) }
                 })
             }
+        }
+        taskListLocal.setOnFailed {
+            throw taskListLocal.exception
         }
         MyWorker.runTask(taskListLocal)
     }

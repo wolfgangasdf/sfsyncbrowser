@@ -107,6 +107,7 @@ object Helpers {
             path.split("/").dropLastWhile { it.isEmpty() }.lastOrNull()
 
     fun chooseDirectoryRel(title: String? = null, initialDirectory: File, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): File? {
+        // there is no way to allow opening multiple directories locally, also not via FileChooser!
         val res = chooseDirectory(title, initialDirectory, owner, op)
         if (res?.startsWith(initialDirectory.path) == true)
             return res.relativeTo(initialDirectory)
@@ -253,7 +254,7 @@ object Helpers {
 
     fun <T> getSortedFilteredList(): SortedFilteredList<T> {
         val res = SortedFilteredList<T>()
-        res.sortedItems.setComparator { o1, o2 -> o1.toString().compareTo(o2.toString()) }
+        res.sortedItems.setComparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) }
         return res
     }
 
