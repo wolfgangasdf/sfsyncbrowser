@@ -43,7 +43,7 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
     }
 
-    class ServerSettingsPane(server: Server): View() {
+    inner class ServerSettingsPane(server: Server): View() {
         override val root = Form()
         init {
             with(root) {
@@ -52,14 +52,21 @@ class MainView : View("SSyncBrowser") {
                     field("Protocol") { combobox<Protocol>(server.proto, server.protocols) }
                     field {
                         button("Add new protocol") { action {
-                            server.protocols += Protocol(server, SSP("sftp:user@//"), SimpleBooleanProperty(false),
+                            Protocol(server, SSP("sftp:user@//"), SimpleBooleanProperty(false),
                                     SSP(""), SimpleBooleanProperty(false),
-                                    SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0]))
+                                    SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
+                                server.protocols += it
+                                if (server.proto.value == null) server.proto.set(it)
+                                selectItem(it)
+                            }
                         } }
                         button("Add new sync") { action {
-                            server.syncs += Sync(SSP("sytype"), SSP("syname"),
+                            Sync(SSP("sytype"), SSP("syname"),
                                 SSP(""), SSP("sylocalfolder"),
-                                SSP("syremotefolder"), server=server)
+                                SSP("syremotefolder"), server=server).let {
+                                server.syncs += it
+                                selectItem(it)
+                            }
                         } }
                         button("Open browser") { action {
                             openNewWindow(BrowserView(server, "", ""))
@@ -126,7 +133,7 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
-    class SyncSettingsPane(sync: Sync): View() {
+    inner class SyncSettingsPane(sync: Sync): View() {
         override val root = Form()
         init {
             with(root) {
@@ -162,8 +169,10 @@ class MainView : View("SSyncBrowser") {
                     }
                     field {
                         button("Add new subset") { action {
-                            sync.subsets += SubSet(SSP("ssname"),
-                                    SSP(""), SSP(""), sync = sync)
+                            SubSet(SSP("ssname"), SSP(""), SSP(""), sync = sync).let {
+                                sync.subsets += it
+                                selectItem(it)
+                            }
                         } }
                         button("Add <all> subset") { action {
                             val ss = SubSet(SSP("all"), SSP(""), SSP(""), sync = sync)
@@ -246,6 +255,20 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
+    private fun selectItem(item: Any) {
+        getTreeViewItem(item)?.let { ttv.selectionModel.select(it) }
+    }
+    private fun getTreeViewItem(value: Any, item: TreeItem<Any>? = ttv.root): TreeItem<Any>? {
+        if (item != null && item.value == value)
+            return item
+        for (child in item!!.children) {
+            val s = getTreeViewItem(value, child)
+            if (s != null)
+                return s
+        }
+        return null
+    }
+
     private val ttv = treeview<Any> {
         root = TreeItem<Any>("root")
         populate({ ite -> MyTreeItem(ite)}) { parent ->
@@ -300,12 +323,13 @@ class MainView : View("SSyncBrowser") {
 
     override val root = vbox {
         prefWidth = 800.0
-        label("conns")
         this += ttv
         hbox {
             button("Add server") { action {
-                SettingsStore.servers += Server(SSP("name"), SSP("status"),
-                        SimpleIntegerProperty(-1))
+                Server(SSP("name"), SSP("status"), SimpleIntegerProperty(-1)).let {
+                    SettingsStore.servers += it
+                    selectItem(it)
+                }
             } }
             button("save sett") { action {
                 SettingsStore.saveSettings()
