@@ -80,7 +80,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
     // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
     fun getFileName(): String = File(path).name
-    fun getParent(): String = File(path).parent
+    fun getParent(): String = File(path).parent.let { if (it.endsWith("/")) it else "$it/" }
     fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension
     fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
@@ -383,18 +383,13 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
             Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
         } else {
-            try {
-                // sftpt.download erases local file if it exists also if remote file can't be read
-                val tmpf = createTempFile("sfsync-tempfile", ".dat")
-                sftpt.download("$remoteBasePath$cp", tmpf.absolutePath)
-                Files.move(tmpf.toPath(), Paths.get(to), StandardCopyOption.REPLACE_EXISTING)
-            } catch (e: Exception) {
-                logger.debug("getfile: exception $e")
-                throw e
-            }
+            Files.createDirectories(Paths.get(to).parent)
+            // copy-then-move: sftpt.download erases local file if it exists also if remote file can't be read
+            val tmpf = createTempFile("sfsync-tempfile", ".dat")
+            sftpt.download("$remoteBasePath$cp", tmpf.absolutePath)
+            Files.move(tmpf.toPath(), Paths.get(to), StandardCopyOption.REPLACE_EXISTING)
             if (transferListener!!.bytesTotal != transferListener!!.bytesTransferred)
                 throw IllegalStateException("filesize mismatch: ${transferListener!!.bytesTotal} <> ${transferListener!!.bytesTransferred}")
-
             Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
         }
     }
@@ -410,7 +405,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         try {
             resls = sftpc.stat(sp) // throws exception if not
         } catch (e: SFTPException) {
-            if (e.statusCode == StatusCode.NO_SUCH_FILE) logger.debug("no such file: ${e.message}") else throw(e)
+            if (e.statusCode == StatusCode.NO_SUCH_FILE) logger.debug("no such file <$sp>: ${e.message}") else throw(e)
         }
         return resls
     }

@@ -1,5 +1,7 @@
+import javafx.beans.property.BooleanProperty
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
@@ -43,6 +45,16 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
     }
 
+    class Status(val status: SimpleStringProperty, val auto: BooleanProperty = SimpleBooleanProperty(false)) {
+        val datetime = SimpleStringProperty("")
+        fun setSynced() {
+            // TODO
+        }
+        fun setError() {
+            // TODO
+        }
+    }
+
     inner class ServerSettingsPane(server: Server): View() {
         override val root = Form()
         init {
@@ -72,6 +84,7 @@ class MainView : View("SSyncBrowser") {
                             openNewWindow(BrowserView(server, "", ""))
                         } }
                         button("Remove server") { action {
+                            server.syncs.forEach { DBSettings.clearCacheFile(it.cacheid.value) }
                             SettingsStore.servers.remove(server)
                         } }
                         button("Close connection") { action {
@@ -144,7 +157,7 @@ class MainView : View("SSyncBrowser") {
         init {
             with(root) {
                 if (sync.type in setOf(SyncType.NORMAL, SyncType.CACHED)) fieldset("Sync") {
-                    field("Name and type") { textfield(sync.title) ; label(sync.type.name) }
+                    field("Name and type") { textfield(sync.title) ; label(sync.type.name) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
                     field("Cacheid") {
                         textfield(sync.cacheid)
                         button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
@@ -189,7 +202,7 @@ class MainView : View("SSyncBrowser") {
                         } }
                     }
                 } else fieldset("File sync") {
-                    field("File path") { label(sync.title) }
+                    field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
                     field("Cacheid") {
                         textfield(sync.cacheid)
                     }
@@ -350,7 +363,7 @@ class MainView : View("SSyncBrowser") {
         this += ttv
         hbox {
             button("Add server") { action {
-                Server(SSP("name"), SSP("status"), SimpleIntegerProperty(-1)).let {
+                Server(SSP("name"), SSP(""), SimpleIntegerProperty(-1)).let {
                     SettingsStore.servers += it
                     selectItem(it)
                 }

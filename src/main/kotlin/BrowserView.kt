@@ -116,6 +116,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                                     SSP(""), SSP(fileTableView.selectedItem?.getParent()), server = server).apply {
                                 localfolder.set(DBSettings.getCacheFolder(cacheid.value))
                             }
+                            // TODO somehow initiate sync and reveal afterwards! also
                         }
                     }
                 }
