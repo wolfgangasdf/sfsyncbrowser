@@ -61,7 +61,7 @@ class MainView : View("SSyncBrowser") {
                             }
                         } }
                         button("Add new sync") { action {
-                            Sync(SSP("sytype"), SSP("syname"),
+                            Sync(SyncType.NORMAL, SSP("syname"),
                                 SSP(""), SSP("sylocalfolder"),
                                 SSP("syremotefolder"), server=server).let {
                                 server.syncs += it
@@ -133,12 +133,18 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
+    private fun compSyncFile(sync: Sync) {
+        val sv = SyncView(sync.server, sync)
+        openNewWindow(sv)
+        sv.runCompare()
+    }
+
     inner class SyncSettingsPane(sync: Sync): View() {
         override val root = Form()
         init {
             with(root) {
-                fieldset("Sync") {
-                    field("Name and type") { textfield(sync.title) ; textfield(sync.type) }
+                if (sync.type in setOf(SyncType.NORMAL, SyncType.CACHED)) fieldset("Sync") {
+                    field("Name and type") { textfield(sync.title) ; label(sync.type.name) }
                     field("Cacheid") {
                         textfield(sync.cacheid)
                         button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
@@ -182,6 +188,23 @@ class MainView : View("SSyncBrowser") {
                             sync.server.syncs.remove(sync)
                         } }
                     }
+                } else fieldset("File sync") {
+                    field("File path") { label(sync.title) }
+                    field("Cacheid") {
+                        textfield(sync.cacheid)
+                    }
+                    field("Local folder") {
+                        label(sync.localfolder)
+                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value)) }
+                    }
+                    field("Remote folder") {
+                        label(sync.remoteFolder)
+                    }
+                    field {
+                        button("Remove sync") { action {
+                            sync.server.syncs.remove(sync)
+                        } }
+                    }
                 }
             }
         }
@@ -194,7 +217,6 @@ class MainView : View("SSyncBrowser") {
                 val sv = SyncView(subset.sync.server, subset.sync, subset)
                 openNewWindow(sv)
                 sv.runCompare()
-
             }
         }
         init {
@@ -296,7 +318,9 @@ class MainView : View("SSyncBrowser") {
                         openNewWindow(BrowserView(tit.server, "", tit.path.value))
                     }
                     is Sync -> {
-                        button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
+                        if (tit.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
+                            compSyncFile(tit)
+                        } else button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
                             val all = tit.subsets.filter { it2 -> it2.title.value == "all" }
                             if (all.size == 1) {
                                 SubsetSettingsPane.compSync(all.first())

@@ -80,6 +80,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 
     // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
     fun getFileName(): String = File(path).name
+    fun getParent(): String = File(path).parent
     fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension
     fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
@@ -144,7 +145,6 @@ abstract class GeneralConnection(val protocol: Protocol) {
                 (if (FilePermission.OTH_W.isIn(mask)) "w" else "-") +
                 (if (FilePermission.OTH_X.isIn(mask)) "x" else "-")
     }
-
 }
 
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
@@ -238,7 +238,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun isAlive() = true
-
 }
 
 
@@ -644,7 +643,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun mkdirrec(absolutePath: String) {
-        throw NotImplementedError("mkdirrec for sftp")
+        throw NotImplementedError("mkdirrec for sftp") // TODO implement from checkit() above?
     }
 }
 

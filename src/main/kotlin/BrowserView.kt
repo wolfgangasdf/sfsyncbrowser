@@ -4,14 +4,14 @@ import javafx.scene.input.KeyCode
 import javafx.scene.input.TransferMode
 import javafx.util.Callback
 import mu.KotlinLogging
-import store.BrowserBookmark
-import store.Server
+import store.*
 import synchro.VirtualFile
 import tornadofx.*
 import util.Helpers
 import util.Helpers.getFileIntoTempAndDo
 import util.MyTask
 import util.MyWorker
+import util.SSP
 
 private val logger = KotlinLogging.logger {}
 
@@ -106,8 +106,19 @@ class BrowserView(private val server: Server, private val basePath: String, path
         toolbar {
             button("Refresh").setOnAction { updateBrowser() }
             when (mode) {
-                BrowserViewMode.NORMAL -> button("Add bookmark").setOnAction {
-                    server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value)) }
+                BrowserViewMode.NORMAL -> {
+                    button("Add bookmark").setOnAction {
+                        server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value))
+                    }
+                    button("Add syncfile").setOnAction {
+                        if (fileTableView.selectedItem?.isFile() == true) {
+                            server.syncs += Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
+                                    SSP(""), SSP(fileTableView.selectedItem?.getParent()), server = server).apply {
+                                localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+                            }
+                        }
+                    }
+                }
                 BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
                     if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
                     this@BrowserView.close() }

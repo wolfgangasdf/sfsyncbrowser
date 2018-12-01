@@ -72,6 +72,8 @@ object DBSettings {
 
     fun getCacheFilename(cacheid: String) = "$dbdir/$cacheid-cache.txt"
 
+    fun getCacheFolder(cacheid: String) = "$dbdir/$cacheid-cache"
+
     fun clearCacheFile(cacheid: String) {
         logger.info("delete cache database $cacheid")
         val fff = Paths.get(getCacheFilename(cacheid))
@@ -86,11 +88,13 @@ object DBSettings {
 }
 
 ///////////////////////// settings
+enum class SyncType { NORMAL, FILE, CACHED }
 
-class Sync(val type: StringProperty, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
+// title is filepath for file sync
+class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList() ) {
-    override fun toString() = "[Sync] ${title.value}"
+    override fun toString() = "[Sync ${type.name}] ${title.value}"
 }
 
 class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
@@ -171,7 +175,7 @@ object SettingsStore {
             }
             props["se.$idx.syncs"] = server.syncs.size.toString()
             server.syncs.forEachIndexed { idx2, sync ->
-                props["sy.$idx.$idx2.type"] = sync.type.value
+                props["sy.$idx.$idx2.type"] = sync.type.name
                 props["sy.$idx.$idx2.title"] = sync.title.value
                 props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
                 props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
@@ -219,7 +223,7 @@ object SettingsStore {
                     }
                     if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
-                        val sync = Sync(p2sp("sy.$idx.$idx2.type"), p2sp("sy.$idx.$idx2.title"),
+                        val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
                                 SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server)
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
                             val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)

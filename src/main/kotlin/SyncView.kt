@@ -29,6 +29,7 @@ import util.Helpers.revealFile
 import util.Helpers.runUIwait
 import util.MyTask
 import util.MyWorker
+import util.SSP
 import java.io.File
 import java.nio.file.Files
 
@@ -75,6 +76,12 @@ object CF {
 }
 
 class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $server $sync $subset") {
+    // single-file constructor
+    constructor(server: Server, sync: Sync): this(server, sync,
+            SubSet(SSP(""), SSP(""), SSP(""), sync = sync).apply {
+                subfolders += sync.title.value // this is filepath!
+            })
+
     private var profile = Profile(server, sync, subset)
 
     private var syncEnabled = false

@@ -24,6 +24,7 @@ import util.Helpers.runUIwait
 
 private val logger = KotlinLogging.logger {}
 
+// subfolder can be single-file entry (for sync single file)
 class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
 
     var cache = Cache(sync.cacheid.value)
