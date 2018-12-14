@@ -9,6 +9,7 @@ import javafx.scene.control.Alert
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.stage.Modality
+import javafx.stage.Screen
 import mu.KotlinLogging
 import store.*
 import tornadofx.*
@@ -196,6 +197,7 @@ class MainView : View("SSyncBrowser") {
                         button("Add <all> subset") { action {
                             val ss = SubSet(SSP("all"), SSP(""), SSP(""), sync = sync)
                             ss.subfolders += ""
+                            sync.subsets += ss
                         } }
                         button("Remove sync") { action {
                             sync.server.syncs.remove(sync)
@@ -377,6 +379,10 @@ class MainView : View("SSyncBrowser") {
 
     init {
         logger.info("Initialize MainView...")
+        Screen.getPrimary().bounds.let {
+            currentStage!!.x = 0.1 * it.width
+            currentStage!!.y = 0.1 * it.height
+        }
         ttv.setOnMouseClicked { me ->
             val src = ttv.selectedValue
             if (src is BrowserBookmark) {

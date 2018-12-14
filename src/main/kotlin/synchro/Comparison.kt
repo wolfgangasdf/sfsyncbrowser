@@ -56,7 +56,7 @@ object Comparison {
         }
         logger.debug("TTT a took = " + swse.getTimeRestart())
 
-        // iterate over all folders that are cacheed
+        // iterate over all folders that are cached
         cache.cache.iterate { _, _, se ->
             if (se.relevant && se.isDir && se.cSize != -1L) {
                 se.hasCachedParent = true
@@ -70,7 +70,7 @@ object Comparison {
             if (se.relevant && !se.isDir) {
                 if (se.cSize == -1L) { // only get parent folder for unknown files, faster!
                     val parent = getParentFolder(path)
-                    if (cache.cache[parent]?.hasCachedParent == false) {
+                    if (cache.cache[parent]?.hasCachedParent != true) {
                         se.compareSetAction(newcache = true) // test
                     } else {
                         se.compareSetAction(newcache = false)

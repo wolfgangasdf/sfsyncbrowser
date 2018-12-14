@@ -126,8 +126,8 @@ abstract class GeneralConnection(val protocol: Protocol) {
 
     // return dir (most likely NOT absolute path but subfolder!) without trailing /
     fun checkIsDir(path: String): Pair<String, Boolean> {
-        val isdir = path.endsWith("/")
-        val resp = if (isdir) path.substring(0, path.length - 1) else path
+        val isdir = path.endsWith("/") || path == ""
+        val resp = if (isdir && path != "") path.substring(0, path.length - 1) else path
         return Pair(resp, isdir)
     }
 

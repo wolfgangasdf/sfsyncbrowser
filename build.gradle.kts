@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 
-val kotlin_version = "1.3.10"
+val kotlin_version = "1.3.11"
 
 buildscript {
 
@@ -20,7 +20,7 @@ group = "com.wolle.ssyncbrowser"
 version = "1.0-SNAPSHOT"
 
 plugins {
-    kotlin("jvm") version "1.3.10"
+    kotlin("jvm") version "1.3.11"
     id("idea")
     id("application")
     id("com.github.ben-manes.versions") version "0.20.0" // TODO gradle5
@@ -85,7 +85,7 @@ repositories {
 dependencies {
     compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version")
     compile("org.jetbrains.kotlin:kotlin-reflect:$kotlin_version")
-    compile("io.github.microutils:kotlin-logging:1.6.20")
+    compile("io.github.microutils:kotlin-logging:1.6.22")
     compile("com.hierynomus:sshj:0.26.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta2") // no colors, everything stderr
     compile("no.tornado:tornadofx:1.7.17")
