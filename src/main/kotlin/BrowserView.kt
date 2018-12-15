@@ -8,6 +8,7 @@ import store.*
 import synchro.VirtualFile
 import tornadofx.*
 import util.Helpers
+import util.Helpers.dialogInputString
 import util.Helpers.getFileIntoTempAndDo
 import util.MyTask
 import util.MyWorker
@@ -19,7 +20,7 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER, SELECTFOLDERS
 }
 
-class BrowserView(private val server: Server, private val basePath: String, path: String, mode: BrowserViewMode = BrowserViewMode.NORMAL) :
+class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
     private var currentPath = SimpleStringProperty(path)
@@ -28,6 +29,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     var selectFolderCallback: (f: VirtualFile) -> Unit = {}
     var selectFoldersCallback: (fl: List<VirtualFile>) -> Unit = {}
+    private fun isNormal() = mode == BrowserViewMode.NORMAL
 
     private val pathButtonFlowPane = hbox {
         label("Path:")
@@ -51,7 +53,57 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             row
         }
-        setOnKeyReleased { ke -> when(ke.code) {
+        lazyContextmenu {
+            item("Refresh").action { updateBrowser() }
+            item("Add bookmark") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
+                server.bookmarks += BrowserBookmark(server, SimpleStringProperty(selectedItem?.path))
+            }
+            item("Add syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
+                server.syncs += Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
+                        SSP(""), SSP(selectedItem?.getParent()), server = server).apply {
+                            localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+                        }
+                // TODO somehow initiate sync and reveal afterwards! also
+            }
+            separator()
+            item("Rename...") { isDisable = !isNormal() || selectedItem == null }.action {
+                dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
+                    println("huhu $it")
+                    val c = server.getConnection(basePath)
+                    if (c.canRename()) {
+                        // TODO all in worker!
+                    } else {
+                        // TODO if folder, fail. if file, download, delete, rename, upload
+                    }
+                }
+            }
+            item("Change permissions...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("Copy URL") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            separator()
+            item("Duplicate...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("Download...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("Upload...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("New folder...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("New file...") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+            item("Delete") { isDisable = !isNormal() }.action {
+                // TODO
+            }
+        }
+        setOnKeyReleased { ke -> when(ke.code) { // quicklook
              KeyCode.SPACE -> {
                  if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
                      lastpreviewvf = selectedItem
@@ -104,21 +156,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
         prefWidth = 800.0
         prefHeight = 600.0
         toolbar {
-            button("Refresh").setOnAction { updateBrowser() }
             when (mode) {
                 BrowserViewMode.NORMAL -> {
-                    button("Add bookmark").setOnAction {
-                        server.bookmarks += BrowserBookmark(server, SimpleStringProperty(currentPath.value))
-                    }
-                    button("Add syncfile").setOnAction {
-                        if (fileTableView.selectedItem?.isFile() == true) {
-                            server.syncs += Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
-                                    SSP(""), SSP(fileTableView.selectedItem?.getParent()), server = server).apply {
-                                localfolder.set(DBSettings.getCacheFolder(cacheid.value))
-                            }
-                            // TODO somehow initiate sync and reveal afterwards! also
-                        }
-                    }
                 }
                 BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
                     if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)

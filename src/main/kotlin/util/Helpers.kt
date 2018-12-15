@@ -209,14 +209,14 @@ object Helpers {
         }.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK
     }
 
-    fun dialogInputString(titletext: String, header: String, content: String): String {
-        return TextInputDialog().apply {
+    fun dialogInputString(titletext: String, header: String, content: String, inival: String = ""): String? {
+        return TextInputDialog(inival).apply {
             //initOwner(stage)
             (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
             contentText = content
-        }.showAndWait().orElse("")
+        }.showAndWait().orElse(null)
     }
 
     fun dialogMessage(type: Alert.AlertType, titletext: String, header: String, htmlmsg: String) {

@@ -118,6 +118,14 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
     abstract fun isAlive(): Boolean
 
+    // extended functions only for some connections
+    abstract fun canRename(): Boolean
+    abstract fun canChmod(): Boolean
+    abstract fun canDuplicate(): Boolean
+    open fun extRename(oldPath: String, newPath: String) { throw Exception("Can't rename") }
+    open fun extChmod(path: String, newPerms: String) { throw Exception("Can't chmod") }
+    open fun extDuplicate(oldPath: String, newPath: String) { throw Exception("Can't duplicate") }
+
     fun assignRemoteBasePath(remoteFolder: String) {
         remoteBasePath = protocol.baseFolder.value + remoteFolder
     }
@@ -148,6 +156,22 @@ abstract class GeneralConnection(val protocol: Protocol) {
 }
 
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
+    override fun canRename(): Boolean = true
+    override fun canChmod(): Boolean = true
+    override fun canDuplicate(): Boolean = true
+    override fun extRename(oldPath: String, newPath: String) {
+        // TODO test
+        val (cp, _) = checkIsDir(oldPath)
+        Files.move(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
+    }
+    override fun extChmod(path: String, newPerms: String) {
+        // TODO
+    }
+    override fun extDuplicate(oldPath: String, newPath: String) {
+        // TODO test
+        val (cp, _) = checkIsDir(oldPath)
+        Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
+    }
 
     override fun cleanUp() {}
 
@@ -247,6 +271,18 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     init {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
+    }
+
+    override fun canRename(): Boolean = true
+    override fun canChmod(): Boolean = true
+    override fun canDuplicate(): Boolean = false //
+    override fun extRename(oldPath: String, newPath: String) {
+        // TODO test
+        val (cp, _) = checkIsDir(oldPath)
+        sftpc.rename("$remoteBasePath$cp", "$remoteBasePath$newPath")
+    }
+    override fun extChmod(path: String, newPerms: String) {
+        // TODO
     }
 
     inner class MyTransferListener(private var relPath: String = "") : TransferListener {
