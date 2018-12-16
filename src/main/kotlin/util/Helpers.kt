@@ -9,7 +9,6 @@ import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.concurrent.Task
 import javafx.event.EventTarget
-import javafx.geometry.Rectangle2D
 import javafx.scene.control.*
 import javafx.scene.layout.Priority
 import javafx.scene.web.WebView
@@ -322,26 +321,23 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
 
     private val taskListView = listview(taskList) {
         cellFormat { // https://www.youtube.com/watch?v=mlDT1Y1b09M
-            graphic = cache {
-                vbox {
-                    hbox {
-                        label(itemProperty().select(MyTask<*>::titleProperty)) {
-                            isWrapText = true
-                            //                    prefWidthProperty().bind(lv.widthProperty() - 180)
-                            hgrow = Priority.ALWAYS
-                        }
-                        progressbar(itemProperty().select(MyTask<*>::progressProperty)) {
-                            prefWidth = 150.0
-                        }
-                    }
-                    label(itemProperty().select(MyTask<*>::messageProperty)) {
+            graphic = vbox {
+                hbox {
+                    label(itemProperty().select(MyTask<*>::titleProperty)) {
                         isWrapText = true
-                        //                    prefWidthProperty().bind(lv.widthProperty() - 30)
-                        style = "-fx-font-size: 10"
+                        hgrow = Priority.NEVER
+                    }
+                    progressbar(itemProperty().select(MyTask<*>::progressProperty)) {
+                        hgrow = Priority.ALWAYS
                     }
                 }
+                label(itemProperty().select(MyTask<*>::messageProperty)) {
+                    isWrapText = true
+                    style = "-fx-font-size: 10"
+                    hgrow = Priority.NEVER
+                    this@vbox.widthProperty().onChange { w -> prefWidth = w }
+                }
             }
-
         }
     }
 
@@ -354,11 +350,14 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
             this += taskListView
         }
         dialogPane.buttonTypes += ButtonType.CANCEL
-        val sb: Rectangle2D = Screen.getPrimary().visualBounds
-        dialogPane.setPrefSize(sb.width/2.5, sb.height/3)
+
+        dialogPane.setPrefSize(600.0,300.0)
+        Screen.getPrimary().visualBounds.let {
+            x = 0.9*it.width - dialogPane.prefWidth
+            y = 0.9*it.height - dialogPane.prefHeight
+        }
 
         initModality(Modality.NONE)
-        (dialogPane.scene.window as Stage).isAlwaysOnTop = true
 
         setOnCloseRequest {
             if (taskList.isNotEmpty()) {

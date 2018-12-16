@@ -25,7 +25,7 @@ import util.Helpers.runUIwait
 private val logger = KotlinLogging.logger {}
 
 // subfolder can be single-file entry (for sync single file)
-class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
+class Profile(private val server: Server, private val sync: Sync, private val subfolder: SubSet) {
 
     var cache = Cache(sync.cacheid.value)
     var local: GeneralConnection? = null
@@ -33,7 +33,7 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
     private val uiUpdateInterval = 0.5
     var profileInitialized = false
 
-    val taskIni = MyTask<Unit> {
+    fun taskIni() = MyTask<Unit> {
         updateTit("Initialize connections...")
         cache.loadCache()
 
@@ -55,7 +55,7 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
     }
 
 
-    val taskCompFiles = MyTask<Boolean> {
+    fun taskCompFiles() = MyTask<Boolean> {
         updateTit("CompareFiles...")
         val sw = StopWatch() // for timing meas
 
@@ -155,7 +155,7 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
         haveChanges
     }
 
-    val taskSynchronize = MyTask<Unit> {
+    fun taskSynchronize() = MyTask<Unit> {
         logger.info("*********************** synchronize")
         updateTit("Synchronize")
         updateProgr(0, 100, "startup...")
@@ -295,7 +295,7 @@ class Profile(server: Server, private val sync: Sync, subfolder: SubSet) {
     }
 
     // cleanup (transfers must be stopped before, connection is kept alive here.)
-    val taskCleanup = MyTask<Unit> {
+    fun taskCleanup() = MyTask<Unit> {
         updateTit("Cleanup profile...")
         updateProgr(1, 100, "Save cache...")
         cache.saveCache()

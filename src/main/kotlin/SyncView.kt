@@ -75,7 +75,7 @@ object CF {
     }
 }
 
-class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $server $sync $subset") {
+class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     constructor(server: Server, sync: Sync): this(server, sync,
             SubSet(SSP(""), SSP(""), SSP(""), sync = sync).apply {
@@ -104,16 +104,18 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
     }
 
 
-    fun runCompare() {
+    private fun runCompare() {
         logger.info("Compare...")
         btSync.isDisable = true
         val ctask = MyTask<Unit> {
             updateTit("A Compare files")
             updateProgr(0, 100, "Initialize local and remote...")
-            profile.taskIni.setOnSucceeded {
+            val taskIni = profile.taskIni()
+            val taskCompFiles = profile.taskCompFiles()
+            taskIni.setOnSucceeded {
                 updateProgr(50, 100, "Run comparison...")
-                profile.taskCompFiles.setOnSucceeded {
-                    val haveChanges = profile.taskCompFiles.get()
+                taskCompFiles.setOnSucceeded {
+                    val haveChanges = taskCompFiles.get()
                     btCompare.isDisable = false
                     runUIwait { profile.cache.updateObservableBuffer() }
                     logger.debug("havechanges=$haveChanges")
@@ -126,13 +128,13 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
                         updateSyncButton(allow = true)
                     }
                 }
-                profile.taskCompFiles.setOnFailed { handleFailed(profile.taskCompFiles) }
-                profile.taskCompFiles.setOnCancelled { handleCancelled() }
-                MyWorker.runTask(profile.taskCompFiles)
+                taskCompFiles.setOnFailed { handleFailed(taskCompFiles) }
+                taskCompFiles.setOnCancelled { handleCancelled() }
+                MyWorker.runTask(taskCompFiles)
             }
-            profile.taskIni.setOnFailed { handleFailed(profile.taskIni) }
-            profile.taskIni.setOnCancelled { handleCancelled() }
-            runUIwait { MyWorker.runTask(profile.taskIni) }
+            taskIni.setOnFailed { handleFailed(taskIni) }
+            taskIni.setOnCancelled { handleCancelled() }
+            runUIwait { MyWorker.runTask(taskIni) }
 
             updateProgr(100, 100, "ended!")
         }
@@ -140,18 +142,20 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
     }
 
     private fun runSynchronize() {
-        profile.taskSynchronize.setOnSucceeded {
+        val taskSynchronize = profile.taskSynchronize()
+        taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
-            profile.taskCleanup.setOnSucceeded { this.close() }
-            MyWorker.runTask(profile.taskCleanup)
+            val taskCleanup = profile.taskCleanup()
+            taskCleanup.setOnSucceeded { this.close() }
+            MyWorker.runTask(taskCleanup)
         }
-        profile.taskSynchronize.setOnFailed { handleFailed(profile.taskSynchronize) }
-        profile.taskSynchronize.setOnCancelled {
+        taskSynchronize.setOnFailed { handleFailed(taskSynchronize) }
+        taskSynchronize.setOnCancelled {
             profile.local!!.interrupted.set(true)
             profile.remote!!.interrupted.set(true)
             handleCancelled()
         }
-        MyWorker.runTask(profile.taskSynchronize)
+        MyWorker.runTask(taskSynchronize)
     }
 
     private fun updateSyncButton(allow: Boolean): Boolean {
@@ -160,7 +164,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
     }
 
     private fun updateSyncButton(): Boolean { // returns true if can synchronize
-        logger.debug("update sync button")
+        logger.debug("update sync button $syncEnabled")
         val canSync = if (syncEnabled) profile.cache.canSync() else false
         btSync.isDisable = !canSync
         return canSync
@@ -176,8 +180,8 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
     }
 
     private val btCompare = button("Compare!") { action {
-        btSync.isDisable = true
-        this.isDisable = true
+//        btSync.isDisable = true
+//        this.isDisable = true
         runCompare()
     }}
 
@@ -337,7 +341,6 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
         }
     } }
 
-
     override val root = vbox {
         prefWidth = 1200.0
         prefHeight = 600.0
@@ -356,7 +359,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : View("Sync view $se
         }
     }
 
-    init {
-
+    override fun doAfterShown() {
+        runCompare()
     }
 }

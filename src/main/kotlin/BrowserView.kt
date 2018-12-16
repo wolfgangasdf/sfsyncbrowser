@@ -21,9 +21,11 @@ enum class BrowserViewMode {
 }
 
 class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
-        View("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
+        MyView("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
-    private var currentPath = SimpleStringProperty(path)
+    private var currentPath = SimpleStringProperty(path).apply {
+        onChange { if (it != null) updateBrowser() }
+    }
 
     private val files = mutableListOf<VirtualFile>().observable()
 
@@ -136,6 +138,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             } // TODO also accept internal files
         }
         setOnDragDropped { de ->
+            println("drag dropped $de")
             var success = false
             if (de.dragboard.hasFiles()) {
                 println("drop file ${de.dragboard.files} mode=${de.transferMode}")
@@ -145,10 +148,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
             de.isDropCompleted = success
             de.consume()
         }
+        setOnDragExited { de ->
+            println("dragexited: ${de.transferMode}, ${de.dragboard}")
+        }
         setOnDragDone { de ->
             println("dragdone: ${de.transferMode}, ${de.dragboard}")
-            de.dragboard.setContent { putString("newstring") }
-            // TODO
+            de.dragboard.setContent { putString("newstring") } // TODO doesn't work. here i wanted to retrieve file.
+            // TODO: how to get drop location??????? see readme...
         }
     }
 
@@ -205,11 +211,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
         MyWorker.runTask(taskListLocal)
     }
-    init {
-        logger.debug("opening browser protobp=${server.getProtocol().baseFolder.value} bp=$basePath p=$path")
-        currentPath.onChange { if (it != null) {
-            updateBrowser()
-        } }
+
+    override fun doAfterShown() {
+        logger.debug("opening browser protobp=${server.getProtocol().baseFolder.value} bp=$basePath")
         updateBrowser()
     }
 }

@@ -21,6 +21,8 @@ import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
 import util.Helpers.revealFile
 import util.Helpers.valitextfield
+import util.MyTask
+import util.MyWorker
 import util.SSP
 import java.io.File
 
@@ -148,9 +150,7 @@ class MainView : View("SSyncBrowser") {
     }
 
     private fun compSyncFile(sync: Sync) {
-        val sv = SyncView(sync.server, sync)
-        openNewWindow(sv)
-        sv.runCompare()
+        openNewWindow(SyncView(sync.server, sync))
     }
 
     inner class SyncSettingsPane(sync: Sync): View() {
@@ -229,9 +229,7 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
         companion object {
             fun compSync(subset: SubSet) {
-                val sv = SyncView(subset.sync.server, subset.sync, subset)
-                openNewWindow(sv)
-                sv.runCompare()
+                openNewWindow(SyncView(subset.sync.server, subset.sync, subset))
             }
         }
         init {
@@ -372,6 +370,22 @@ class MainView : View("SSyncBrowser") {
             } }
             button("save sett") { action {
                 SettingsStore.saveSettings()
+            } }
+            button("test") { action {
+                val testtask = MyTask<Unit> {
+                    updateTit("Getting remote file list...")
+                    Thread.sleep(500L)
+                    updateProgr(10,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
+                    Thread.sleep(500L)
+                    updateProgr(20,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
+                    Thread.sleep(500L)
+                    updateProgr(30,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
+                    Thread.sleep(500L)
+                    updateProgr(40,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
+                    Thread.sleep(500L)
+                    updateProgr(50,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
+                }
+                MyWorker.runTask(testtask)
             } }
         }
         this += settingsview

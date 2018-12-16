@@ -1,4 +1,5 @@
 
+import javafx.scene.Node
 import javafx.scene.Scene
 import javafx.scene.control.Alert
 import javafx.scene.image.Image
@@ -10,15 +11,21 @@ import javafx.stage.Stage
 import mu.KotlinLogging
 import store.DBSettings
 import store.SettingsStore
-import tornadofx.*
+import tornadofx.App
+import tornadofx.View
+import tornadofx.addStageIcon
+import tornadofx.reloadStylesheetsOnFocus
 import util.Helpers
 import util.Helpers.dialogMessage
 import kotlin.random.Random
 
 private val logger = KotlinLogging.logger {}
 
+abstract class MyView(title: String? = null, icon: Node? = null) : View(title, icon) {
+    open fun doAfterShown() {}
+}
 
-fun <T: UIComponent> openNewWindow(view: T, m: Modality = Modality.NONE): T {
+fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     val newstage = Stage()
     newstage.titleProperty().bind(view.titleProperty)
     newstage.scene = Scene(view.root)
@@ -27,7 +34,7 @@ fun <T: UIComponent> openNewWindow(view: T, m: Modality = Modality.NONE): T {
         newstage.x = Random.nextDouble(0.1, 0.3) * it.width
         newstage.y = Random.nextDouble(0.1, 0.3) * it.height
     }
-
+    newstage.setOnShown { view.doAfterShown() }
     newstage.show()
     newstage.addEventFilter(KeyEvent.KEY_RELEASED) {
         if (it.code == KeyCode.ESCAPE) newstage.close()
