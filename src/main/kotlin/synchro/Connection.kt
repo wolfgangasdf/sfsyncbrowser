@@ -112,7 +112,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long)
-    abstract fun putfile(localBasePath: String, from: String, mtime: Long): Long // returns mtime if cantSetDate
+    abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long // returns mtime if cantSetDate
     abstract fun mkdirrec(absolutePath: String)
     abstract fun deletefile(what: String, mtime: Long)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
@@ -193,17 +193,17 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun putfile(localBasePath: String, from: String, mtime: Long): Long {
+    override fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String): Long {
         val (cp, isdir) = checkIsDir(from)
-        logger.debug("from=$from isdir=$isdir")
+        val remoteabspath = if (remotePath == "") "$remoteBasePath$cp" else "$remoteBasePath$remotePath"
+        logger.debug("putfile: from=$from isdir=$isdir remabspath=$remoteabspath")
         if (isdir) { // ensure that target path exists
-            val abspath = "$remoteBasePath$cp"
-            if (!Files.exists(Paths.get(abspath).parent)) {
+            if (!Files.exists(Paths.get(remoteabspath).parent)) {
                 logger.debug("creating folder $cp")
-                mkdirrec(Paths.get(abspath).parent.toString())
+                mkdirrec(Paths.get(remoteabspath).parent.toString())
             }
         }
-        Files.copy(Paths.get("$localBasePath$cp"), Paths.get("$remoteBasePath$cp"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+        Files.copy(Paths.get("$localBasePath$cp"), Paths.get(remoteabspath), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
         return mtime
     }
 
@@ -346,9 +346,10 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    override fun putfile(localBasePath: String, from: String, mtime: Long): Long {
+    override fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String): Long {
         val (cp, isdir) = checkIsDir(from)
-        val rp = "$remoteBasePath$cp"
+        val rp = if (remotePath == "") "$remoteBasePath$cp" else "$remoteBasePath$remotePath"
+        logger.debug("putfile: from=$from isdir=$isdir rp=$rp")
 
         fun setAttr(changeperms: Boolean, rp: String) {
             val lf = FileSystemFile("$localBasePath$cp")
