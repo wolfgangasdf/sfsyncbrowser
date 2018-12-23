@@ -18,6 +18,7 @@ import util.MyTask
 import util.MyWorker
 import util.SSP
 import java.io.File
+import java.nio.file.Files
 
 private val logger = KotlinLogging.logger {}
 
@@ -25,30 +26,19 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER, SELECTFOLDERS
 }
 
-// java DnD: can't get finder or explorer drop location ("promised files" not implemented)
-// TODO crashes due to jvm...
-class DragView(file: File) : View("Drag...") {
-    private val btDnd = button("The file has been downloaded to ${file.path}.\nDrag this to the destination!").apply {
+class DragView(temppath: File) : View("Drag...") {
+    private val btDnd = button("The file(s) have been downloaded to ${temppath.path}.\nDrag this to the destination!").apply {
         setOnDragDetected { me ->
-            println("DV: drag detected! ")
-            val dragBoard = startDragAndDrop(TransferMode.COPY)
-            dragBoard.setContent { putFiles(listOf(file)) }
+            val dragBoard = startDragAndDrop(TransferMode.MOVE) // so tempfiles are removed by OS
+            dragBoard.setContent { putFiles(temppath.listFiles().toList()) }
             me.consume()
         }
-        setOnDragDropped { de ->
-            println("DV dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
-            de.consume()
-        }
         setOnDragDone { de ->
-            println("dragdone: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} target=${de.gestureTarget} de=$de db=${de.dragboard}")
+            de.consume()
+            this@DragView.close()
         }
     }
-    override val root = vbox {
-        this += btDnd
-        button("Cancel").setOnAction {
-            // TODO
-        }
-    }
+    override val root = btDnd
 }
 
 class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
@@ -130,7 +120,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 // TODO
             }
             item("Delete") { isDisable = !isNormal() }.action {
-                // TODO
+                selectionModel.selectedItems.forEach {
+                    server.getConnection("").deletefile(it.path)
+                }
+                updateBrowser()
             }
         }
         setOnKeyReleased { ke -> when(ke.code) { // quicklook
@@ -143,29 +136,46 @@ class BrowserView(private val server: Server, private val basePath: String, path
              }
             else -> {}
         }}
-        setOnDragDetected { me ->
-            println("drag detected! ${selectionModel.selectedItems}")
-            getFileIntoTempAndDo(server, selectedItem!!) {
+        setOnDragDetected { me -> // drag from here...
+            // java DnD: can't get finder or explorer drop location ("promised files" not implemented yet), therefore open this window.
+            // mac crashes due to jvm: add to accessibility prefs, gradle dist, run in shell build/macApp/ssyncbrowser.app/Contents/MacOS/JavaAppLauncher
+            val selfiles = selectionModel.selectedItems
+            selfiles.find { it.isDir() }?.let {
+                Helpers.dialogMessage(Alert.AlertType.WARNING, "Drag", "Can't drag folders!", "")
+                me.consume()
+                return@setOnDragDetected
+            }
+            val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+            val taskGetFile = MyTask<Unit> {
+                updateTit("Downloading files for drag and drop...")
+                selfiles.forEach { vf ->
+                    updateMsg("Downloading file $vf...")
+                    val lf = "${tempfolder.path}/${vf.getFileName()}"
+                    logger.debug("downloading $vf to $lf...")
+                    server.getConnection("").getfile("", vf.path, vf.modTime, lf)
+                }
+            }
+            taskGetFile.setOnSucceeded {
                 val newstage = Stage()
-                val dragView = DragView(it)
+                val dragView = DragView(tempfolder)
                 newstage.scene = Scene(dragView.root)
                 newstage.initModality(Modality.WINDOW_MODAL)
                 newstage.show()
             }
+            MyWorker.runTask(taskGetFile)
             me.consume()
         }
         setOnDragOver { de ->
             if (de.gestureSource != this) {
-                println("dragover: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
-                // TODO also for own type for DnD between browser windows!
+                //println("dragover: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
                 if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
             }
             de.consume()
         }
-        setOnDragDropped { de ->
-            println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
+        setOnDragDropped { de -> // dropped from external
+            //println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
             if (de.dragboard.hasFiles()) {
-                println("drop files ${de.dragboard.files} mode=${de.transferMode}")
+                //println("drop files ${de.dragboard.files} mode=${de.transferMode}")
                 val fff = de.dragboard.files
                 // check no dirs
                 fff.find { it.isDirectory }?.let {
@@ -189,7 +199,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 val taskUploadFiles = MyTask<Unit> {
                     fff.forEach { f ->
                         updateTit("Uploading file $f...")
-                        server.getConnection("").putfile("", f.path, f.lastModified(), currentPath.value + f.name)
+                        server.getConnection("").putfile("", f.path, f.lastModified(), "${currentPath.value}/${f.name}")
                     }
                 }
                 taskUploadFiles.setOnSucceeded {
@@ -202,10 +212,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 de.isDropCompleted = true
             }
             de.consume()
-        }
-        setOnDragDone { de ->
-            println("dragdone: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} target=${de.gestureTarget} de=$de db=${de.dragboard}")
-            //de.dragboard.setContent { putString("newstring") } // TODO doesn't work. here i wanted to retrieve file.
         }
     }
 

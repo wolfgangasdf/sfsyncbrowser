@@ -104,7 +104,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     override fun compareTo(other: VirtualFile): Int = path.compareTo(other.path)
 }
 
-
+// TODO this got a bit messy: better have sftpconn etc act only on absolute paths, handle basepaths in generalconn!
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
     var remoteBasePath: String = protocol.baseFolder.value
@@ -112,9 +112,10 @@ abstract class GeneralConnection(val protocol: Protocol) {
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long)
-    abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long // returns mtime if cantSetDate
+    // returns mtime if cantSetDate ; if remotePath not empty: take this as absolute file path!
+    abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long
     abstract fun mkdirrec(absolutePath: String)
-    abstract fun deletefile(what: String, mtime: Long)
+    abstract fun deletefile(what: String)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
     abstract fun isAlive(): Boolean
 
@@ -175,7 +176,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun cleanUp() {}
 
-    override fun deletefile(what: String, mtime: Long) {
+    override fun deletefile(what: String) {
         val (cp, _) = checkIsDir(what)
         val fp = Paths.get("$remoteBasePath$cp")
         try {
@@ -318,7 +319,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private var transferListener: MyTransferListener? = null
 
-    override fun deletefile(what: String, mtime: Long) {
+    override fun deletefile(what: String) {
         val (cp, isdir) = checkIsDir(what)
         if (isdir) {
             try {

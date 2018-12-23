@@ -36,7 +36,6 @@ fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     newstage.setOnShown { view.doAfterShown() }
     newstage.show()
     newstage.addEventFilter(KeyEvent.KEY_RELEASED) {
-        if (it.code == KeyCode.ESCAPE) newstage.close()
         if (it.isMetaDown && it.code == KeyCode.W) newstage.close()
     }
     return view

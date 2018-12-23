@@ -196,13 +196,13 @@ class Profile(private val server: Server, private val sync: Sync, private val su
                 when (se.action) {
                     A_MERGE -> throw UnsupportedOperationException("Merge not implemented yet!")
                     A_RMLOCAL -> {
-                        local!!.deletefile(path, se.lTime); se.delete = true; se.relevant = false
+                        local!!.deletefile(path); se.delete = true; se.relevant = false
                     }
                     A_RMREMOTE -> {
-                        remote!!.deletefile(path, se.rTime); se.delete = true; se.relevant = false
+                        remote!!.deletefile(path); se.delete = true; se.relevant = false
                     }
                     A_RMBOTH -> {
-                        local!!.deletefile(path, se.lTime); remote!!.deletefile(path, se.rTime); se.delete = true; se.relevant = false
+                        local!!.deletefile(path); remote!!.deletefile(path); se.delete = true; se.relevant = false
                     }
                     A_USELOCAL -> {
                         val nrt = remote!!.putfile(sync.localfolder.value, path, se.lTime)
