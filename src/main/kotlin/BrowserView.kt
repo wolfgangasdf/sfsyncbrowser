@@ -99,7 +99,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         SSP(selectedItem!!.path), server=server)
             }
             item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                // TODO
+                // TODO also ask if auto!
             }
             separator()
             item("Rename...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canRename() }.action {

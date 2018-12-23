@@ -368,7 +368,7 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     }
 
     private fun cleanup() {
-        /*if (taskList.isNotEmpty()) runLater {*/
+        if (taskList.isNotEmpty()) runLater {
             var iii = 0
             while (iii < taskList.size) {
                 if (taskList[iii].isDone || taskList[iii].isCancelled) {
@@ -378,9 +378,9 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
                 }
             }
             if (taskList.isEmpty()) {
-                this@MyWorker.hide()
+                this@MyWorker.close()
             }
-        //}
+        }
     }
 
     fun runTask(atask: MyTask<*>) {
@@ -388,9 +388,9 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         val onsucc = atask.onSucceeded
         val oncanc = atask.onCancelled
         val onfail = atask.onFailed
-        atask.setOnSucceeded { taskList -= atask ; cleanup() ; onsucc?.handle(it) }
-        atask.setOnCancelled { taskList -= atask ; cleanup() ; oncanc?.handle(it) }
-        atask.setOnFailed { taskList -= atask ; cleanup() ; onfail?.handle(it) }
+        atask.setOnSucceeded { cleanup() ; onsucc?.handle(it) }
+        atask.setOnCancelled { cleanup() ; oncanc?.handle(it) }
+        atask.setOnFailed { cleanup() ; onfail?.handle(it) }
 
         taskList += atask
         if (!this.isShowing) this.show()
