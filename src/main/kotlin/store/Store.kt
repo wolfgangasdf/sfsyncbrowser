@@ -72,7 +72,7 @@ object DBSettings {
 
     fun getCacheFilename(cacheid: String) = "$dbdir/$cacheid-cache.txt"
 
-    fun getCacheFolder(cacheid: String) = "$dbdir/$cacheid-cache/"
+    fun getCacheFolder(cacheid: String) = "$dbdir/$cacheid-cache/" // for temp and file syncs
 
     fun clearCacheFile(cacheid: String) {
         logger.info("delete cache database $cacheid")

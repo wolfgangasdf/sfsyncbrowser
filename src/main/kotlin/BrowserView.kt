@@ -85,6 +85,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 server.syncs += Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
                         SSP(""), SSP(selectedItem?.getParent()), server = server).apply {
                             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+                            auto.set(true)
                         }
                 // TODO somehow initiate sync and reveal afterwards! also
             }
@@ -99,7 +100,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         SSP(selectedItem!!.path), server=server)
             }
             item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                // TODO also ask if auto!
+                val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
+                server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
+                        SSP(""), SSP(""),
+                        SSP(selectedItem!!.path), server=server).apply {
+                    localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+                    auto.set(true)
+                }
             }
             separator()
             item("Rename...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canRename() }.action {

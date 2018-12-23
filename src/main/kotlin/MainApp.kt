@@ -10,6 +10,7 @@ import javafx.stage.Stage
 import mu.KotlinLogging
 import store.DBSettings
 import store.SettingsStore
+import store.SyncType
 import tornadofx.App
 import tornadofx.View
 import tornadofx.addStageIcon
@@ -49,6 +50,22 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
         DBSettings.releaseLock()
         DBSettings.shutdown()
         System.exit(0)
+    }
+
+    override fun start(stage: Stage) {
+        stage.setOnCloseRequest {
+            var sane = ""
+            SettingsStore.servers.forEach { s ->
+                s.syncs.filter { y -> y.type == SyncType.FILE || y.type == SyncType.CACHED }.forEach {
+                    y -> sane += "${y.type}: ${s.title.value} / ${y.title.value}\n"
+                }
+            }
+            if (sane != "") {
+                if (!Helpers.dialogOkCancel("Close", "Really close? There are file or cached syncs:", sane))
+                    it.consume()
+            }
+        }
+        super.start(stage)
     }
 
     init {
