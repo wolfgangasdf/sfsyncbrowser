@@ -89,35 +89,53 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 // TODO somehow initiate sync and reveal afterwards! also
             }
             item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
+                val sname = dialogInputString("New sync", "Enter sync name:", "")
+                var lfolder = "sylocalfolder"
+                chooseDirectory("Select local folder")?.let {
+                    lfolder = if (it.absolutePath.endsWith("/")) it.absolutePath else it.absolutePath + "/"
+                }
+                server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
+                        SSP(""), SSP(lfolder),
+                        SSP(selectedItem!!.path), server=server)
+            }
+            item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 // TODO
             }
             separator()
-            item("Rename...") { isDisable = !isNormal() || selectedItem == null }.action {
+            item("Rename...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canRename() }.action {
                 dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    println("huhu $it")
-                    val c = server.getConnection(basePath)
-                    if (c.canRename()) {
-                        // TODO all in worker!
-                    } else {
-                        // TODO if folder, fail. if file, download, delete, rename, upload
-                    }
+                    server.getConnection(basePath).extRename(selectedItem!!.path, selectedItem!!.getParent() + it)
+                    updateBrowser()
                 }
             }
             item("Change permissions...") { isDisable = !isNormal() }.action {
                 // TODO
             }
-            item("Copy URL") { isDisable = !isNormal() }.action {
-                // TODO
+            item("Copy URL") { isDisable = !isNormal() || selectedItem == null }.action {
+                clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${selectedItem!!.path}")
             }
             separator()
-            item("Duplicate...") { isDisable = !isNormal() }.action {
-                // TODO
+            item("Duplicate...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canDuplicate() }.action {
+                dialogInputString("Duplicate...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
+                    server.getConnection(basePath).extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it)
+                    updateBrowser()
+                }
             }
             item("New folder...") { isDisable = !isNormal() }.action {
-                // TODO
+                dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
+                    server.getConnection(basePath).mkdirrec(currentPath.value + it)
+                    updateBrowser()
+                }
             }
             item("New file...") { isDisable = !isNormal() }.action {
-                // TODO
+                dialogInputString("Create new file", "Enter file name:", "", "")?.let {
+                    val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+                    val f = File("${tempfolder.path}/$it")
+                    if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
+                    server.getConnection(basePath).putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
+
+                    updateBrowser()
+                }
             }
             item("Delete") { isDisable = !isNormal() }.action {
                 selectionModel.selectedItems.forEach {
@@ -130,7 +148,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
              KeyCode.SPACE -> {
                  if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
                      lastpreviewvf = selectedItem
-                     // TODO show progress dialog and allow interruption!
                      getFileIntoTempAndDo(server, selectedItem!!) { Helpers.previewDocument(it) }
                  }
              }
@@ -199,7 +216,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 val taskUploadFiles = MyTask<Unit> {
                     fff.forEach { f ->
                         updateTit("Uploading file $f...")
-                        server.getConnection("").putfile("", f.path, f.lastModified(), "${currentPath.value}/${f.name}")
+                        server.getConnection("").putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
                     }
                 }
                 taskUploadFiles.setOnSucceeded {
@@ -259,7 +276,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             pathButtonFlowPane.add(button("[base]") { action { currentPath.set("") }})
             pl.reversed().forEach { it2 ->
                 pathButtonFlowPane.add(button(Helpers.getFileName(it2)!!) {
-                    action { currentPath.set(it2) }
+                    action { currentPath.set("$it2/") }
                 })
             }
         }

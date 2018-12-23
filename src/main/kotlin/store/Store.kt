@@ -121,7 +121,7 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
              val protocols: ObservableList<Protocol> = getSortedFilteredList(), val syncs: ObservableList<Sync> = getSortedFilteredList(),
              val bookmarks: ObservableList<BrowserBookmark> = getSortedFilteredList()) {
     val proto = SimpleObjectProperty<Protocol>().apply {
-        onChange { currentProtocol.set(protocols.indexOf(it)) }
+        onChange { closeConnection() ; currentProtocol.set(protocols.indexOf(it)) }
     }
     private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"

@@ -104,7 +104,6 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     override fun compareTo(other: VirtualFile): Int = path.compareTo(other.path)
 }
 
-// TODO this got a bit messy: better have sftpconn etc act only on absolute paths, handle basepaths in generalconn!
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
     var remoteBasePath: String = protocol.baseFolder.value
@@ -161,15 +160,14 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun canChmod(): Boolean = true
     override fun canDuplicate(): Boolean = true
     override fun extRename(oldPath: String, newPath: String) {
-        // TODO test
         val (cp, _) = checkIsDir(oldPath)
-        Files.move(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
+        logger.debug("locrename: $remoteBasePath$cp -> $remoteBasePath$newPath ")
+        Files.move(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"))
     }
     override fun extChmod(path: String, newPerms: String) {
         // TODO
     }
     override fun extDuplicate(oldPath: String, newPath: String) {
-        // TODO test
         val (cp, _) = checkIsDir(oldPath)
         Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
     }
@@ -236,7 +234,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             val javaPath = toJavaPathSeparator(cc.toString())
             val fixedPath = java.text.Normalizer.normalize(javaPath, java.text.Normalizer.Form.NFC)
             // fixedPath is without trailing "/" for dirs!
-            logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
+            //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
             var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
             if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
@@ -276,10 +274,10 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true
-    override fun canDuplicate(): Boolean = false //
+    override fun canDuplicate(): Boolean = false
     override fun extRename(oldPath: String, newPath: String) {
-        // TODO test
         val (cp, _) = checkIsDir(oldPath)
+        logger.debug("sftprename: $remoteBasePath$cp -> $remoteBasePath$newPath ")
         sftpc.rename("$remoteBasePath$cp", "$remoteBasePath$newPath")
     }
     override fun extChmod(path: String, newPerms: String) {
@@ -380,15 +378,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         return if (isdir) {
-            fun checkit(p: String) { // recursively create parents
-                val parent = Paths.get(p).parent.toString()
-                if (sftpexists(parent) == null) {
-                    checkit(parent)
-                    sftpc.mkdir(parent)
-                }
-            }
-            checkit(rp)
-            sftpc.mkdir(rp)
+            mkdirrec(rp)
             if (protocol.doSetPermissions.value) setAttr(true, rp)
             mtime // dirs don't need mtime
         } else {
@@ -676,7 +666,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun mkdirrec(absolutePath: String) {
-        throw NotImplementedError("mkdirrec for sftp") // TODO implement from checkit() above?
+        sftpc.mkdirs(absolutePath)
     }
 }
 
