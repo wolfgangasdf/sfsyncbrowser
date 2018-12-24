@@ -1,7 +1,4 @@
 import javafx.beans.property.BooleanProperty
-import javafx.beans.property.SimpleBooleanProperty
-import javafx.beans.property.SimpleIntegerProperty
-import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
@@ -13,6 +10,7 @@ import javafx.stage.Screen
 import mu.KotlinLogging
 import store.*
 import tornadofx.*
+import util.*
 import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
@@ -21,9 +19,6 @@ import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
 import util.Helpers.revealFile
 import util.Helpers.valitextfield
-import util.MyTask
-import util.MyWorker
-import util.SSP
 import java.io.File
 
 private val logger = KotlinLogging.logger {}
@@ -48,8 +43,8 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
     }
 
-    class Status(val status: SimpleStringProperty, val auto: BooleanProperty = SimpleBooleanProperty(false)) {
-        val datetime = SimpleStringProperty("")
+    class Status(val status: SSP, val auto: BooleanProperty = SBP(false)) {
+        val datetime = SSP("")
         fun setSynced() {
             // TODO
         }
@@ -64,17 +59,25 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 fieldset("Server") {
                     field("Name") { textfield(server.title) }
-                    field("Protocol") { combobox<Protocol>(server.proto, server.protocols) }
-                    field {
-                        button("Add new protocol") { action {
-                            Protocol(server, SSP("sftp:user@//"), SimpleBooleanProperty(false),
-                                    SSP(""), SimpleBooleanProperty(false),
+                    field("Protocol") {
+                        combobox<Protocol>(server.proto, server.protocols)
+                        button("Edit") { action {
+                            openNewWindow(ProtocolView(server.proto.value), Modality.APPLICATION_MODAL)
+                        }}
+                        button("Add") { action {
+                            Protocol(server, SSP("sftp://user@server:/folder/"), SBP(false),
+                                    SSP(""), SBP(false),
                                     SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
                                 server.protocols += it
                                 if (server.proto.value == null) server.proto.set(it)
                                 selectItem(it)
                             }
                         } }
+                        button("Remove") { action {
+                            server.protocols.remove(server.proto.value)
+                        } }
+                    }
+                    field {
                         button("Add new sync") { action {
                             Sync(SyncType.NORMAL, SSP("syname"),
                                 SSP(""), SSP("sylocalfolder"),
@@ -99,7 +102,7 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
-    class ProtocolSettingsPane(proto: Protocol): View() {
+    class ProtocolView(proto: Protocol): MyView() {
         override val root = Form()
         init {
             with(root) {
@@ -119,11 +122,6 @@ class MainView : View("SSyncBrowser") {
                     field("Tunnel host") {
                         textfield(proto.tunnelHost) { tooltip("Enter tunnel host[:port] from which the sftp server is reachable") }
                         combobox(proto.tunnelMode, SettingsStore.tunnelModes) { tooltip("Choose if tunnel shall be used, or auto (tries to ping sftp host)") }
-                    }
-                    field {
-                        button("Remove protocol") { action {
-                            proto.server.protocols.remove(proto)
-                        } }
                     }
                 }
             }
@@ -310,7 +308,7 @@ class MainView : View("SSyncBrowser") {
             val value = parent.value
             when {
                 parent == root -> SettingsStore.servers
-                value is Server -> concatObsLists(value.protocols, value.syncs, value.bookmarks)
+                value is Server -> concatObsLists(value.syncs, value.bookmarks)
                 value is Sync -> value.subsets
                 else -> null
             }
@@ -363,7 +361,7 @@ class MainView : View("SSyncBrowser") {
         this += ttv
         hbox {
             button("Add server") { action {
-                Server(SSP("name"), SSP(""), SimpleIntegerProperty(-1)).let {
+                Server(SSP("name"), SSP(""), SIP(-1)).let {
                     SettingsStore.servers += it
                     selectItem(it)
                 }
@@ -412,7 +410,6 @@ class MainView : View("SSyncBrowser") {
                 settingsview.removeFromParent()
                 settingsview = when(ti) {
                     is Server -> ServerSettingsPane(ti)
-                    is Protocol -> ProtocolSettingsPane(ti)
                     is BrowserBookmark -> BookmarkSettingsPane(ti)
                     is Sync -> SyncSettingsPane(ti)
                     is SubSet -> SubsetSettingsPane(ti)

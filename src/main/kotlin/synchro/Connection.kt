@@ -37,6 +37,8 @@ import java.net.ServerSocket
 import java.net.UnknownHostException
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.PublicKey
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -74,12 +76,13 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 }
 
 // if ends on "/", is dir except for "" which is also dir (basepath)
-class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: String = "") : Comparable<VirtualFile> {
+class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile> {
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
     // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
     fun getFileName(): String = File(path).name
+    fun getPermString(): String = PosixFilePermissions.toString(permissions)
     fun getParent(): String = File(path).parent.let { if (it.endsWith("/")) it else "$it/" }
     fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension
@@ -123,7 +126,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun canChmod(): Boolean
     abstract fun canDuplicate(): Boolean
     open fun extRename(oldPath: String, newPath: String) { throw Exception("Can't rename") }
-    open fun extChmod(path: String, newPerms: String) { throw Exception("Can't chmod") }
+    open fun extChmod(path: String, newPerms: Set<PosixFilePermission>) { throw Exception("Can't chmod") }
     open fun extDuplicate(oldPath: String, newPath: String) { throw Exception("Can't duplicate") }
 
     fun assignRemoteBasePath(remoteFolder: String) {
@@ -140,21 +143,9 @@ abstract class GeneralConnection(val protocol: Protocol) {
     }
 
     abstract fun cleanUp()
-
-    fun permToString(permissions: Set<FilePermission>): String {
-        val mask = FilePermission.toMask(permissions)
-        return  (if (FilePermission.USR_R.isIn(mask)) "r" else "-") +
-                (if (FilePermission.USR_W.isIn(mask)) "w" else "-") +
-                (if (FilePermission.USR_X.isIn(mask)) "x" else "-") +
-                (if (FilePermission.GRP_R.isIn(mask)) "r" else "-") +
-                (if (FilePermission.GRP_W.isIn(mask)) "w" else "-") +
-                (if (FilePermission.GRP_X.isIn(mask)) "x" else "-") +
-                (if (FilePermission.OTH_R.isIn(mask)) "r" else "-") +
-                (if (FilePermission.OTH_W.isIn(mask)) "w" else "-") +
-                (if (FilePermission.OTH_X.isIn(mask)) "x" else "-")
-    }
 }
 
+// TODO proper permission handling like in sftp?
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true
@@ -164,9 +155,10 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         logger.debug("locrename: $remoteBasePath$cp -> $remoteBasePath$newPath ")
         Files.move(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"))
     }
-    override fun extChmod(path: String, newPerms: String) {
-        // TODO
+    override fun extChmod(path: String, newPerms: Set<PosixFilePermission>) {
+        Files.setPosixFilePermissions(Paths.get("$remoteBasePath$path"), newPerms)
     }
+
     override fun extDuplicate(oldPath: String, newPath: String) {
         val (cp, _) = checkIsDir(oldPath)
         Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
@@ -237,7 +229,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
             var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
             if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
-            val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc))
+            val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc),
+                    Files.getPosixFilePermissions(cc))
             if (vf.isNotFiltered(filterregexp)) {
                 if (debugslow) Thread.sleep(500)
                 action(vf)
@@ -280,8 +273,11 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         logger.debug("sftprename: $remoteBasePath$cp -> $remoteBasePath$newPath ")
         sftpc.rename("$remoteBasePath$cp", "$remoteBasePath$newPath")
     }
-    override fun extChmod(path: String, newPerms: String) {
-        // TODO
+    override fun extChmod(path: String, newPerms: Set<PosixFilePermission>) {
+        val rp = "$remoteBasePath$path"
+        val fab = FileAttributes.Builder()
+        fab.withPermissions(posix2filePermissions(newPerms))
+        sftpc.setattr(rp, fab.build())
     }
 
     inner class MyTransferListener(private var relPath: String = "") : TransferListener {
@@ -446,7 +442,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 path = fullFilePath.substring(remoteBasePath.length)
                 modTime = attrs.mtime * 1000
                 size = attrs.size
-                permissions = permToString(attrs.permissions)
+                permissions = filePermissions2posix(attrs.permissions)
                 if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
                 if (path == "/") path = ""
             }
@@ -477,6 +473,25 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             doaction(sp, sftpsp, true) { parseContent(it) }
         }
         logger.debug("parsing done")
+    }
+
+    private val filePermissions2posix = mapOf(
+        FilePermission.USR_R to PosixFilePermission.OWNER_READ,
+        FilePermission.USR_W to PosixFilePermission.OWNER_WRITE,
+        FilePermission.USR_X to PosixFilePermission.OWNER_EXECUTE,
+        FilePermission.GRP_R to PosixFilePermission.GROUP_READ,
+        FilePermission.GRP_W to PosixFilePermission.GROUP_WRITE,
+        FilePermission.GRP_X to PosixFilePermission.GROUP_EXECUTE,
+        FilePermission.OTH_R to PosixFilePermission.OTHERS_READ,
+        FilePermission.OTH_W to PosixFilePermission.OTHERS_WRITE,
+        FilePermission.OTH_X to PosixFilePermission.OTHERS_EXECUTE
+    )
+    private val posix2filePermissions = filePermissions2posix.entries.associateBy({ it.value }) { it.key }
+    private fun filePermissions2posix(fp: Set<FilePermission>): MutableSet<PosixFilePermission> {
+        return fp.mapNotNull {filePermissions2posix[it] }.toMutableSet()
+    }
+    private fun posix2filePermissions(fp: Set<PosixFilePermission>): MutableSet<FilePermission> {
+        return fp.mapNotNull {posix2filePermissions[it] }.toMutableSet()
     }
 
     // see ConsoleKnownHostsVerifier

@@ -3,6 +3,8 @@
 package util
 
 import javafx.application.Platform
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
@@ -38,6 +40,8 @@ import kotlin.math.floor
 private val logger = KotlinLogging.logger {}
 
 typealias SSP = SimpleStringProperty
+typealias SBP = SimpleBooleanProperty
+typealias SIP = SimpleIntegerProperty
 
 object Helpers {
     fun isMac() = System.getProperty("os.name").toLowerCase().contains("mac")

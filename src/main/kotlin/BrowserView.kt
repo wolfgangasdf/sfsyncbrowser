@@ -1,4 +1,3 @@
-import javafx.beans.property.SimpleStringProperty
 import javafx.scene.Scene
 import javafx.scene.control.Alert
 import javafx.scene.control.TableRow
@@ -11,14 +10,12 @@ import mu.KotlinLogging
 import store.*
 import synchro.VirtualFile
 import tornadofx.*
-import util.Helpers
+import util.*
 import util.Helpers.dialogInputString
 import util.Helpers.getFileIntoTempAndDo
-import util.MyTask
-import util.MyWorker
-import util.SSP
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,7 +41,7 @@ class DragView(temppath: File) : View("Drag...") {
 class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         MyView("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
-    private var currentPath = SimpleStringProperty(path).apply {
+    private var currentPath = SSP(path).apply {
         onChange { if (it != null) updateBrowser() }
     }
 
@@ -61,10 +58,47 @@ class BrowserView(private val server: Server, private val basePath: String, path
     // mac quicklook lets "space" to close through... this is good in principle, to allow navigation while preview open. implement?
     private var lastpreviewvf: VirtualFile? = null
 
+    inner class InfoView(vf: VirtualFile): MyView() {
+        override val root = Form()
+        private val permbps = PosixFilePermission.values().map {
+            it to SBP(vf.permissions.contains(it)).apply {
+                onChange { op -> if (op) vf.permissions.add(it) else vf.permissions.remove(it) }
+            }
+        }.toMap()
+        init {
+            with(root) {
+                fieldset("Permissions") {
+                    field("User") {
+                        checkbox("read", permbps[PosixFilePermission.OWNER_READ])
+                        checkbox("write", permbps[PosixFilePermission.OWNER_WRITE])
+                        checkbox("execute", permbps[PosixFilePermission.OWNER_EXECUTE])
+                    }
+                    field("Group") {
+                        checkbox("read", permbps[PosixFilePermission.GROUP_READ])
+                        checkbox("write", permbps[PosixFilePermission.GROUP_WRITE])
+                        checkbox("execute", permbps[PosixFilePermission.GROUP_EXECUTE])
+                    }
+                    field("Others") {
+                        checkbox("read", permbps[PosixFilePermission.OTHERS_READ])
+                        checkbox("write", permbps[PosixFilePermission.OTHERS_WRITE])
+                        checkbox("execute", permbps[PosixFilePermission.OTHERS_EXECUTE])
+                    }
+                    field("") {
+                        button("Apply permissions").setOnAction {
+                            server.getConnection(basePath).extChmod(vf.path, vf.permissions)
+                            updateBrowser()
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
     private val fileTableView = tableview(files) {
         column("title", VirtualFile::getFileNameBrowser).remainingWidth()
         column("size", VirtualFile::size)
-        column("perms", VirtualFile::permissions)
+        column("perms", VirtualFile::getPermString)
     }.apply {
         multiSelect(true)
         rowFactory = Callback {
@@ -79,7 +113,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         lazyContextmenu {
             item("Refresh").action { updateBrowser() }
             item("Add bookmark") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                server.bookmarks += BrowserBookmark(server, SimpleStringProperty(selectedItem?.path))
+                server.bookmarks += BrowserBookmark(server, SSP(selectedItem?.path))
             }
             item("Add syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
                 server.syncs += Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
@@ -106,6 +140,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         SSP(selectedItem!!.path), server=server).apply {
                     localfolder.set(DBSettings.getCacheFolder(cacheid.value))
                     auto.set(true)
+                    // TODO somehow initiate sync and reveal afterwards! also
                 }
             }
             separator()
@@ -115,8 +150,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     updateBrowser()
                 }
             }
-            item("Change permissions...") { isDisable = !isNormal() }.action {
-                // TODO
+            item("Info...") { isDisable = !isNormal() || selectedItem == null }.action {
+                openNewWindow(InfoView(selectedItem!!), Modality.APPLICATION_MODAL)
             }
             item("Copy URL") { isDisable = !isNormal() || selectedItem == null }.action {
                 clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${selectedItem!!.path}")

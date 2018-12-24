@@ -2,7 +2,10 @@ package store
 
 import CF
 import SortedProperties
-import javafx.beans.property.*
+import javafx.beans.property.BooleanProperty
+import javafx.beans.property.IntegerProperty
+import javafx.beans.property.SimpleObjectProperty
+import javafx.beans.property.StringProperty
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import mu.KotlinLogging
@@ -20,6 +23,8 @@ import tornadofx.onChange
 import util.Helpers
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
+import util.SBP
+import util.SIP
 import util.SSP
 import java.io.File
 import java.io.FileReader
@@ -93,15 +98,15 @@ enum class SyncType { NORMAL, FILE, CACHED }
 // title is filepath for file sync
 class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
-           val subsets: ObservableList<SubSet> = getSortedFilteredList(), val auto: BooleanProperty = SimpleBooleanProperty(false) ) {
+           val subsets: ObservableList<SubSet> = getSortedFilteredList(), val auto: BooleanProperty = SBP(false) ) {
     override fun toString() = "[Sync ${type.name}] ${title.value}"
 }
 
-class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
+class Protocol(private val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
                val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
                val tunnelHost: StringProperty, val tunnelMode: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
-    override fun toString(): String = "[Protocol ${protocoluri.value}]"
+    override fun toString(): String = "[Protocol ${protocoluri.value} of $server]"
     fun tunnelHostname() = tunnelHost.value.split(":").first()
     fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }
@@ -208,8 +213,8 @@ object SettingsStore {
             val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
             if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
             fun p2sp(key: String) = SSP(props.getOrDefault(key, ""))
-            fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
-            fun p2ip(key: String) = SimpleIntegerProperty(props.getOrDefault(key, "0").toInt())
+            fun p2bp(key: String) = SBP(props.getOrDefault(key, "0").toBoolean())
+            fun p2ip(key: String) = SIP(props.getOrDefault(key, "0").toInt())
             try {
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
