@@ -47,8 +47,8 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
     override fun stop() {
         logger.info("*************** stop app")
         SettingsStore.saveSettings()
+        SettingsStore.shutdown()
         DBSettings.releaseLock()
-        DBSettings.shutdown()
         System.exit(0)
     }
 

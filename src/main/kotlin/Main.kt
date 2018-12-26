@@ -7,6 +7,7 @@ import util.Helpers
 fun main(args: Array<String>) {
 
     System.setProperty("org.slf4j.simpleLogger.log.net.schmizz", "INFO")
+    System.setProperty("org.slf4j.simpleLogger.log.io.methvin.watcher", "INFO")
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
     System.setProperty(org.slf4j.simple.SimpleLogger.SHOW_DATE_TIME_KEY, "true")
     System.setProperty(org.slf4j.simple.SimpleLogger.DATE_TIME_FORMAT_KEY, "yyyy-MM-dd HH:mm:ss:SSS")

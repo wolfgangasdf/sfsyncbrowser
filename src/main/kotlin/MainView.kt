@@ -147,10 +147,6 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
-    private fun compSyncFile(sync: Sync) {
-        openNewWindow(SyncView(sync.server, sync))
-    }
-
     inner class SyncSettingsPane(sync: Sync): View() {
         override val root = Form()
         init {
@@ -202,13 +198,13 @@ class MainView : View("SSyncBrowser") {
                         } }
                     }
                 } else fieldset("File sync") {
-                    field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
+                    field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = false } }
                     field("Cacheid") {
                         textfield(sync.cacheid)
                     }
                     field("Local folder") {
                         label(sync.localfolder)
-                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value)) }
+                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value), true) }
                     }
                     field("Remote folder") {
                         label(sync.remoteFolder)
@@ -356,6 +352,7 @@ class MainView : View("SSyncBrowser") {
         useMaxWidth = true
     }
 
+    private var fw: FileWatcher? = null
     override val root = vbox {
         prefWidth = 800.0
         this += ttv
@@ -385,6 +382,14 @@ class MainView : View("SSyncBrowser") {
                 }
                 MyWorker.runTask(testtask)
             } }
+            button("testWatch") { action {
+                fw = FileWatcher("/Unencrypted_Data/incoming/firefox/0000-newfile.txt").watch() {
+                    println("watch: change: $it")
+                }
+            }}
+            button("testWatch stop") { action {
+                fw?.stop()
+            }}
         }
         this += settingsview
     }
@@ -418,6 +423,12 @@ class MainView : View("SSyncBrowser") {
                 root += settingsview
                 FX.primaryStage.sizeToScene() // rescale stage to show full scene
             }
+        }
+    }
+
+    companion object {
+        fun compSyncFile(sync: Sync) {
+            openNewWindow(SyncView(sync.server, sync))
         }
     }
 }

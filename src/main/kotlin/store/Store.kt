@@ -20,12 +20,9 @@ import synchro.Actions.A_UNKNOWN
 import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import tornadofx.onChange
-import util.Helpers
+import util.*
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
-import util.SBP
-import util.SIP
-import util.SSP
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -86,10 +83,6 @@ object DBSettings {
             Files.delete(fff)
         }
     }
-
-    fun shutdown() {
-        SettingsStore.servers.forEach { it.closeConnection() }
-    }
 }
 
 ///////////////////////// settings
@@ -100,6 +93,7 @@ class Sync(val type: SyncType, val title: StringProperty, val status: StringProp
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(), val auto: BooleanProperty = SBP(false) ) {
     override fun toString() = "[Sync ${type.name}] ${title.value}"
+    val fileWatcher: FileWatcher? = null
 }
 
 class Protocol(private val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
@@ -144,6 +138,7 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
         return connection!!
     }
     fun closeConnection() {
+        syncs.forEach { it.fileWatcher?.stop() }
         connection?.cleanUp()
         connection = null
     }
@@ -247,6 +242,10 @@ object SettingsStore {
             }
             logger.info("settings loaded!")
         }
+    }
+
+    fun shutdown() {
+        SettingsStore.servers.forEach { it.closeConnection() }
     }
 
     init {

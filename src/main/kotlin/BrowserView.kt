@@ -116,12 +116,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 server.bookmarks += BrowserBookmark(server, SSP(selectedItem?.path))
             }
             item("Add syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                server.syncs += Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
+                val newSync = Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
                         SSP(""), SSP(selectedItem?.getParent()), server = server).apply {
                             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
                             auto.set(true)
                         }
-                // TODO somehow initiate sync and reveal afterwards! also
+                server.syncs += newSync
+                MainView.compSyncFile(newSync)
             }
             item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 val sname = dialogInputString("New sync", "Enter sync name:", "")

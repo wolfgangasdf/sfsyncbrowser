@@ -77,13 +77,15 @@ object CF {
 
 class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
+    private var isSingleFileSync = false
     constructor(server: Server, sync: Sync): this(server, sync,
             SubSet(SSP(""), SSP(""), SSP(""), sync = sync).apply {
                 subfolders += sync.title.value // this is filepath!
-            })
+            }) {
+        isSingleFileSync = true
+    }
 
     private var profile = Profile(server, sync, subset)
-
     private var syncEnabled = false
 
     private fun handleFailed(task: MyTask<*>) {
@@ -111,7 +113,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $
             updateTit("A Compare files")
             updateProgr(0, 100, "Initialize local and remote...")
             val taskIni = profile.taskIni()
-            val taskCompFiles = profile.taskCompFiles()
+            val taskCompFiles = profile.taskCompFiles(isSingleFileSync)
             taskIni.setOnSucceeded {
                 updateProgr(50, 100, "Run comparison...")
                 taskCompFiles.setOnSucceeded {

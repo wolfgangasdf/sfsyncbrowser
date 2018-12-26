@@ -2,6 +2,7 @@
 
 package util
 
+import io.methvin.watcher.DirectoryWatcher
 import javafx.application.Platform
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
@@ -30,6 +31,7 @@ import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
@@ -59,9 +61,9 @@ object Helpers {
         return "%.1f%s".format(num, ext)
     }
 
-    fun revealFile(file: java.io.File) {
+    fun revealFile(file: java.io.File, gointo: Boolean = false) {
         when {
-            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("open", "-R", file.path))
+            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("open", if (gointo) "" else "-R", file.path))
             Helpers.isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.path}")
             Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
             else -> error("not supported OS, tell me how to do it!")
@@ -405,3 +407,27 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
 
 }
 
+class FileWatcher(val path: String) {
+    private var dw: DirectoryWatcher? = null
+    private var lastmod = 0L
+
+    private fun lastMod(): Long = File(path).lastModified()
+
+    fun watch(callback: (String) -> Unit ): FileWatcher {
+        lastmod = lastMod()
+        dw = DirectoryWatcher.builder().path(Paths.get(path)).listener { dce ->
+            logger.debug("filewatcher($path): $dce")
+            val newlastmod = lastMod()
+            if (newlastmod != lastmod) {
+                lastmod = newlastmod
+                callback(path)
+            }
+        }.fileHashing(false).build()
+        dw?.watchAsync()
+        return this
+    }
+
+    fun stop() {
+        dw?.close()
+    }
+}

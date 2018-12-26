@@ -30,7 +30,7 @@ object Actions {
 
 object Comparison {
     // compare, update database entries only.
-    fun compareSyncEntries(cache: Cache): Boolean {
+    fun compareSyncEntries(cache: Cache, isSingleFileSync: Boolean = false): Boolean {
         logger.debug("compare sync entries...")
         val swse = StopWatch()
         // q contains all entries to be checked

@@ -54,7 +54,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
     }
 
 
-    fun taskCompFiles() = MyTask<Boolean> {
+    fun taskCompFiles(isSingleFileSync: Boolean = false) = MyTask<Boolean> {
         updateTit("CompareFiles...")
         val sw = StopWatch() // for timing meas
 
@@ -146,7 +146,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         updateProgr(76, 100, "comparing...")
         sw.restart()
         logger.info("*********************** compare sync entrie")
-        val haveChanges = Comparison.compareSyncEntries(cache)
+        val haveChanges = Comparison.compareSyncEntries(cache, isSingleFileSync)
         logger.debug("havechanges1: $haveChanges")
 
         logger.debug("sw: comparing: " + sw.getTimeRestart())
