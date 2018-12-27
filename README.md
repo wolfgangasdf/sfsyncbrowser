@@ -17,6 +17,7 @@ SSyncBrowser is a file synchronization and remote file browsing program which wo
 
 * Quicklook on mac
 * Automatic ssh tunnel
+* Symbolic link (symlink) handling: browser follows directory links, synchronization ignores symlinks (but accepts symlinked paths in basefolders etc).
 
 ### More information
 

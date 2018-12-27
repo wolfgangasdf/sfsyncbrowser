@@ -70,8 +70,8 @@ object Comparison {
             if (se.relevant && !se.isDir) {
                 if (se.cSize == -1L) { // only get parent folder for unknown files, faster!
                     val parent = getParentFolder(path)
-                    if (cache.cache[parent]?.hasCachedParent != true) {
-                        se.compareSetAction(newcache = true) // test
+                    if (cache.cache[parent]?.hasCachedParent != true && !isSingleFileSync) {
+                        se.compareSetAction(newcache = true)
                     } else {
                         se.compareSetAction(newcache = false)
                     }
@@ -79,6 +79,7 @@ object Comparison {
                     se.compareSetAction(newcache = false)
                 }
             }
+            println("XXXXXXY se: $se")
         }
         logger.debug("TTT c took = " + swse.getTimeRestart())
 

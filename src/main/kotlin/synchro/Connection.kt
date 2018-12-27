@@ -116,7 +116,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun getfile(localBasePath: String, from: String, mtime: Long)
     // returns mtime if cantSetDate ; if remotePath not empty: take this as absolute file path!
     abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long
-    abstract fun mkdirrec(absolutePath: String)
+    abstract fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean = false)
     abstract fun deletefile(what: String)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
     abstract fun isAlive(): Boolean
@@ -249,8 +249,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
     }
 
-    override fun mkdirrec(absolutePath: String) {
-        Files.createDirectories(Paths.get(absolutePath))
+    override fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean) {
+        Files.createDirectories(Paths.get(if (addRemoteBasePath) "$remoteBasePath$absolutePath" else absolutePath))
     }
 
     override fun isAlive() = true
@@ -680,8 +680,9 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         pfsftp.close()
     }
 
-    override fun mkdirrec(absolutePath: String) {
-        sftpc.mkdirs(absolutePath)
+    override fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean) {
+        logger.debug("sftp mkdirrec $absolutePath")
+        sftpc.mkdirs(if (addRemoteBasePath) "$remoteBasePath$absolutePath" else absolutePath)
     }
 }
 

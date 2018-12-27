@@ -3,16 +3,13 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 
-val kotlin_version = "1.3.11"
+val kotlinversion = "1.3.11"
 
 buildscript {
 
     repositories {
         mavenCentral()
         jcenter()
-    }
-    dependencies {
-        classpath("com.hierynomus:sshj:0.26.0") // TODO: why???
     }
 }
 
@@ -23,9 +20,9 @@ plugins {
     kotlin("jvm") version "1.3.11"
     id("idea")
     id("application")
-    id("com.github.ben-manes.versions") version "0.20.0" // TODO gradle5
-    id("com.github.johnrengelman.shadow") version "4.0.3" // TODO gradle5 test, can work!
-    id("edu.sc.seis.macAppBundle") version "2.3.0" // TODO test gradle 5
+    id("com.github.ben-manes.versions") version "0.20.0"
+    id("com.github.johnrengelman.shadow") version "4.0.3"
+    id("edu.sc.seis.macAppBundle") version "2.3.0"
 }
 
 tasks.withType<Wrapper> {
@@ -35,14 +32,6 @@ tasks.withType<Wrapper> {
 //java.sourceSets {
 //    main.kotlin.exclude "**/Connection.kt"
 //    main.kotlin.exclude "**/Profile.kt"
-//}
-
-// TODO
-//idea {
-//    module {
-//        downloadJavadoc = true
-//        downloadSources = true
-//    }
 //}
 
 application {
@@ -83,8 +72,8 @@ repositories {
 }
 
 dependencies {
-    compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version")
-    compile("org.jetbrains.kotlin:kotlin-reflect:$kotlin_version")
+    compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinversion")
+    compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
     compile("io.github.microutils:kotlin-logging:1.6.22")
     compile("com.hierynomus:sshj:0.26.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta2") // no colors, everything stderr

@@ -50,6 +50,8 @@ object Helpers {
     fun isLinux() = System.getProperty("os.name").toLowerCase().matches("(.*nix)|(.*nux)".toRegex())
     fun isWin() = System.getProperty("os.name").toLowerCase().contains("win")
 
+    fun dformat() = java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
+
     fun tokMGTPE(d: Double): String {
         var num = d
         var ext = ""
@@ -413,11 +415,13 @@ class FileWatcher(val path: String) {
 
     private fun lastMod(): Long = File(path).lastModified()
 
+    // this doesn't work with directories, watches file mod time to avoid double notifications.
     fun watch(callback: (String) -> Unit ): FileWatcher {
+        logger.info("filewatcher: watching $path")
         lastmod = lastMod()
         dw = DirectoryWatcher.builder().path(Paths.get(path)).listener { dce ->
-            logger.debug("filewatcher($path): $dce")
             val newlastmod = lastMod()
+            logger.debug("filewatcher($path, $lastmod, $newlastmod): $dce")
             if (newlastmod != lastmod) {
                 lastmod = newlastmod
                 callback(path)
@@ -428,6 +432,7 @@ class FileWatcher(val path: String) {
     }
 
     fun stop() {
+        logger.info("filewatcher: stop watching $path")
         dw?.close()
     }
 }

@@ -122,6 +122,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                             auto.set(true)
                         }
                 server.syncs += newSync
+                // TODO implement this, but how? need to get callback from runSync....     val openit = dialogOkCancel("Temporary sync file", "After synchronization of the file, open it with default program?", "")
                 MainView.compSyncFile(newSync)
             }
             item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
@@ -140,8 +141,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         SSP(""), SSP(""),
                         SSP(selectedItem!!.path), server=server).apply {
                     localfolder.set(DBSettings.getCacheFolder(cacheid.value))
-                    auto.set(true)
-                    // TODO somehow initiate sync and reveal afterwards! also
+                    auto.set(false)
                 }
             }
             separator()
@@ -166,7 +166,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             item("New folder...") { isDisable = !isNormal() }.action {
                 dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
-                    server.getConnection(basePath).mkdirrec(currentPath.value + it)
+                    server.getConnection(basePath).mkdirrec(currentPath.value + it, true)
                     updateBrowser()
                 }
             }

@@ -23,6 +23,7 @@ import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import synchro.Profile
 import tornadofx.*
+import util.Helpers.dformat
 import util.Helpers.dialogMessage
 import util.Helpers.readFileToString
 import util.Helpers.revealFile
@@ -32,6 +33,7 @@ import util.MyWorker
 import util.SSP
 import java.io.File
 import java.nio.file.Files
+import java.util.*
 
 private val logger = KotlinLogging.logger {}
 
@@ -75,7 +77,7 @@ object CF {
     }
 }
 
-class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
+class SyncView(server: Server, private val sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     private var isSingleFileSync = false
     constructor(server: Server, sync: Sync): this(server, sync,
@@ -105,8 +107,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $
         }
     }
 
-
-    private fun runCompare() {
+    private fun runCompare(runSyncIfPossible: Boolean = false) {
         logger.info("Compare...")
         btSync.isDisable = true
         val ctask = MyTask<Unit> {
@@ -124,6 +125,9 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
+                        runSynchronize()
+                    } else if (runSyncIfPossible && canSync) {
+                        logger.info("Finished compare, changes found but can sync & runSyncIfPossible. Synchronizing...")
                         runSynchronize()
                     } else {
                         logger.info("Finished compare")
@@ -147,6 +151,7 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $
         val taskSynchronize = profile.taskSynchronize()
         taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
+            sync.status.set("synchronized ${dformat().format(Date())}")
             val taskCleanup = profile.taskCleanup()
             taskCleanup.setOnSucceeded { this.close() }
             MyWorker.runTask(taskCleanup)
@@ -362,6 +367,6 @@ class SyncView(server: Server, sync: Sync, subset: SubSet) : MyView("Sync view $
     }
 
     override fun doAfterShown() {
-        runCompare()
+        runCompare(isSingleFileSync)
     }
 }

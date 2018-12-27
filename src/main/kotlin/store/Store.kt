@@ -21,6 +21,7 @@ import synchro.Actions.A_USELOCAL
 import synchro.Actions.A_USEREMOTE
 import tornadofx.onChange
 import util.*
+import util.Helpers.dformat
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
 import java.io.File
@@ -76,12 +77,19 @@ object DBSettings {
 
     fun getCacheFolder(cacheid: String) = "$dbdir/$cacheid-cache/" // for temp and file syncs
 
-    fun clearCacheFile(cacheid: String) {
+    fun removeCacheFile(cacheid: String) {
         logger.info("delete cache database $cacheid")
-        val fff = Paths.get(getCacheFilename(cacheid))
-        if (Files.exists(fff)) {
-            Files.delete(fff)
+        File(getCacheFilename(cacheid)).delete()
+    }
+
+    fun removeCacheFolder(cacheid: String) {
+        logger.info("delete cache folder $cacheid")
+        val f = File(getCacheFolder(cacheid))
+        f.listFiles()?.forEach {
+            logger.info("deleting $it")
+            it.delete()
         }
+        f.delete()
     }
 }
 
@@ -93,7 +101,7 @@ class Sync(val type: SyncType, val title: StringProperty, val status: StringProp
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(), val auto: BooleanProperty = SBP(false) ) {
     override fun toString() = "[Sync ${type.name}] ${title.value}"
-    val fileWatcher: FileWatcher? = null
+    var fileWatcher: FileWatcher? = null
 }
 
 class Protocol(private val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
@@ -143,6 +151,12 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
         connection = null
     }
     fun getProtocol(): Protocol = protocols[currentProtocol.value]
+    fun removeSync(sync: Sync) {
+        sync.fileWatcher?.stop()
+        DBSettings.removeCacheFile(sync.cacheid.value)
+        DBSettings.removeCacheFolder(sync.cacheid.value)
+        syncs.remove(sync)
+    }
 }
 
 object SettingsStore {
@@ -227,6 +241,7 @@ object SettingsStore {
                         val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
                                 SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server,
                                 auto = p2bp("sy.$idx.$idx2.auto"))
+                        if (sync.auto.get()) sync.status.set("need to re-start auto sync!")
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
                             val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
                             for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!
@@ -264,11 +279,11 @@ class SyncEntry2(var path: String, var se: SyncEntry) {
     override fun toString(): String = "[path=$path action=[${CF.amap[se.action]}] lTime=${se.lTime} lSize=${se.lSize} rTime=${se.rTime} rSize=${se.rSize} lcTime=${se.lcTime} rcTime=${se.rcTime} cSize=${se.cSize} rel=${se.relevant}"
     fun toStringNice(): String =
             """
-     |Path: $path (${(if (se.isDir) "dir" else "file")})
+     |Path: $path (${(if (se.isDir) "dir" else "file")} ${se.hasCachedParent})
      |Local : ${se.detailsLocal().value}
      |Remote: ${se.detailsRemote().value}
      |LCache : ${se.detailsLCache().value}
-     |RCache : ${se.detailsRCache().value} (${se.hasCachedParent})
+     |RCache : ${se.detailsRCache().value}
     """.trimMargin()
 }
 
@@ -286,7 +301,6 @@ class SyncEntry(var action: Int,
     private fun sameTime(t1: Long, t2: Long): Boolean = Math.abs(t1 - t2) < 2000 // in milliseconds
 
     fun status() = SSP(this, "status", CF.amap[action])
-    private fun dformat() = java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
     fun detailsLocal() = SSP(this, "detailsl",
             if (lSize != -1L) dformat().format(java.util.Date(lTime)) + "(" + lSize + ")" else "none")
 

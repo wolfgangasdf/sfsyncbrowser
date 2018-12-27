@@ -1,4 +1,3 @@
-import javafx.beans.property.BooleanProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
@@ -43,16 +42,6 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
     }
 
-    class Status(val status: SSP, val auto: BooleanProperty = SBP(false)) {
-        val datetime = SSP("")
-        fun setSynced() {
-            // TODO
-        }
-        fun setError() {
-            // TODO
-        }
-    }
-
     inner class ServerSettingsPane(server: Server): View() {
         override val root = Form()
         init {
@@ -90,7 +79,8 @@ class MainView : View("SSyncBrowser") {
                             openNewWindow(BrowserView(server, "", ""))
                         } }
                         button("Remove server") { action {
-                            server.syncs.forEach { DBSettings.clearCacheFile(it.cacheid.value) }
+                            val iter = server.syncs.iterator()
+                            while (iter.hasNext()) server.removeSync(iter.next())
                             SettingsStore.servers.remove(server)
                         } }
                         button("Close connection") { action {
@@ -156,7 +146,7 @@ class MainView : View("SSyncBrowser") {
                     field("Cacheid") {
                         textfield(sync.cacheid)
                         button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
-                            DBSettings.clearCacheFile(sync.cacheid.value)
+                            DBSettings.removeCacheFile(sync.cacheid.value)
                         }
                     }
                     field("Local folder") {
@@ -194,11 +184,11 @@ class MainView : View("SSyncBrowser") {
                             sync.subsets += ss
                         } }
                         button("Remove sync") { action {
-                            sync.server.syncs.remove(sync)
+                            sync.server.removeSync(sync)
                         } }
                     }
                 } else fieldset("File sync") {
-                    field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = false } }
+                    field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
                     field("Cacheid") {
                         textfield(sync.cacheid)
                     }
@@ -211,7 +201,7 @@ class MainView : View("SSyncBrowser") {
                     }
                     field {
                         button("Remove sync") { action {
-                            sync.server.syncs.remove(sync)
+                            sync.server.removeSync(sync)
                         } }
                     }
                 }
@@ -352,7 +342,6 @@ class MainView : View("SSyncBrowser") {
         useMaxWidth = true
     }
 
-    private var fw: FileWatcher? = null
     override val root = vbox {
         prefWidth = 800.0
         this += ttv
@@ -382,14 +371,6 @@ class MainView : View("SSyncBrowser") {
                 }
                 MyWorker.runTask(testtask)
             } }
-            button("testWatch") { action {
-                fw = FileWatcher("/Unencrypted_Data/incoming/firefox/0000-newfile.txt").watch() {
-                    println("watch: change: $it")
-                }
-            }}
-            button("testWatch stop") { action {
-                fw?.stop()
-            }}
         }
         this += settingsview
     }
@@ -428,7 +409,13 @@ class MainView : View("SSyncBrowser") {
 
     companion object {
         fun compSyncFile(sync: Sync) {
+            sync.fileWatcher?.stop()
             openNewWindow(SyncView(sync.server, sync))
+            if (sync.auto.value) {
+                sync.fileWatcher = FileWatcher(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value).watch {
+                    runLater { compSyncFile(sync) }
+                }
+            }
         }
     }
 }

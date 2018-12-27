@@ -224,7 +224,6 @@ class Profile(private val server: Server, private val sync: Sync, private val su
             } catch (e: InterruptedException) {
                 throw e
             } catch (e: Exception) {
-                // TODO on first sync exception, ask user if to stop, continue, or continue ignoring errors
                 logger.error("sync exception:", e)
                 se.action = A_SYNCERROR
                 se.delete = false
