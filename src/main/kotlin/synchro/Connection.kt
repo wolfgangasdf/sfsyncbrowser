@@ -448,7 +448,11 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                         cp = if (!it.startsWith("/")) "${Paths.get(cp).parent}/$it" else it
                     }
                     logger.debug("sftp: resolving symlink, next: $cp")
-                    rriattributes = sftpc.lstat(cp)
+                    try { rriattributes = sftpc.lstat(cp) }
+                    catch (e: SFTPException) {
+                        logger.debug("sftp: can't stat, skip: $cp")
+                        break
+                    }
                 } while (rriattributes.type == FileMode.Type.SYMLINK)
             }
 
