@@ -1,9 +1,9 @@
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
-import javafx.scene.control.Alert
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
+import javafx.scene.layout.Priority
 import javafx.stage.Modality
 import javafx.stage.Screen
 import mu.KotlinLogging
@@ -13,7 +13,6 @@ import util.*
 import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
-import util.Helpers.dialogMessage
 import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
 import util.Helpers.revealFile
@@ -178,11 +177,6 @@ class MainView : View("SSyncBrowser") {
                                 selectItem(it)
                             }
                         } }
-                        button("Add <all> subset") { action {
-                            val ss = SubSet(SSP("all"), SSP(""), SSP(""), sync = sync)
-                            ss.subfolders += ""
-                            sync.subsets += ss
-                        } }
                         button("Remove sync") { action {
                             sync.server.removeSync(sync)
                         } }
@@ -299,37 +293,36 @@ class MainView : View("SSyncBrowser") {
                 else -> null
             }
         }
-        cellFormat { tit ->
+        cellFormat { what ->
             graphic = hbox(20, Pos.CENTER_LEFT) {
-                label(tit.toString()) {
+                label(what.toString()) {
                     isEditable = false
                 }
-                when (tit) {
+                when (what) {
                     is Server -> { button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
-                            openNewWindow(BrowserView(tit, "", ""))
+                            openNewWindow(BrowserView(what, "", ""))
                         }
-                        label(tit.status)
+                        label(what.status)
                     }
 
                     is BrowserBookmark -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
-                        openNewWindow(BrowserView(tit.server, "", tit.path.value))
+                        openNewWindow(BrowserView(what.server, "", what.path.value))
                     }
                     is Sync -> {
-                        if (tit.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
-                            compSyncFile(tit)
+                        if (what.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
+                            compSyncFile(what)
                         } else button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                            val all = tit.subsets.filter { it2 -> it2.title.value == "all" }
-                            if (all.size == 1) {
-                                SubsetSettingsPane.compSync(all.first())
-                            } else dialogMessage(Alert.AlertType.ERROR, "Error", "You must have exactly one \"all\" subset!", "")
+                            val allsubset = SubSet(SSP("all"), SSP(""), SSP(""), sync = what)
+                            allsubset.subfolders += ""
+                            SubsetSettingsPane.compSync(allsubset)
                         }
-                        label(tit.status)
+                        label(what.status)
                     }
                     is SubSet -> {
                         button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
-                            SubsetSettingsPane.compSync(tit)
+                            SubsetSettingsPane.compSync(what)
                         }
-                        label(tit.status)
+                        label(what.status)
                     }
                 }
 
@@ -339,6 +332,7 @@ class MainView : View("SSyncBrowser") {
         isShowRoot = false
         root.children.forEach { it.isExpanded = true ; it.children.forEach { it2 -> it2.isExpanded = true }}
         prefHeight = 350.0
+        vgrow = Priority.ALWAYS
         useMaxWidth = true
     }
 

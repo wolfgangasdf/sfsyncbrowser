@@ -118,7 +118,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long
     abstract fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean = false)
     abstract fun deletefile(what: String)
-    abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit)
+    abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit)
     abstract fun isAlive(): Boolean
 
     // extended functions only for some connections
@@ -216,7 +216,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // include the subfolder but root "/" is not allowed!
-    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit) {
+    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
+        val linkOptions = if (resolveSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
         fun parseContent(cc: Path, goDeeper: Boolean) {
             // on mac 10.8 with oracle java 7, filenames are encoded with strange 'decomposed unicode'. grr
@@ -228,13 +229,13 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             // fixedPath is without trailing "/" for dirs!
             //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
             var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
-            if (Files.isDirectory(cc) && strippedPath != "") strippedPath += "/"
+            if (Files.isDirectory(cc, *linkOptions) && strippedPath != "") strippedPath += "/"
             val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc),
                     Files.getPosixFilePermissions(cc))
             if (vf.isNotFiltered(filterregexp)) {
                 if (debugslow) Thread.sleep(500)
                 action(vf)
-                if (Files.isDirectory(cc) && goDeeper) {
+                if (Files.isDirectory(cc, *linkOptions) && goDeeper) {
                     val dir = Files.newDirectoryStream(cc)
                     for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
                     dir.close()
@@ -307,9 +308,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
         }
     }
-
-    private fun isDirectoryx(fa: FileAttributes): Boolean =
-            ((fa.type.toMask() and FileMode.Type.DIRECTORY.toMask()) > 0)
 
     private var transferListener: MyTransferListener? = null
 
@@ -434,25 +432,40 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         return resls
     }
 
-    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, action: (VirtualFile) -> Unit) {
+    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive fil=$filterregexp) in thread ${Thread.currentThread().id}")
 
-        fun vfFromSftp(fullFilePath: String, attrs: FileAttributes): VirtualFile {
-            return VirtualFile().apply {
-                path = fullFilePath.substring(remoteBasePath.length)
-                modTime = attrs.mtime * 1000
-                size = attrs.size
-                permissions = filePermissions2posix(attrs.permissions)
-                if (isDirectoryx(attrs) && !path.endsWith("/")) path += "/"
-                if (path == "/") path = ""
-            }
-        }
+        fun doaction(rripath: String, rriattributesini: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
 
-        fun doaction(rripath: String, rriattributes: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
-            val vf = vfFromSftp(rripath, rriattributes)
-            if (vf.isNotFiltered(filterregexp)) {
-                action(vf)
-                if (isDirectoryx(rriattributes) && (recursive || parsealways))  parseContentFun(rripath)
+            var rriattributes = rriattributesini
+
+            if (rriattributes.type == FileMode.Type.SYMLINK && resolveSymlinks) { // resolve symlink. use target attrs but link path.
+                var cp = rripath
+                logger.debug("sftp: resolving symlink $cp...")
+                do {
+                    sftpc.readlink(cp).let {
+                        cp = if (!it.startsWith("/")) "${Paths.get(cp).parent}/$it" else it
+                    }
+                    logger.debug("sftp: ... next: $cp")
+                    rriattributes = sftpc.lstat(cp)
+                } while (rriattributes.type == FileMode.Type.SYMLINK)
+            }
+
+            if (!listOf(FileMode.Type.DIRECTORY, FileMode.Type.REGULAR).contains(rriattributes.type)) {
+                logger.error("Not a regular file or directory, ignoring: $rripath : $rriattributes")
+            } else {
+                val vf = VirtualFile().apply {
+                    path = rripath.substring(remoteBasePath.length)
+                    modTime = rriattributes.mtime * 1000
+                    size = rriattributes.size
+                    permissions = filePermissions2posix(rriattributes.permissions)
+                    if (rriattributes.type == FileMode.Type.DIRECTORY && !path.endsWith("/")) path += "/"
+                    if (path == "/") path = ""
+                }
+                if (vf.isNotFiltered(filterregexp)) {
+                    action(vf)
+                    if (vf.isDir() && (recursive || parsealways)) parseContentFun(rripath)
+                }
             }
         }
 

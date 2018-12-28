@@ -1,8 +1,10 @@
+import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.Alert
 import javafx.scene.control.TableRow
 import javafx.scene.input.KeyCode
 import javafx.scene.input.TransferMode
+import javafx.scene.layout.Priority
 import javafx.stage.Modality
 import javafx.stage.Stage
 import javafx.util.Callback
@@ -51,8 +53,11 @@ class BrowserView(private val server: Server, private val basePath: String, path
     var selectFoldersCallback: (fl: List<VirtualFile>) -> Unit = {}
     private fun isNormal() = mode == BrowserViewMode.NORMAL
 
-    private val pathButtonFlowPane = hbox {
-        label("Path:")
+    private val pathButtonFlowPane = flowpane {
+        alignment = Pos.CENTER_LEFT
+        paddingAll = 5.0
+        hgap = 5.0
+        vgap = 5.0
     }
 
     // mac quicklook lets "space" to close through... this is good in principle, to allow navigation while preview open. implement?
@@ -99,6 +104,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         column("title", VirtualFile::getFileNameBrowser).remainingWidth()
         column("size", VirtualFile::size)
         column("perms", VirtualFile::getPermString)
+        vgrow = Priority.ALWAYS
     }.apply {
         multiSelect(true)
         rowFactory = Callback {
@@ -299,7 +305,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
             val tmpl = mutableListOf<VirtualFile>()
             updateTit("Getting remote file list...")
-            server.getConnection(basePath).list(currentPath.value, "", false) { it2 ->
+            server.getConnection(basePath).list(currentPath.value, "", false, true) { it2 ->
                 if (it2.path != currentPath.value) tmpl.add(it2)
             }
             tmpl.sortWith( Comparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) })

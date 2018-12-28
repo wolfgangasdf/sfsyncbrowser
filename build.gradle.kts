@@ -29,11 +29,6 @@ tasks.withType<Wrapper> {
     gradleVersion = "4.4.1"
 }
 
-//java.sourceSets {
-//    main.kotlin.exclude "**/Connection.kt"
-//    main.kotlin.exclude "**/Profile.kt"
-//}
-
 application {
     mainClassName = "MainKt"
     //defaultTasks = tasks.run
@@ -79,8 +74,8 @@ dependencies {
     compile("org.slf4j:slf4j-simple:1.8.0-beta2") // no colors, everything stderr
     compile("no.tornado:tornadofx:1.7.17")
     compile("io.methvin:directory-watcher:0.9.3")
-//    implementation "com.beust:klaxon:3.0.1"
-//    compile "com.fasterxml.jackson.module:jackson-module-kotlin:2.9.+"
+    compile("org.bouncycastle:bcprov-jdk15on:1.60")
+    compile("org.bouncycastle:bcpkix-jdk15on:1.60")
 }
 
 tasks.withType<KotlinCompile> {

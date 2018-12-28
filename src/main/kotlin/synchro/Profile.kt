@@ -103,13 +103,13 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         val taskListLocal = MyTask<Unit> {
             updateTit("Find local file")
             subfolder.subfolders.forEach {
-                local!!.list(it, subfolder.excludeFilter.valueSafe, recursive = true) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } }
+                local!!.list(it, subfolder.excludeFilter.valueSafe, true, false) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
         val taskListRemote = MyTask<Unit> {
             updateTit("Find remote file")
             subfolder.subfolders.forEach {
-                remote!!.list(it, subfolder.excludeFilter.valueSafe, recursive = true) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } }
+                remote!!.list(it, subfolder.excludeFilter.valueSafe, true, false) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
 
