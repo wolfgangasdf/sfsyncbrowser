@@ -54,9 +54,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1"
-     inkscape:cx="64"
-     inkscape:cy="64"
+     inkscape:zoom="4"
+     inkscape:cx="73.739111"
+     inkscape:cy="50.218276"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      width="128px"
@@ -92,57 +92,35 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:85.33333588px;line-height:125%;font-family:Rockwell;-inkscape-font-specification:'Rockwell, Normal';font-variant-ligatures:none;font-variant-caps:normal;font-variant-numeric:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#a686be;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="0.25253898"
-       y="60.824856"
+       x="7.7525392"
+       y="51.574856"
        id="text2366"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
-         x="0.25253898"
-         y="60.824856"
-         id="tspan4153">k</tspan></text>
-    <text
-       sodipodi:linespacing="125%"
-       id="text4157"
-       y="111.83756"
-       x="5.303299"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:85.33333588px;line-height:125%;font-family:Rockwell;-inkscape-font-specification:'Rockwell, Normal';font-variant-ligatures:none;font-variant-caps:normal;font-variant-numeric:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#a686be;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       xml:space="preserve"><tspan
-         id="tspan4159"
-         y="111.83756"
-         x="5.303299"
-         sodipodi:role="line">s</tspan></text>
+         x="7.7525392"
+         y="51.574856"
+         id="tspan4153">s</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:85.33333588px;line-height:125%;font-family:Rockwell;-inkscape-font-specification:'Rockwell, Normal';font-variant-ligatures:none;font-variant-caps:normal;font-variant-numeric:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#a686be;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="77.024124"
-       y="106.28172"
+       x="71.774124"
+       y="119.53172"
        id="text4161"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
-         x="77.024124"
-         y="106.28172"
-         id="tspan4163">p</tspan></text>
+         x="71.774124"
+         y="119.53172"
+         id="tspan4163">b</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4165"
-       y="84.058365"
-       x="42.93148"
+       y="86.808365"
+       x="37.93148"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:85.33333588px;line-height:125%;font-family:Rockwell;-inkscape-font-specification:'Rockwell, Normal';font-variant-ligatures:none;font-variant-caps:normal;font-variant-numeric:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#a686be;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        xml:space="preserve"><tspan
          id="tspan4167"
-         y="84.058365"
-         x="42.93148"
-         sodipodi:role="line">f</tspan></text>
-    <text
-       sodipodi:linespacing="125%"
-       id="text4169"
-       y="96.432739"
-       x="59.346462"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:85.33333588px;line-height:125%;font-family:Rockwell;-inkscape-font-specification:'Rockwell, Normal';font-variant-ligatures:none;font-variant-caps:normal;font-variant-numeric:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;fill:#a686be;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       xml:space="preserve"><tspan
-         id="tspan4171"
-         y="96.432739"
-         x="59.346462"
-         sodipodi:role="line">t</tspan></text>
+         y="86.808365"
+         x="37.93148"
+         sodipodi:role="line">s</tspan></text>
   </g>
 </svg>
