@@ -69,7 +69,7 @@ class MainView : View("SSyncBrowser") {
                         button("Add new sync") { action {
                             Sync(SyncType.NORMAL, SSP("syname"),
                                 SSP(""), SSP("sylocalfolder"),
-                                SSP("syremotefolder"), server=server).let {
+                                SSP("syremotefolder"), SSP(""), server=server).let {
                                 server.syncs += it
                                 selectItem(it)
                             }
@@ -170,9 +170,10 @@ class MainView : View("SSyncBrowser") {
                             }
                         }
                     }
+                    field("Exclude filter") { textfield(sync.excludeFilter) }
                     field {
                         button("Add new subset") { action {
-                            SubSet(SSP("ssname"), SSP(""), SSP(""), sync = sync).let {
+                            SubSet(SSP("ssname"), SSP(""), sync = sync).let {
                                 sync.subsets += it
                                 selectItem(it)
                             }
@@ -220,7 +221,6 @@ class MainView : View("SSyncBrowser") {
                 fieldset("Subset") {
                     field("Name: ") { textfield(subset.title) }
                     field { this += lvFolders }
-                    field("Exclude filter") { textfield(subset.excludeFilter) }
                     field {
                         button("Compare & Sync!") { action {
                             compSync(subset)
@@ -310,9 +310,9 @@ class MainView : View("SSyncBrowser") {
                     }
                     is Sync -> {
                         if (what.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
-                            compSyncFile(what)
+                            compSyncFile(what) {}
                         } else button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                            val allsubset = SubSet(SSP("all"), SSP(""), SSP(""), sync = what)
+                            val allsubset = SubSet(SSP("all"), SSP(""), sync = what)
                             allsubset.subfolders += ""
                             SubsetSettingsPane.compSync(allsubset)
                         }
@@ -402,12 +402,12 @@ class MainView : View("SSyncBrowser") {
     }
 
     companion object {
-        fun compSyncFile(sync: Sync) {
+        fun compSyncFile(sync: Sync, successfulSyncCallback: () -> Unit) {
             sync.fileWatcher?.stop()
-            openNewWindow(SyncView(sync.server, sync))
+            openNewWindow(SyncView(sync.server, sync, successfulSyncCallback))
             if (sync.auto.value) {
                 sync.fileWatcher = FileWatcher(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value).watch {
-                    runLater { compSyncFile(sync) }
+                    runLater { compSyncFile(sync, successfulSyncCallback) }
                 }
             }
         }

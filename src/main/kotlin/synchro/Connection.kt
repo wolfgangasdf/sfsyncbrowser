@@ -145,7 +145,6 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun cleanUp()
 }
 
-// TODO proper permission handling like in sftp?
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true
@@ -217,12 +216,12 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     // include the subfolder but root "/" is not allowed!
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
-        val linkOptions = if (resolveSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
-        fun parseContent(cc: Path, goDeeper: Boolean) {
+        fun parseContent(cc: Path, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             // on mac 10.8 with oracle java 7, filenames are encoded with strange 'decomposed unicode'. grr
             // this is in addition to the bug that LC_CTYPE is not set. grrr
             // don't use cc.getPath directly!!
+            val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
             if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
             val javaPath = toJavaPathSeparator(cc.toString())
             val fixedPath = java.text.Normalizer.normalize(javaPath, java.text.Normalizer.Form.NFC)
@@ -230,22 +229,24 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
             var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
             if (Files.isDirectory(cc, *linkOptions) && strippedPath != "") strippedPath += "/"
-            val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc),
-                    Files.getPosixFilePermissions(cc))
-            if (vf.isNotFiltered(filterregexp)) {
-                if (debugslow) Thread.sleep(500)
-                action(vf)
-                if (Files.isDirectory(cc, *linkOptions) && goDeeper) {
-                    val dir = Files.newDirectoryStream(cc)
-                    for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
-                    dir.close()
+            if (Files.isDirectory(cc, *linkOptions) || Files.isRegularFile(cc, *linkOptions)) {
+                val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc),
+                        Files.getPosixFilePermissions(cc))
+                if (vf.isNotFiltered(filterregexp)) {
+                    if (debugslow) Thread.sleep(500)
+                    action(vf)
+                    if (Files.isDirectory(cc, *linkOptions) && goDeeper) {
+                        val dir = Files.newDirectoryStream(cc)
+                        for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
+                        dir.close()
+                    }
                 }
             }
         }
 
         val sp = Paths.get(remoteBasePath + subfolder)
         if (Files.exists(sp)) {
-            parseContent(sp, goDeeper = true)
+            parseContent(sp, goDeeper = true, forceFollowSymlinks = true)
         }
         logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
     }
@@ -446,7 +447,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                     sftpc.readlink(cp).let {
                         cp = if (!it.startsWith("/")) "${Paths.get(cp).parent}/$it" else it
                     }
-                    logger.debug("sftp: ... next: $cp")
+                    logger.debug("sftp: resolving symlink, next: $cp")
                     rriattributes = sftpc.lstat(cp)
                 } while (rriattributes.type == FileMode.Type.SYMLINK)
             }

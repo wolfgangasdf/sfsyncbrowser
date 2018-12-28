@@ -97,7 +97,7 @@ object DBSettings {
 enum class SyncType { NORMAL, FILE, CACHED }
 
 // title is filepath for file sync
-class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
+class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty, val excludeFilter: StringProperty,
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(), val auto: BooleanProperty = SBP(false) ) {
     override fun toString() = "[Sync ${type.name}] ${title.value}"
@@ -113,7 +113,7 @@ class Protocol(private val server: Server, val protocoluri: StringProperty, val 
     fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }
 
-class SubSet(val title: StringProperty, val status: StringProperty, val excludeFilter: StringProperty,
+class SubSet(val title: StringProperty, val status: StringProperty,
              val subfolders: ObservableList<String> = getSortedFilteredList(),
              val sync: Sync) {
     override fun toString() = "[SubSet] ${title.value}"
@@ -194,12 +194,11 @@ object SettingsStore {
                 props["sy.$idx.$idx2.cacheid"] = sync.cacheid.value
                 props["sy.$idx.$idx2.localfolder"] = sync.localfolder.value
                 props["sy.$idx.$idx2.remoteFolder"] = sync.remoteFolder.value
+                props["sy.$idx.$idx2.excludeFilter"] = sync.excludeFilter.value
                 props["sy.$idx.$idx2.auto"] = sync.auto.value.toString()
                 props["sy.$idx.$idx2.subsets"] = sync.subsets.size.toString()
                 sync.subsets.forEachIndexed { iss, subSet ->
                     props["ss.$idx.$idx2.$iss.title"] = subSet.title.value
-                    props["ss.$idx.$idx2.$iss.excludeFilter"] = subSet.excludeFilter.value
-                    props["ss.$idx.$idx2.$iss.status"] = subSet.status.value
                     props["ss.$idx.$idx2.$iss.subfolders"] = subSet.subfolders.size.toString()
                     subSet.subfolders.forEachIndexed { irf, s ->
                         props["sssf.$idx.$idx2.$iss.$irf"] = s
@@ -239,11 +238,11 @@ object SettingsStore {
                     if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
-                                SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.cacheid"), server,
+                                SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.excludeFilter"), p2sp("sy.$idx.$idx2.cacheid"), server,
                                 auto = p2bp("sy.$idx.$idx2.auto"))
                         if (sync.auto.get()) sync.status.set("need to re-start auto sync!")
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
-                            val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), p2sp("ss.$idx.$idx2.$iss.status"), p2sp("ss.$idx.$idx2.$iss.excludeFilter"), sync=sync)
+                            val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), SSP(""), sync=sync)
                             for (irf in 0 until props["ss.$idx.$idx2.$iss.subfolders"]!!.toInt()) subSet.subfolders += props["sssf.$idx.$idx2.$iss.$irf"]!!
                             sync.subsets += subSet
                         }

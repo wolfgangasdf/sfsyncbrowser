@@ -79,7 +79,6 @@ object Comparison {
                     se.compareSetAction(newcache = false)
                 }
             }
-            println("XXXXXXY se: $se")
         }
         logger.debug("TTT c took = " + swse.getTimeRestart())
 

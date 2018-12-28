@@ -80,11 +80,13 @@ object CF {
 class SyncView(server: Server, private val sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     private var isSingleFileSync = false
-    constructor(server: Server, sync: Sync): this(server, sync,
-            SubSet(SSP(""), SSP(""), SSP(""), sync = sync).apply {
+    private var afterSuccessfulSyncCallback: () -> Unit = {}
+    constructor(server: Server, sync: Sync, successfulSyncCallback: () -> Unit): this(server, sync, // single file sync
+            SubSet(SSP(""), SSP(""), sync = sync).apply {
                 subfolders += sync.title.value // this is filepath!
             }) {
         isSingleFileSync = true
+        afterSuccessfulSyncCallback = successfulSyncCallback
     }
 
     private var profile = Profile(server, sync, subset)
@@ -153,7 +155,10 @@ class SyncView(server: Server, private val sync: Sync, subset: SubSet) : MyView(
             logger.info("Synchronization finished!")
             sync.status.set("synchronized ${dformat().format(Date())}")
             val taskCleanup = profile.taskCleanup()
-            taskCleanup.setOnSucceeded { this.close() }
+            taskCleanup.setOnSucceeded {
+                this.close()
+                afterSuccessfulSyncCallback()
+            }
             MyWorker.runTask(taskCleanup)
         }
         taskSynchronize.setOnFailed { handleFailed(taskSynchronize) }

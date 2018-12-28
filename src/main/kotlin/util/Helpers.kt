@@ -81,6 +81,15 @@ object Helpers {
         }
     }
 
+    fun openFile(path: String) {
+        if (Desktop.isDesktopSupported() && path != "") {
+            val desktop = Desktop.getDesktop()
+            if (desktop.isSupported(Desktop.Action.OPEN)) {
+                desktop.open(File(path))
+            }
+        }
+    }
+
     fun readFileToString(fn: Path): String {
         val enc = Files.readAllBytes(fn)
         return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(enc)).toString()

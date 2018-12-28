@@ -54,15 +54,13 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
 
     override fun start(stage: Stage) {
         stage.setOnCloseRequest {
-            var sane = ""
             SettingsStore.servers.forEach { s ->
-                s.syncs.filter { y -> y.type == SyncType.FILE || y.type == SyncType.CACHED }.forEach {
-                    y -> sane += "${y.type}: ${s.title.value} / ${y.title.value}\n"
+                val iter = s.syncs.filter { sy -> sy.type == SyncType.FILE }.iterator()
+                while (iter.hasNext()) {
+                    val sync = iter.next()
+                    logger.info("Exit: removing temporary file sync $sync !")
+                    s.removeSync(sync)
                 }
-            }
-            if (sane != "") {
-                if (!Helpers.dialogOkCancel("Close", "Really close? There are file or cached syncs:", sane))
-                    it.consume()
             }
         }
         super.start(stage)

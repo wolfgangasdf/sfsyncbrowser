@@ -15,6 +15,7 @@ import tornadofx.*
 import util.*
 import util.Helpers.dialogInputString
 import util.Helpers.getFileIntoTempAndDo
+import util.Helpers.openFile
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -121,15 +122,20 @@ class BrowserView(private val server: Server, private val basePath: String, path
             item("Add bookmark") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 server.bookmarks += BrowserBookmark(server, SSP(selectedItem?.path))
             }
-            item("Add syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
+            fun addFilesync(open: Boolean) {
                 val newSync = Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
-                        SSP(""), SSP(selectedItem?.getParent()), server = server).apply {
-                            localfolder.set(DBSettings.getCacheFolder(cacheid.value))
-                            auto.set(true)
-                        }
+                        SSP(""), SSP(selectedItem?.getParent()), SSP(""), server = server).apply {
+                    localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+                    auto.set(true)
+                }
                 server.syncs += newSync
-                // TODO implement this, but how? need to get callback from runSync....     val openit = dialogOkCancel("Temporary sync file", "After synchronization of the file, open it with default program?", "")
-                MainView.compSyncFile(newSync)
+                MainView.compSyncFile(newSync) { if (open) openFile("${newSync.localfolder.value}/${newSync.title.value}") }
+            }
+            item("Add temporary syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
+                addFilesync(false)
+            }
+            item("Add temporary syncfile and open") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
+                addFilesync(true)
             }
             item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 val sname = dialogInputString("New sync", "Enter sync name:", "")
@@ -139,13 +145,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }
                 server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
                         SSP(""), SSP(lfolder),
-                        SSP(selectedItem!!.path), server=server)
+                        SSP(selectedItem!!.path), SSP(""), server=server)
             }
             item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
                 server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
                         SSP(""), SSP(""),
-                        SSP(selectedItem!!.path), server=server).apply {
+                        SSP(selectedItem!!.path), SSP(""), server=server).apply {
                     localfolder.set(DBSettings.getCacheFolder(cacheid.value))
                     auto.set(false)
                 }
