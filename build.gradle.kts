@@ -72,7 +72,7 @@ dependencies {
     compile("io.github.microutils:kotlin-logging:1.6.22")
     compile("com.hierynomus:sshj:0.26.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta2") // no colors, everything stderr
-    compile("no.tornado:tornadofx:1.7.17")
+    compile("no.tornado:tornadofx:1.7.18")
     compile("io.methvin:directory-watcher:0.9.3")
     compile("org.bouncycastle:bcprov-jdk15on:1.60")
     compile("org.bouncycastle:bcpkix-jdk15on:1.60")
