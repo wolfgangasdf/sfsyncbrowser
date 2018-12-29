@@ -18,6 +18,7 @@ import javafx.scene.web.WebView
 import javafx.stage.*
 import mu.KotlinLogging
 import store.Server
+import store.SettingsStore
 import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
@@ -50,7 +51,7 @@ object Helpers {
     fun isLinux() = System.getProperty("os.name").toLowerCase().matches("(.*nix)|(.*nux)".toRegex())
     fun isWin() = System.getProperty("os.name").toLowerCase().contains("win")
 
-    fun dformat() = java.text.SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
+    fun dformat() = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
     fun tokMGTPE(d: Double): String {
         var num = d
@@ -87,6 +88,22 @@ object Helpers {
             if (desktop.isSupported(Desktop.Action.OPEN)) {
                 desktop.open(File(path))
             }
+        }
+    }
+
+    fun editFile(path: String) {
+        when {
+            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("/usr/bin/open", "-a", SettingsStore.ssbSettings.editor.value, path))
+            Helpers.isWin() -> Runtime.getRuntime().exec(arrayOf(SettingsStore.ssbSettings.editor.value, path))
+            Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
+            else -> error("not supported OS, tell me how to do it!")
+        }
+    }
+
+    fun showNotification(title: String, subtitle: String, msg: String) { // should probably use https://github.com/jcgay/send-notification
+        when {
+            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("osascript", "-e", "display notification \"$msg\" with title \"$title\" subtitle \"$subtitle\""))
+            else -> error("not supported OS, tell me how to do it!")
         }
     }
 

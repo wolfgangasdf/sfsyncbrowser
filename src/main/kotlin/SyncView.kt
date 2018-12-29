@@ -28,6 +28,7 @@ import util.Helpers.dialogMessage
 import util.Helpers.readFileToString
 import util.Helpers.revealFile
 import util.Helpers.runUIwait
+import util.Helpers.showNotification
 import util.MyTask
 import util.MyWorker
 import util.SSP
@@ -77,7 +78,7 @@ object CF {
     }
 }
 
-class SyncView(server: Server, private val sync: Sync, private val subset: SubSet) : MyView("Sync view $server $sync $subset") {
+class SyncView(private val server: Server, private val sync: Sync, private val subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     private var isSingleFileSync = false
     private var afterSuccessfulSyncCallback: () -> Unit = {}
@@ -153,7 +154,9 @@ class SyncView(server: Server, private val sync: Sync, private val subset: SubSe
         val taskSynchronize = profile.taskSynchronize()
         taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
-            if (subset.title.value == "<all>")
+            showNotification("Ssyncbrowser: successfully synchronized", "Server: ${server.title.value}",
+                    if (isSingleFileSync) sync.title.value else "Sync: ${sync.title.value} Subset: ${subset.title.value}")
+            if (subset.title.value == "<all>" || isSingleFileSync)
                 sync.status.set("synchronized ${dformat().format(Date())}")
             else
                 subset.status.set("synchronized ${dformat().format(Date())}")

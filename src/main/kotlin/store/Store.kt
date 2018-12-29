@@ -94,6 +94,9 @@ object DBSettings {
 }
 
 ///////////////////////// settings
+
+class SSBSettings(val editor: StringProperty = SSP(""), val browsercols: StringProperty = SSP(""))
+
 enum class SyncType { NORMAL, FILE, CACHED }
 
 // title is filepath for file sync
@@ -161,13 +164,15 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
 
 object SettingsStore {
     val servers = getSortedFilteredList<Server>()
-
+    val ssbSettings = SSBSettings()
     val tunnelModes = FXCollections.observableArrayList("Off", "On", "Auto")!!
 
     fun saveSettings() {
         if (servers.isEmpty()) return
         val props = SortedProperties()
         props["settingsversion"] = "1"
+        props["ssb.editor"] = ssbSettings.editor.value
+        props["ssb.browsercols"] = ssbSettings.browsercols.value
         props["servers"] = servers.size.toString()
         servers.forEachIndexed { idx, server ->
             props["se.$idx.title"] = server.title.value
@@ -224,6 +229,8 @@ object SettingsStore {
             fun p2bp(key: String) = SBP(props.getOrDefault(key, "0").toBoolean())
             fun p2ip(key: String) = SIP(props.getOrDefault(key, "0").toInt())
             try {
+                ssbSettings.editor.set(props.getOrDefault("ssb.editor", ""))
+                ssbSettings.browsercols.set(props.getOrDefault("ssb.browsercols", ""))
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
                             SSP(""), p2ip("se.$idx.currentProtocol"))

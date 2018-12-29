@@ -4,20 +4,21 @@ import javafx.geometry.Pos
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.scene.layout.Priority
+import javafx.stage.FileChooser
 import javafx.stage.Modality
 import javafx.stage.Screen
 import mu.KotlinLogging
 import store.*
 import tornadofx.*
 import util.*
+import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
-import util.Helpers.absPathRegex
 import util.Helpers.hostPortNothingRegex
 import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
-import util.Helpers.uriRegex
 import util.Helpers.revealFile
+import util.Helpers.uriRegex
 import util.Helpers.valitextfield
 import java.io.File
 
@@ -41,6 +42,28 @@ class MainView : View("SSyncBrowser") {
 
     class SettingsViewPlaceholder: View() {
         override val root = Form()
+    }
+
+    class SettingsView: MyView() {
+        override val root = Form()
+        init {
+            val ef = when {
+                Helpers.isWin() -> FileChooser.ExtensionFilter("Applications (*.exe)", "*.exe")
+                Helpers.isMac() -> FileChooser.ExtensionFilter("Applications (*.app)", "*.app")
+                else -> FileChooser.ExtensionFilter("Applications (*)", "*")
+            }
+            with(root) {
+                fieldset("Editor") {
+                    field("Editor path") {
+                        textfield(SettingsStore.ssbSettings.editor) { tooltip("Full path to external editor program") }
+                        button("Choose...").setOnAction {
+                            val fl = chooseFile("Select editor program", arrayOf(ef))
+                            fl.first().let {f -> SettingsStore.ssbSettings.editor.set(f.path) }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     inner class ServerSettingsPane(server: Server): View() {
@@ -349,6 +372,9 @@ class MainView : View("SSyncBrowser") {
                     selectItem(it)
                 }
             } }
+            button("Settings...") { action {
+                openNewWindow(SettingsView(), Modality.APPLICATION_MODAL)
+            }}
             button("save sett") { action {
                 SettingsStore.saveSettings()
             } }

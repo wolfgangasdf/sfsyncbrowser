@@ -24,6 +24,7 @@ import store.DBSettings
 import store.Protocol
 import store.SettingsStore
 import util.Helpers
+import util.Helpers.dformat
 import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
@@ -82,6 +83,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
     fun getFileName(): String = File(path).name
     fun getPermString(): String = PosixFilePermissions.toString(permissions)
+    fun getModtimeString(): String = dformat().format(modTime)
     fun getParent(): String = File(path).parent.let { if (it.endsWith("/")) it else "$it/" }
     fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension

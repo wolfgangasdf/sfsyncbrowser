@@ -14,11 +14,14 @@ import synchro.VirtualFile
 import tornadofx.*
 import util.*
 import util.Helpers.dialogInputString
+import util.Helpers.dialogMessage
+import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
+import kotlin.Pair
 
 private val logger = KotlinLogging.logger {}
 
@@ -101,12 +104,27 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
     }
 
+    enum class SfsOp { NONE, OPEN, EDIT }
     private val fileTableView = tableview(files) {
-        column("title", VirtualFile::getFileNameBrowser).remainingWidth()
-        column("size", VirtualFile::size)
-        column("perms", VirtualFile::getPermString)
+        val colo = SettingsStore.ssbSettings.browsercols.value.let { if (it == "") "1:true;2:true;3:true;4:true" else it }.
+                split(";").map { cs -> cs.split(":").let { Pair(it[0].toInt(), it[1].toBoolean()) } }
+        colo.forEach { col ->
+            when (col.first) {
+                1 -> column("Title", VirtualFile::getFileNameBrowser).remainingWidth()
+                2 -> column("Size", VirtualFile::size)
+                3 -> column("Perms", VirtualFile::getPermString)
+                4 -> column("Modtime", VirtualFile::getModtimeString)
+                else -> { error("Unknown column number ${col.first}") ; null }
+            }?.let {
+                it.userData = col.first
+                it.isVisible = col.second
+                if (!col.second) it.maxWidth = 0.0 // bug
+            }
+        }
         vgrow = Priority.ALWAYS
+        columnResizePolicy = SmartResize.POLICY
     }.apply {
+        isTableMenuButtonVisible = true
         multiSelect(true)
         rowFactory = Callback {
             val row = TableRow<VirtualFile>()
@@ -122,20 +140,32 @@ class BrowserView(private val server: Server, private val basePath: String, path
             item("Add bookmark") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 server.bookmarks += BrowserBookmark(server, SSP(selectedItem?.path))
             }
-            fun addFilesync(open: Boolean) {
+            fun addFilesync(op: SfsOp) {
                 val newSync = Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
                         SSP(""), SSP(selectedItem?.getParent()), SSP(""), server = server).apply {
                     localfolder.set(DBSettings.getCacheFolder(cacheid.value))
                     auto.set(true)
                 }
                 server.syncs += newSync
-                MainView.compSyncFile(newSync) { if (open) openFile("${newSync.localfolder.value}/${newSync.title.value}") }
+                MainView.compSyncFile(newSync) {
+                    when (op) {
+                        SfsOp.NONE -> {}
+                        SfsOp.OPEN -> openFile("${newSync.localfolder.value}/${newSync.title.value}")
+                        SfsOp.EDIT -> if (SettingsStore.ssbSettings.editor.value != "")
+                            editFile("${newSync.localfolder.value}/${newSync.title.value}")
+                        else
+                            dialogMessage(Alert.AlertType.ERROR, "Edit file", "Set editor in settings first!", "")
+                    }
+                }
             }
             item("Add temporary syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                addFilesync(false)
+                addFilesync(SfsOp.NONE)
             }
             item("Add temporary syncfile and open") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                addFilesync(true)
+                addFilesync(SfsOp.OPEN)
+            }
+            item("Add temporary syncfile and edit") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
+                addFilesync(SfsOp.EDIT)
             }
             item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 val sname = dialogInputString("New sync", "Enter sync name:", "")
@@ -212,6 +242,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             // java DnD: can't get finder or explorer drop location ("promised files" not implemented yet), therefore open this window.
             // mac crashes due to jvm: add to accessibility prefs, gradle dist, run in shell build/macApp/ssyncbrowser.app/Contents/MacOS/JavaAppLauncher
             val selfiles = selectionModel.selectedItems
+            if (selfiles.isEmpty()) return@setOnDragDetected
             selfiles.find { it.isDir() }?.let {
                 Helpers.dialogMessage(Alert.AlertType.WARNING, "Drag", "Can't drag folders!", "")
                 me.consume()
@@ -285,6 +316,19 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             de.consume()
         }
+
+        fun saveColumnsettings() {
+            val order = columns.mapNotNull { Pair(it.userData as Int, it.isVisible) }
+            SettingsStore.ssbSettings.browsercols.set(order.joinToString(";") { it -> "${it.first}:${it.second}" } )
+        }
+        columns.onChange {
+            saveColumnsettings()
+        }
+        columns.forEach { it.visibleProperty().onChange { v -> // bug that needed
+            saveColumnsettings()
+            it.maxWidthProperty().set(if (v) 5000.0 else 0.0) // bug
+            this.requestResize() ; this.requestResize()
+        } }
     }
 
     override val root = vbox {
@@ -293,6 +337,12 @@ class BrowserView(private val server: Server, private val basePath: String, path
         toolbar {
             when (mode) {
                 BrowserViewMode.NORMAL -> {
+                    button("test").setOnAction {
+                        fileTableView.smartResize()
+                    }
+                    button("test2").setOnAction {
+                        fileTableView.requestResize()
+                    }
                 }
                 BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
                     if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
@@ -320,6 +370,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
         taskListLocal.setOnSucceeded {
             files.clear()
             files.setAll(taskListLocal.value)
+            fileTableView.sort()
+            fileTableView.requestResize() ; fileTableView.requestResize() // bug
             pathButtonFlowPane.children.clear()
             pathButtonFlowPane.add(label("Path:"))
             var tmpp = currentPath.value
