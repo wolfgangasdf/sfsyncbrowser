@@ -77,7 +77,7 @@ object CF {
     }
 }
 
-class SyncView(server: Server, private val sync: Sync, subset: SubSet) : MyView("Sync view $server $sync $subset") {
+class SyncView(server: Server, private val sync: Sync, private val subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     private var isSingleFileSync = false
     private var afterSuccessfulSyncCallback: () -> Unit = {}
@@ -153,7 +153,10 @@ class SyncView(server: Server, private val sync: Sync, subset: SubSet) : MyView(
         val taskSynchronize = profile.taskSynchronize()
         taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
-            sync.status.set("synchronized ${dformat().format(Date())}")
+            if (subset.title.value == "<all>")
+                sync.status.set("synchronized ${dformat().format(Date())}")
+            else
+                subset.status.set("synchronized ${dformat().format(Date())}")
             val taskCleanup = profile.taskCleanup()
             taskCleanup.setOnSucceeded {
                 this.close()

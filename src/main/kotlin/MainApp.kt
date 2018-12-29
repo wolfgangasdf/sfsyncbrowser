@@ -23,6 +23,7 @@ private val logger = KotlinLogging.logger {}
 
 abstract class MyView(title: String? = null, icon: Node? = null) : View(title, icon) {
     open fun doAfterShown() {}
+    open fun doBeforeClose() {}
 }
 
 fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
@@ -35,6 +36,7 @@ fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
         newstage.y = Random.nextDouble(0.1, 0.3) * it.height
     }
     newstage.setOnShown { view.doAfterShown() }
+    newstage.setOnHiding { view.doBeforeClose() }
     newstage.show()
     newstage.addEventFilter(KeyEvent.KEY_RELEASED) {
         if (it.isMetaDown && it.code == KeyCode.W) newstage.close()

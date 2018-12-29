@@ -52,15 +52,14 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
     constructor() : this("", "", "", -1)
 
     private fun parseString(s: String): Boolean {
-        val regexinetres = """(\S+)://(\S+)@(\S+):(\S+)""".toRegex().find(s)
+        val res = Helpers.uriRegex.find(s)!!.groupValues.filter { it.isNotEmpty() }
         return when {
-            s == "file:///" -> { protocol = "file"; true }
-            regexinetres != null -> {
-                val (prot1, userinfo, host1, port1) = regexinetres.destructured
-                protocol = prot1
-                host = host1
-                port = port1.toInt()
-                username = userinfo
+            res[1] == "file" -> { protocol = "file"; true }
+            res[1] == "sftp" -> {
+                protocol = "sftp"
+                username = res[2]
+                host = res[3]
+                port = res.getOrElse(4) { ":22" }.removePrefix(":").toInt()
                 true
             }
             else -> false
@@ -71,7 +70,7 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 
     constructor(s: String) : this() {
         if (!this.parseString(s))
-            throw RuntimeException("URI in wrong format: $")
+            throw RuntimeException("URI in wrong format: $s")
     }
 }
 

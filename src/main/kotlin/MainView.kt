@@ -10,11 +10,13 @@ import mu.KotlinLogging
 import store.*
 import tornadofx.*
 import util.*
-import util.Helpers.absPathRegex
 import util.Helpers.chooseDirectoryRel
 import util.Helpers.concatObsLists
+import util.Helpers.absPathRegex
+import util.Helpers.hostPortNothingRegex
 import util.Helpers.permissionsRegex
 import util.Helpers.relPathRegex
+import util.Helpers.uriRegex
 import util.Helpers.revealFile
 import util.Helpers.valitextfield
 import java.io.File
@@ -91,13 +93,14 @@ class MainView : View("SSyncBrowser") {
         }
     }
 
-    class ProtocolView(proto: Protocol): MyView() {
+    class ProtocolView(private val proto: Protocol): MyView() {
         override val root = Form()
+        override fun doBeforeClose() { proto.server.protocols.invalidate() }
         init {
             with(root) {
                 fieldset("Protocol") {
                     field("URI and password") {
-                        textfield(proto.protocoluri) { tooltip("'sftp://user@host[:port]' or 'file:///") }
+                        valitextfield(proto.protocoluri, uriRegex, "Regex: $uriRegex") { tooltip("'sftp://user@host[:port]' or 'file://") }
                         passwordfield(proto.password) { tooltip("Leave empty for public key authentification")}
                     }
                     field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder'") { } }
@@ -109,7 +112,7 @@ class MainView : View("SSyncBrowser") {
                         tooltip("E.g., on un-rooted Android devices I can't set the file date via sftp,\nselect this and I will keep track of actual remote times.")
                     } }
                     field("Tunnel host") {
-                        textfield(proto.tunnelHost) { tooltip("Enter tunnel host[:port] from which the sftp server is reachable") }
+                        valitextfield(proto.tunnelHost, hostPortNothingRegex, "Regex: $hostPortNothingRegex") { tooltip("Enter tunnel host[:port] from which the sftp server is reachable") }
                         combobox(proto.tunnelMode, SettingsStore.tunnelModes) { tooltip("Choose if tunnel shall be used, or auto (tries to ping sftp host)") }
                     }
                 }
@@ -312,7 +315,7 @@ class MainView : View("SSyncBrowser") {
                         if (what.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
                             compSyncFile(what) {}
                         } else button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                            val allsubset = SubSet(SSP("all"), SSP(""), sync = what)
+                            val allsubset = SubSet(SSP("<all>"), SSP(""), sync = what)
                             allsubset.subfolders += ""
                             SubsetSettingsPane.compSync(allsubset)
                         }

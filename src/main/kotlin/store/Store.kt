@@ -104,11 +104,11 @@ class Sync(val type: SyncType, val title: StringProperty, val status: StringProp
     var fileWatcher: FileWatcher? = null
 }
 
-class Protocol(private val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
+class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
                val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
                val tunnelHost: StringProperty, val tunnelMode: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
-    override fun toString(): String = "[Protocol ${protocoluri.value} of $server]"
+    override fun toString(): String = "[Protocol ${protocoluri.value}]"
     fun tunnelHostname() = tunnelHost.value.split(":").first()
     fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }

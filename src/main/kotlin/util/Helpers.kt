@@ -134,6 +134,8 @@ object Helpers {
     val absPathRegex = "(^/$)|(^/.*/$)".toRegex() // "/", "/asdf/"
     val permissionsRegex = "([ugo][+-][rwxa],?)*".toRegex()
     val permissionsParseRegex = "([ugo])([+-])([rwxa])".toRegex()
+    val uriRegex = """(?:(^file)://$)|(?:(^sftp)://(\S+)@([a-zA-Z0-9\-.]+)(:[0-9]+)?$)""".toRegex()
+    val hostPortNothingRegex = """|([a-zA-Z0-9\-.]+)(:[0-9]+)?""".toRegex()
 
     // for debugging, this throws exceptions at a place depending on number
     // mind that certain settings have to be chosen (e.g., sftp/local file) to see it fail.
