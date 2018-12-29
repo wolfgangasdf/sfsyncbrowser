@@ -1,6 +1,7 @@
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.Alert
+import javafx.scene.control.TableColumn
 import javafx.scene.control.TableRow
 import javafx.scene.input.KeyCode
 import javafx.scene.input.TransferMode
@@ -18,6 +19,7 @@ import util.Helpers.dialogMessage
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
+import util.Helpers.tokMGTPE
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -110,20 +112,23 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 split(";").map { cs -> cs.split(":").let { Pair(it[0].toInt(), it[1].toBoolean()) } }
         colo.forEach { col ->
             when (col.first) {
-                1 -> column("Title", VirtualFile::getFileNameBrowser).remainingWidth()
-                2 -> column("Size", VirtualFile::size)
+                1 -> column("Name", VirtualFile::getFileNameBrowser).remainingWidth().apply { sortType = TableColumn.SortType.ASCENDING }
+                2 -> column("Size", VirtualFile::size).apply { cellFormat { text = tokMGTPE(it) } }
                 3 -> column("Perms", VirtualFile::getPermString)
-                4 -> column("Modtime", VirtualFile::getModtimeString)
+                4 -> column("Modtime", VirtualFile::modTime).apply { cellFormat { text = Helpers.dformat().format(it) } }
                 else -> { error("Unknown column number ${col.first}") ; null }
             }?.let {
                 it.userData = col.first
-                it.isVisible = col.second
-                if (!col.second) it.maxWidth = 0.0 // bug
+                if (!col.second && col.first != 1) {
+                    it.isVisible = false
+                    it.maxWidth = 0.0 // bug
+                }
             }
         }
         vgrow = Priority.ALWAYS
         columnResizePolicy = SmartResize.POLICY
     }.apply {
+        columns.find { it.userData == 1 }?.let { sortOrder.add(it) }
         isTableMenuButtonVisible = true
         multiSelect(true)
         rowFactory = Callback {
@@ -336,14 +341,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         prefHeight = 600.0
         toolbar {
             when (mode) {
-                BrowserViewMode.NORMAL -> {
-                    button("test").setOnAction {
-                        fileTableView.smartResize()
-                    }
-                    button("test2").setOnAction {
-                        fileTableView.requestResize()
-                    }
-                }
+                BrowserViewMode.NORMAL -> {}
                 BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
                     if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
                     this@BrowserView.close() }
@@ -372,6 +370,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             files.setAll(taskListLocal.value)
             fileTableView.sort()
             fileTableView.requestResize() ; fileTableView.requestResize() // bug
+            // path buttons
             pathButtonFlowPane.children.clear()
             pathButtonFlowPane.add(label("Path:"))
             var tmpp = currentPath.value

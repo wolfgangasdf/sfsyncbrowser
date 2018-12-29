@@ -1,5 +1,3 @@
-@file:Suppress("unused")
-
 package util
 
 import io.methvin.watcher.DirectoryWatcher
@@ -25,7 +23,6 @@ import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
-import java.net.URI
 import java.net.URISyntaxException
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -63,6 +60,14 @@ object Helpers {
         }
         return "%.1f%s".format(num, ext)
     }
+    fun tokMGTPE(d: Long): String {
+        val expo = minOf(floor(Math.log(d.toDouble()) / Math.log(1000.0)).toInt(), 6)
+        return if (expo > 0) {
+            val ext = "kMGTPE" [expo - 1].toString()
+            val num = d / Math.pow(1000.0, expo.toDouble())
+            "%.2f%s".format(num, ext)
+        } else "%d".format(d)
+    }
 
     fun revealFile(file: java.io.File, gointo: Boolean = false) {
         when {
@@ -70,15 +75,6 @@ object Helpers {
             Helpers.isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.path}")
             Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
             else -> error("not supported OS, tell me how to do it!")
-        }
-    }
-
-    fun openURL(url: String) {
-        if (Desktop.isDesktopSupported() && url != "") {
-            val desktop = Desktop.getDesktop()
-            if (desktop.isSupported(Desktop.Action.BROWSE)) {
-                desktop.browse(URI(url))
-            }
         }
     }
 
@@ -124,10 +120,6 @@ object Helpers {
         MyWorker.runTask(taskGetFile)
     }
 
-    fun toHex(i: Int): String {
-        return java.lang.Integer.toHexString(i)
-    }
-
     fun toJavaPathSeparator(input: String): String =
         if (isWin()) input.replace("""\\""", "/")
         else input
@@ -160,17 +152,6 @@ object Helpers {
     const val failat = 0 // 0..5 currently
 
     val filecharset: Charset = java.nio.charset.Charset.forName("UTF-8")
-
-    const val directoryFilter = "([a-zA-Z]:)?/.*" // not for sftp... if (isWin) ".:/.*" else "/.*"
-
-    fun openDocument(file: File) {
-        if (Desktop.isDesktopSupported()) {
-            val desktop = Desktop.getDesktop()
-            if (desktop.isSupported(Desktop.Action.OPEN)) {
-                desktop.open(file)
-            }
-        }
-    }
 
     // do some quicklook-like thing. returns only after window closed!
     fun previewDocument(file: File) {
@@ -313,26 +294,6 @@ object Helpers {
     }
 }
 
-
-// https://github.com/bijukunjummen/kfun/blob/master/src/main/kotlin/io/kfun/Tuples.kt
-object Tuple {
-    operator fun <A> invoke(_1: A): Tuple1<A> = Tuple1(_1)
-    operator fun <A, B> invoke(_1: A, _2: B): Tuple2<A, B> = Tuple2(_1, _2)
-    operator fun <A, B, C> invoke(_1: A, _2: B, _3: C): Tuple3<A, B, C> = Tuple3(_1, _2, _3)
-    operator fun <A, B, C, D> invoke(_1: A, _2: B, _3: C, _4: D): Tuple4<A, B, C, D> = Tuple4(_1, _2, _3, _4)
-    operator fun <A, B, C, D, E> invoke(_1: A, _2: B, _3: C, _4: D, _5: E): Tuple5<A, B, C, D, E> = Tuple5(_1, _2, _3, _4, _5)
-}
-
-data class Tuple1<out A>(val _1: A)
-data class Tuple2<out A, out B>(val _1: A, val _2: B)
-data class Tuple3<out A, out B, out C>(val _1: A, val _2: B, val _3: C)
-data class Tuple4<out A, out B, out C, out D>(val _1: A, val _2: B, val _3: C, val _4: D)
-data class Tuple5<out A, out B, out C, out D, out E>(val _1: A, val _2: B, val _3: C, val _4: D, val _5: E)
-
-typealias Pair<A, B> = Tuple2<A, B>
-typealias Triple<A, B, C> = Tuple3<A, B, C>
-
-
 // all other solutions didn't work well...
 open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
 
@@ -353,7 +314,6 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
 
 object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
     private val taskList = FXCollections.observableArrayList<MyTask<*>>()
-    private var backgroundTimer: java.util.Timer? = null // just to clean up finished tasks
 
     private val taskListView = listview(taskList) {
         cellFormat { // https://www.youtube.com/watch?v=mlDT1Y1b09M
