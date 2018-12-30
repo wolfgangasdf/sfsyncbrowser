@@ -24,6 +24,7 @@ import util.*
 import util.Helpers.dformat
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
+import util.Helpers.tokMGTPE
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -308,16 +309,16 @@ class SyncEntry(var action: Int,
 
     fun status() = SSP(this, "status", CF.amap[action])
     fun detailsLocal() = SSP(this, "detailsl",
-            if (lSize != -1L) dformat().format(java.util.Date(lTime)) + "(" + lSize + ")" else "none")
+            if (lSize != -1L) dformat().format(java.util.Date(lTime)) + "(" + tokMGTPE(lSize) + ")" else "none")
 
     fun detailsRemote() = SSP(this, "detailsr",
-            if (rSize != -1L) dformat().format(java.util.Date(rTime)) + "(" + rSize + ")" else "none")
+            if (rSize != -1L) dformat().format(java.util.Date(rTime)) + "(" + tokMGTPE(rSize) + ")" else "none")
 
     fun detailsRCache() = SSP(this, "detailsrc",
-            if (cSize != -1L) dformat().format(java.util.Date(rcTime)) + "(" + cSize + ")" else "none")
+            if (cSize != -1L) dformat().format(java.util.Date(rcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
     fun detailsLCache() = SSP(this, "detailslc",
-            if (cSize != -1L) dformat().format(java.util.Date(lcTime)) + "(" + cSize + ")" else "none")
+            if (cSize != -1L) dformat().format(java.util.Date(lcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
     //  fun isDir = path.endsWith("/")
     fun isEqual(): Boolean =

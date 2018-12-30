@@ -2,6 +2,7 @@
 import diffmatchpatch.diff_match_patch
 import javafx.scene.control.Alert
 import javafx.scene.control.Button
+import javafx.scene.layout.Priority
 import javafx.scene.paint.Color
 import mu.KotlinLogging
 import store.Server
@@ -124,6 +125,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                     val haveChanges = taskCompFiles.get()
                     btCompare.isDisable = false
                     runUIwait { profile.cache.updateObservableBuffer() }
+                    fileTableView.resizeColumnsToFitContent()
                     logger.debug("havechanges=$haveChanges")
                     val canSync = updateSyncButton(allow = true)
                     if (!haveChanges && canSync) {
@@ -222,7 +224,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             text = it
             tooltip {
                 setOnShowing {
-                    logger.debug("loading tooltip")
                     text = rowItem.toStringNice()
                     style = "-fx-font-family: \"Courier New\";"
                 }
@@ -233,6 +234,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             updateActionButtons()
         }
         multiSelect(true)
+        vgrow = Priority.ALWAYS
     }
 
     private val mbAdvanced = menubutton("Advanced...") {
@@ -334,6 +336,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             profile.cache.updateObservableBuffer()
         }
         profile.cache.filterActions = Filters.getFilter(Filters.changes)
+        this.setValue(Filters.changes)
     }
 
     private val btDiff = Button("Quick diff").apply { setOnAction {
@@ -370,7 +373,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             } }
         }
         this += fileTableView
-        fileTableView.smartResize()
         this += hbox {
             children.addAll(listOf(cFilter,btRmLocal, btUseLocal, btMerge,
             btSkip, btRmBoth, btUseRemote, btRmRemote, btDiff, mbAdvanced))
