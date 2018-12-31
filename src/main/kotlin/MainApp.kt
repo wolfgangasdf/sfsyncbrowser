@@ -56,12 +56,17 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
 
     override fun start(stage: Stage) {
         stage.setOnCloseRequest {
-            SettingsStore.servers.forEach { s ->
-                val iter = s.syncs.filter { sy -> sy.type == SyncType.FILE }.iterator()
-                while (iter.hasNext()) {
-                    val sync = iter.next()
-                    logger.info("Exit: removing temporary file sync $sync !")
-                    s.removeSync(sync)
+            val filesyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.FILE } }.flatten()
+            if (filesyncs.isNotEmpty()) {
+                if (SettingsStore.ssbSettings.onExitRemoveFilesyncs.value ||
+                        Helpers.dialogOkCancel("File syncs existing", "File syncs existing. Remove them, including the local file?",
+                                    filesyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {
+                    val iter = filesyncs.iterator()
+                    while (iter.hasNext()) {
+                        val sync = iter.next()
+                        logger.info("Exit: removing temporary file sync $sync !")
+                        sync.server.removeSync(sync)
+                    }
                 }
             }
         }

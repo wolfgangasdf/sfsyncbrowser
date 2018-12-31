@@ -96,7 +96,10 @@ object DBSettings {
 
 ///////////////////////// settings
 
-class SSBSettings(val editor: StringProperty = SSP(""), val browsercols: StringProperty = SSP(""))
+class SSBSettings(val editor: StringProperty = SSP(""),
+                  val browsercols: StringProperty = SSP(""),
+                  val onExitRemoveFilesyncs: BooleanProperty = SBP(false)
+)
 
 enum class SyncType { NORMAL, FILE, CACHED }
 
@@ -174,6 +177,7 @@ object SettingsStore {
         props["settingsversion"] = "1"
         props["ssb.editor"] = ssbSettings.editor.value
         props["ssb.browsercols"] = ssbSettings.browsercols.value
+        props["ssb.onExitRemoveFilesyncs"] = ssbSettings.onExitRemoveFilesyncs.value.toString()
         props["servers"] = servers.size.toString()
         servers.forEachIndexed { idx, server ->
             props["se.$idx.title"] = server.title.value
@@ -232,6 +236,7 @@ object SettingsStore {
             try {
                 ssbSettings.editor.set(props.getOrDefault("ssb.editor", ""))
                 ssbSettings.browsercols.set(props.getOrDefault("ssb.browsercols", ""))
+                ssbSettings.onExitRemoveFilesyncs.set(props.getOrDefault("ssb.onExitRemoveFilesyncs", "0").toBoolean())
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
                             SSP(""), p2ip("se.$idx.currentProtocol"))

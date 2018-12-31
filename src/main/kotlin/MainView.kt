@@ -53,6 +53,7 @@ class MainView : View("SSyncBrowser") {
                 else -> FileChooser.ExtensionFilter("Applications (*)", "*")
             }
             with(root) {
+                prefWidth = 600.0
                 fieldset("Editor") {
                     field("Editor path") {
                         textfield(SettingsStore.ssbSettings.editor) { tooltip("Full path to external editor program") }
@@ -61,6 +62,9 @@ class MainView : View("SSyncBrowser") {
                             fl.first().let {f -> SettingsStore.ssbSettings.editor.set(f.path) }
                         }
                     }
+                }
+                fieldset("On exit") {
+                    checkbox("Automatically remove file syncs", SettingsStore.ssbSettings.onExitRemoveFilesyncs)
                 }
             }
         }
@@ -121,6 +125,7 @@ class MainView : View("SSyncBrowser") {
         override fun doBeforeClose() { proto.server.protocols.invalidate() }
         init {
             with(root) {
+                prefWidth = 600.0
                 fieldset("Protocol") {
                     field("URI and password") {
                         valitextfield(proto.protocoluri, uriRegex, "Regex: $uriRegex") { tooltip("'sftp://user@host[:port]' or 'file://") }
