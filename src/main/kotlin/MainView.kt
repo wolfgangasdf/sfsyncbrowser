@@ -174,7 +174,7 @@ class MainView : View("SSyncBrowser") {
                 if (sync.type in setOf(SyncType.NORMAL, SyncType.CACHED)) fieldset("Sync") {
                     field("Name and type") { textfield(sync.title) ; label(sync.type.name) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
                     field("Cacheid") {
-                        textfield(sync.cacheid)
+                        textfield(sync.cacheid) { isEditable = false }
                         button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
                             DBSettings.removeCacheFile(sync.cacheid.value)
                         }
@@ -216,7 +216,7 @@ class MainView : View("SSyncBrowser") {
                 } else fieldset("File sync") {
                     field("File path") { label(sync.title) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
                     field("Cacheid") {
-                        textfield(sync.cacheid)
+                        textfield(sync.cacheid) { isEditable = false }
                     }
                     field("Local folder") {
                         label(sync.localfolder)

@@ -211,7 +211,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     updateBrowser()
                 }
             }
-            item("New folder...") { isDisable = !isNormal() }.action {
+            item("New folder...") { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
                 dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
                     server.getConnection(basePath).mkdirrec(currentPath.value + it, true)
                     updateBrowser()
