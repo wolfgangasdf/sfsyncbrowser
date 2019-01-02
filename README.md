@@ -38,7 +38,7 @@ This will result in nice synchronization errors, but no data loss will happen.
 ### How to use ###
 
 * Get the latest [Java JRE 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html). Don't forget to untick the [crapware](https://www.google.com/search?q=java+crapware) installer, and/or [disable it permanently](https://www.java.com/en/download/faq/disable_offers.xml)!
-* [Download the zip](https://bitbucket.org/wolfgang/sfsync/downloads) for Mac or (Windows, Linux), extract it somewhere and double-click the app (Mac) or
+* [Download the zip](https://github.com/wolfgangasdf/ssyncbrowser-test/releases) for Mac or (Windows, Linux), extract it somewhere and double-click the app (Mac) or
   jar file (Windows, Linux).
 
 Everything should be self-explanatory (watch out for tooltips).
