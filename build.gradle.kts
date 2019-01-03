@@ -26,7 +26,7 @@ plugins {
 }
 
 tasks.withType<Wrapper> {
-    gradleVersion = "4.4.1"
+    gradleVersion = "4.10.3"
 }
 
 application {
@@ -37,7 +37,6 @@ application {
 tasks.withType<Jar> {
     manifest {
         attributes(mapOf(
-                "Main-Class" to "test.ApplicationKt",
                 "Description" to "SSyncBrowser JAR",
                 "Implementation-Title" to "SSyncBrowser",
                 "Implementation-Version" to version,
