@@ -23,6 +23,7 @@ import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
+import java.net.URI
 import java.net.URISyntaxException
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -83,6 +84,15 @@ object Helpers {
             val desktop = Desktop.getDesktop()
             if (desktop.isSupported(Desktop.Action.OPEN)) {
                 desktop.open(File(path))
+            }
+        }
+    }
+
+    fun openURL(url: String) {
+        if (Desktop.isDesktopSupported() && url != "") {
+            val desktop = Desktop.getDesktop()
+            if (desktop.isSupported(Desktop.Action.BROWSE)) {
+                desktop.browse(URI(url))
             }
         }
     }

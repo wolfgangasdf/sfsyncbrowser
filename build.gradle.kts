@@ -6,7 +6,6 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 val kotlinversion = "1.3.11"
 
 buildscript {
-
     repositories {
         mavenCentral()
         jcenter()
@@ -26,7 +25,7 @@ plugins {
 }
 
 tasks.withType<Wrapper> {
-    gradleVersion = "4.10.3"
+    gradleVersion = "5.1.1"
 }
 
 application {
@@ -50,14 +49,13 @@ tasks.withType<ShadowJar> {
     baseName = "app"
     classifier = ""
     version = ""
-    mergeServiceFiles() // essential to enable flac etc
+    mergeServiceFiles() // can be essential
 }
 
 macAppBundle {
     mainClassName = "MainKt"
     icon = "icon.icns"
     bundleJRE = false
-    javaProperties["apple.laf.useScreenMenuBar"] = "true"
 }
 
 repositories {

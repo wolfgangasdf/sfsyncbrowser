@@ -44,6 +44,21 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
     }
 
+    class AboutView: MyView() {
+        override val root = Form()
+        init {
+            with(root) {
+                prefWidth = 600.0
+                fieldset("About") {
+                    field("Build time") { textfield(Helpers.getClassBuildTime().toString()) { isDisable = true } }
+                    button("Open homepage...").setOnAction {
+                        Helpers.openURL("https://github.com/wolfgangasdf/ssyncbrowser-test")
+                    }
+                }
+            }
+        }
+    }
+
     class SettingsView: MyView() {
         override val root = Form()
         init {
@@ -408,6 +423,14 @@ class MainView : View("SSyncBrowser") {
         Screen.getPrimary().bounds.let {
             currentStage!!.x = 0.1 * it.width
             currentStage!!.y = 0.1 * it.height
+        }
+        menubar {
+            isUseSystemMenuBar = true
+            menu("Help") {
+                item("About").setOnAction {
+                    openNewWindow(AboutView(), Modality.APPLICATION_MODAL)
+                }
+            }
         }
         ttv.setOnMouseClicked { me ->
             val src = ttv.selectedValue
