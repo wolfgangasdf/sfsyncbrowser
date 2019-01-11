@@ -131,7 +131,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     fun assignRemoteBasePath(remoteFolder: String) {
         remoteBasePath = protocol.baseFolder.value + remoteFolder
     }
-    //noinspection ScalaUnusedSymbol
+
     var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> }
 
     // return dir (most likely NOT absolute path but subfolder!) without trailing /

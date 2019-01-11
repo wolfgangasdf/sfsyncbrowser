@@ -479,7 +479,7 @@ class Cache(private val cacheid: String) {
 
     fun saveCache() {
         logger.info("save cache database...$cacheid")
-        val fff = java.io.File(getCacheFilename(cacheid)) // forget scalax.io.file: much too slow
+        val fff = java.io.File(getCacheFilename(cacheid))
         if (fff.exists()) fff.delete()
         val out = java.io.BufferedWriter(java.io.FileWriter(fff), 1000000)
         out.write(cacheversion + "\n")
