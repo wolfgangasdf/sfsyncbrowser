@@ -54,6 +54,7 @@ Everything should be self-explanatory (watch out for tooltips).
 * [Kotlin](https://kotlinlang.org/) and [Gradle](https://gradle.org/)
 * [TornadoFX](https://github.com/edvin/tornadofx)
 * [Shadow](https://github.com/johnrengelman/shadow) to package
+* [Gradle-macappbundle](https://github.com/crotwell/gradle-macappbundle) to make mac app bundle
 * [SSHJ](https://github.com/hierynomus/sshj)
 * [Directory-watcher](https://github.com/gmethvin/directory-watcher) to watch local files for changes
 

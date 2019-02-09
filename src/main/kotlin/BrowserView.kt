@@ -23,7 +23,6 @@ import util.Helpers.tokMGTPE
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
-import kotlin.Pair
 
 private val logger = KotlinLogging.logger {}
 
@@ -184,7 +183,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
                 val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
-                server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
+                server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
                         SSP(""), SSP(""),
                         SSP(selectedItem!!.path), SSP(""), server=server).apply {
                     localfolder.set(DBSettings.getCacheFolder(cacheid.value))
@@ -324,7 +323,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
         fun saveColumnsettings() {
             val order = columns.mapNotNull { Pair(it.userData as Int, it.isVisible) }
-            SettingsStore.ssbSettings.browsercols.set(order.joinToString(";") { it -> "${it.first}:${it.second}" } )
+            SettingsStore.ssbSettings.browsercols.set(order.joinToString(";") { "${it.first}:${it.second}" } )
         }
         columns.onChange {
             saveColumnsettings()

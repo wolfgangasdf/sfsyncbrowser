@@ -4,6 +4,7 @@ import javafx.geometry.Pos
 import javafx.scene.control.TreeItem
 import javafx.scene.control.cell.TextFieldListCell
 import javafx.scene.layout.Priority
+import javafx.scene.paint.Color
 import javafx.stage.FileChooser
 import javafx.stage.Modality
 import javafx.stage.Screen
@@ -32,7 +33,9 @@ class Styles : Stylesheet() {
     init {
         thinbutton {
             fontSize = 0.8.em
-            padding = box(2.0.px)
+            padding = box(1.5.px)
+            backgroundColor += Color.WHITE
+            borderColor += box(Color.GRAY)
         }
         logger.info("Loaded stylesheet!")
     }
@@ -187,7 +190,12 @@ class MainView : View("SSyncBrowser") {
         init {
             with(root) {
                 if (sync.type in setOf(SyncType.NORMAL, SyncType.CACHED)) fieldset("Sync") {
-                    field("Name and type") { textfield(sync.title) ; label(sync.type.name) ; checkbox("Auto", sync.auto).apply { isDisable = true } }
+                    field("Name and type") {
+                        textfield(sync.title)
+                        label(sync.type.name)
+                        checkbox("Auto", sync.auto).apply { isDisable = true }
+                        checkbox("Disable full sync", sync.disableFullSync)
+                    }
                     field("Cacheid") {
                         textfield(sync.cacheid) { isEditable = false }
                         button("Delete cache!") { tooltip("Clear the cache database for this sync") } .setOnAction {
@@ -299,7 +307,7 @@ class MainView : View("SSyncBrowser") {
     // annoying that needed: https://stackoverflow.com/questions/32478383/updating-treeview-items-from-textfield
     // this is better than writing generic type TtvThing, which gets messy!
     private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
-        private val changeListener = ChangeListener<String> { _, _, _ ->
+        private val changeListener = ChangeListener<Any> { _, _, _ ->
             Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this))
         }
         init {
@@ -307,7 +315,7 @@ class MainView : View("SSyncBrowser") {
                 is Server -> ele.title.addListener(changeListener)
                 is Protocol -> ele.protocoluri.addListener(changeListener)
                 is BrowserBookmark -> ele.path.addListener(changeListener)
-                is Sync -> ele.title.addListener(changeListener)
+                is Sync -> { ele.title.addListener(changeListener) ; ele.disableFullSync.addListener(changeListener) }
                 is SubSet -> ele.title.addListener(changeListener)
             }
             // have to remove listeners? I don't think so.
@@ -345,22 +353,27 @@ class MainView : View("SSyncBrowser") {
                     isEditable = false
                 }
                 when (what) {
-                    is Server -> { button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
+                    is Server -> {
+                        style(true) { backgroundColor += c("#6B6B6B", .5) }
+                        button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
                             openNewWindow(BrowserView(what, "", ""))
                         }
                         label(what.status)
                     }
-
                     is BrowserBookmark -> button("Open browser") { addClass(Styles.thinbutton) }.setOnAction {
                         openNewWindow(BrowserView(what.server, "", what.path.value))
                     }
                     is Sync -> {
+                        style(true) { backgroundColor += c("#B0B0B0", .5) }
                         if (what.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
                             compSyncFile(what) {}
-                        } else button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
+                        } else if (!what.disableFullSync.value) button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
                             val allsubset = SubSet(SSP("<all>"), SSP(""), sync = what)
                             allsubset.subfolders += ""
                             SubsetSettingsPane.compSync(allsubset)
+                        }
+                        button("Reveal local") { addClass(Styles.thinbutton) }.setOnAction {
+                            revealFile(File(what.localfolder.value))
                         }
                         label(what.status)
                     }

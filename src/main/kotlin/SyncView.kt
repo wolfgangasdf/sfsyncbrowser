@@ -57,7 +57,7 @@ object CF {
     )
     private fun stringToAction(actionString: String): Int {
         val x = amap.entries.associate{(k,v)-> v to k}
-        return x[actionString]!!
+        return x.getValue(actionString)
     }
     fun stringToColor(actionString: String): Color {
         val cmap = mapOf(
@@ -75,10 +75,11 @@ object CF {
                 A_SKIP to Color.SALMON
         )
         val a = stringToAction(actionString)
-        return cmap[a]!!
+        return cmap.getValue(a)
     }
 }
 
+@Suppress("BooleanLiteralArgument")
 class SyncView(private val server: Server, private val sync: Sync, private val subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
     private var isSingleFileSync = false
@@ -303,7 +304,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             btSkip.isDisable = false
             if (legal) {
                 if (allEqual) {
-                    if (existCheck == Pair(true,true)) btRmBoth.isDisable = false
+                    if (existCheck == Pair(true, true)) btRmBoth.isDisable = false
                 } else {
                     when (existCheck) {
                         Pair(true,true) -> listOf(btUseLocal,btUseRemote,btMerge,btRmBoth).forEach { it.isDisable = false }
