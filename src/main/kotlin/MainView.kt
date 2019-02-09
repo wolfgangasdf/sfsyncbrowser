@@ -389,7 +389,7 @@ class MainView : View("SSyncBrowser") {
         }
         root.isExpanded = true
         isShowRoot = false
-        root.children.forEach { it.isExpanded = true ; it.children.forEach { it2 -> it2.isExpanded = true }}
+        root.children.forEach { it.isExpanded = false ; it.children.forEach { it2 -> it2.isExpanded = true }}
         prefHeight = 350.0
         vgrow = Priority.ALWAYS
         useMaxWidth = true
@@ -447,6 +447,10 @@ class MainView : View("SSyncBrowser") {
         }
         ttv.setOnMouseClicked { me ->
             val src = ttv.selectedValue
+            if (me.clickCount == 1) { // auto collapse/expand servers!
+                if (src is Server)
+                    ttv.root.children.forEach { it.isExpanded = (src == it.value) }
+            }
             if (src is BrowserBookmark) {
                 if (me.clickCount == 2) {
                     openNewWindow(BrowserView(src.server, "", src.path.value))
