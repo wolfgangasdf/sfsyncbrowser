@@ -95,8 +95,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     }
                     field("") {
                         button("Apply permissions").setOnAction {
-                            server.getConnection(basePath).extChmod(vf.path, vf.permissions)
-                            updateBrowser()
+                            MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).extChmod(vf.path, vf.permissions) }
                         }
                     }
 
@@ -191,10 +190,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }
             }
             separator()
-            item("Rename...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canRename() }.action {
+            item("Rename...") { isDisable = !isNormal() || selectedItem == null || !canRename }.action {
                 dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    server.getConnection(basePath).extRename(selectedItem!!.path, selectedItem!!.getParent() + it)
-                    updateBrowser()
+                    MyWorker.runTask({ updateBrowser() }) {server.getConnection(basePath).extRename(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
             item("Info...") { isDisable = !isNormal() || selectedItem == null }.action {
@@ -204,16 +202,14 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${selectedItem!!.path}")
             }
             separator()
-            item("Duplicate...") { isDisable = !isNormal() || selectedItem == null || !server.getConnection(basePath).canDuplicate() }.action {
+            item("Duplicate...") { isDisable = !isNormal() || selectedItem == null || !canDuplicate }.action {
                 dialogInputString("Duplicate...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    server.getConnection(basePath).extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it)
-                    updateBrowser()
+                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
             item("New folder...") { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
                 dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
-                    server.getConnection(basePath).mkdirrec(currentPath.value + it, true)
-                    updateBrowser()
+                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).mkdirrec(currentPath.value + it, true) }
                 }
             }
             item("New file...") { isDisable = !isNormal() }.action {
@@ -221,16 +217,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
                     val f = File("${tempfolder.path}/$it")
                     if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
-                    server.getConnection(basePath).putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
-
-                    updateBrowser()
+                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
                 }
             }
             item("Delete") { isDisable = !isNormal() }.action {
-                selectionModel.selectedItems.forEach {
-                    server.getConnection("").deletefile(it.path)
+                MyWorker.runTask({ updateBrowser() }) {
+                    selectionModel.selectedItems.forEach { server.getConnection("").deletefile(it.path) }
                 }
-                updateBrowser()
             }
         }
         setOnKeyReleased { ke -> when(ke.code) { // quicklook
@@ -354,8 +347,17 @@ class BrowserView(private val server: Server, private val basePath: String, path
         fileTableView.smartResize()
     }
 
+    private var canRename: Boolean = false
+    private var canChmod: Boolean = false
+    private var canDuplicate: Boolean = false
+
     private fun updateBrowser() {
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
+            // do here because needs to be done in background thread
+            canRename = server.getConnection(basePath).canRename()
+            canChmod = server.getConnection(basePath).canChmod()
+            canDuplicate = server.getConnection(basePath).canDuplicate()
+
             val tmpl = mutableListOf<VirtualFile>()
             updateTit("Getting remote file list...")
             server.getConnection(basePath).list(currentPath.value, "", false, true) { it2 ->

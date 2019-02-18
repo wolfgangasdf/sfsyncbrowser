@@ -2,9 +2,10 @@
 
 package synchro
 
-import javafx.application.Platform
 import javafx.scene.control.Alert
 import mu.KotlinLogging
+import net.schmizz.keepalive.KeepAliveProvider
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
@@ -82,7 +83,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
     fun getFileName(): String = File(path).name
     fun getPermString(): String = PosixFilePermissions.toString(permissions)
-    fun getParent(): String = File(path).parent.let { if (it.endsWith("/")) it else "$it/" }
+    fun getParent(): String = File(path).parent?.let { if (it.endsWith("/")) it else "$it/" } ?: "/"
     fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
     fun getFileExtension(): String = File(getFileName()).extension
     fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
@@ -262,10 +263,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
-
-    init {
-        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, opens dialogs)")
-    }
+    val timeoutms = 6000
+    val ctimeoutms = 10000
 
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true
@@ -534,12 +533,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // https://stackoverflow.com/a/16023513
-    class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int, private val hosttunnel: String, private val porttunnel: Int, private val tunnelmode: Int,
+    inner class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int, private val hosttunnel: String, private val porttunnel: Int, private val tunnelmode: Int,
                             private val username: String, private val password: String) {
 
         private val startPort = 2222
 
-        class PortForwarder(private val sshClient: SSHClient, private val remoteAddress: InetSocketAddress, private val localSocket: ServerSocket) : Thread(), Closeable {
+        inner class PortForwarder(private val sshClient: SSHClient, private val remoteAddress: InetSocketAddress, private val localSocket: ServerSocket) : Thread(), Closeable {
             val latch = CountDownLatch(1)
 
             private var forwarder: LocalPortForwarder? = null
@@ -559,7 +558,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             }
         }
 
-        class TunnelPortManager {
+        inner class TunnelPortManager {
             private val maxPort = 65536
             private val portsHandedOut = HashSet<Int>()
 
@@ -608,9 +607,14 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
 
         private fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
-            val ssh = SSHClient()
+            val defaultConfig = DefaultConfig()
+            defaultConfig.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
+            val ssh = SSHClient(defaultConfig)
             ssh.addHostKeyVerifier(MyHostKeyVerifier())
+            ssh.timeout = timeoutms // TODO timeouts don't work: if wifi disabled after connected, quit ssb hangs.
+            ssh.connectTimeout = ctimeoutms
             ssh.connect(hostname, port)
+            ssh.connection.keepAlive.keepAliveInterval = 2 // KeepaliveRunner makes 5 retries...
             try {
                 ssh.authPublickey(username)
             } catch (e: UserAuthException) {
@@ -660,9 +664,14 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         fun close() {
-            sftpClient.close()
-            if (forwarderThread != null) forwarderThread!!.close()
-            if (sshClient.isConnected) sshClient.disconnect()
+            try {
+                logger.debug("sshc.isal=${sshClient.connection.keepAlive.isAlive}")
+                session.close()
+                if (forwarderThread != null) forwarderThread!!.close()
+                if (sshClient.isConnected) sshClient.disconnect()
+            } catch (e: Exception) {
+                logger.info("Exception during PFSftp close, ignored! " + e.message)
+            }
             logger.info("Sftp closed!")
         }
 
@@ -671,19 +680,20 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
         val sshClient = connect()
-        init {
-            sshClient.startSession()
-        }
+        private val session = sshClient.startSession()!!
         private val sftpClient = sshClient.newSFTPClient()!!
+        init {
+            sftpClient.sftpEngine.timeoutMs = timeoutms
+        }
     }
 
     private val pfsftp = PortForwardedSftp(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
     private val sftpc = pfsftp.sshClient.newSFTPClient()
     private val sftpt = sftpc.fileTransfer
 
-
     init {
         logger.debug("ini sftp connection remoteBasePath=$remoteBasePath")
+        sftpc.sftpEngine.timeoutMs = timeoutms
         transferListener = MyTransferListener()
         sftpt.transferListener = transferListener
 

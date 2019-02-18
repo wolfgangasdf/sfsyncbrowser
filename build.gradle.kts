@@ -66,13 +66,13 @@ repositories {
 dependencies {
     compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinversion")
     compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    compile("io.github.microutils:kotlin-logging:1.6.23")
+    compile("io.github.microutils:kotlin-logging:1.6.24")
     compile("com.hierynomus:sshj:0.27.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta2") // no colors, everything stderr
     compile("no.tornado:tornadofx:1.7.18")
     compile("io.methvin:directory-watcher:0.9.3")
-    compile("org.bouncycastle:bcprov-jdk15on:1.60")
-    compile("org.bouncycastle:bcpkix-jdk15on:1.60")
+    compile("org.bouncycastle:bcprov-jdk15on:1.61")
+    compile("org.bouncycastle:bcpkix-jdk15on:1.61")
 }
 
 tasks.withType<KotlinCompile> {

@@ -405,6 +405,15 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         th.start()
     }
 
+    fun runTask(onsucc: () -> Unit, callfun: MyTask<Unit>.() -> Unit) {
+        val t = MyTask(callfun)
+        t.setOnSucceeded { onsucc() }
+        t.setOnFailed {
+            throw t.exception
+        }
+        MyWorker.runTask(t)
+    }
+
 }
 
 class FileWatcher(val path: String) {

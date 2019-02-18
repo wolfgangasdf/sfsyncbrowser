@@ -2,6 +2,7 @@ package store
 
 import CF
 import SortedProperties
+import javafx.application.Platform
 import javafx.beans.property.BooleanProperty
 import javafx.beans.property.IntegerProperty
 import javafx.beans.property.SimpleObjectProperty
@@ -146,13 +147,14 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
     private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"
     fun getConnection(remoteFolder: String): GeneralConnection {
+        if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, might open dialogs)")
         if (connection?.isAlive() != true) {
             val proto = protocols[currentProtocol.value]
             logger.info("opening new connection to $proto")
             connection = when {
                 proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
                 proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
-                else -> throw java.lang.Exception("asdf")
+                else -> throw java.lang.Exception("unknown connection type")
             }
         }
         connection!!.assignRemoteBasePath(remoteFolder)
