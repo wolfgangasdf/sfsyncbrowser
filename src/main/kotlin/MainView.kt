@@ -57,6 +57,12 @@ class MainView : View("SSyncBrowser") {
                     button("Open homepage...").setOnAction {
                         Helpers.openURL("https://github.com/wolfgangasdf/ssyncbrowser-test")
                     }
+                    DBSettings.logFile?.let {f ->
+                        field("Log file") {
+                            textfield(f.path) { isDisable = true }
+                            button("Open log file").setOnAction { Helpers.openFile(f.path) }
+                        }
+                    }
                 }
             }
         }

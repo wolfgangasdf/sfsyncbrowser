@@ -62,7 +62,7 @@ object DBSettings {
     }
 
     val lockFile = java.io.File("$settpath/SSB.lock")
-
+    var logFile: File? = null
     val knownHostsFile = java.io.File("$settpath/known_hosts")
 
     init {
@@ -83,7 +83,6 @@ object DBSettings {
         logger.info("delete cache database $cacheid")
         File(getCacheFilename(cacheid)).delete()
     }
-
     fun removeCacheFolder(cacheid: String) {
         logger.info("delete cache folder $cacheid")
         val f = File(getCacheFolder(cacheid))
