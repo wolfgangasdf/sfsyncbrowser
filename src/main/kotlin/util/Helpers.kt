@@ -17,6 +17,7 @@ import javafx.stage.*
 import mu.KotlinLogging
 import store.Server
 import store.SettingsStore
+import synchro.GeneralConnection
 import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
@@ -314,10 +315,11 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
     fun updateTit(title: String?) { runLater { updateTitle(title) } }
     fun updateMsg(msg: String?) { runLater { updateMessage(msg) } }
 
-    fun updateProgr(workDone: Int, max: Int, msg: String) {
+    fun updateProgr(workDone: Int, max: Int, msg: String) = updateProgr(workDone.toDouble(), max.toDouble(), msg)
+    fun updateProgr(workDone: Double, max: Double, msg: String) {
         runLater {
             updateMessage(msg)
-            updateProgress(workDone.toDouble(), max.toDouble())
+            updateProgress(workDone, max)
         }
     }
 }
@@ -405,8 +407,17 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         th.start()
     }
 
-    fun runTask(onsucc: () -> Unit, callfun: MyTask<Unit>.() -> Unit) {
-        val t = MyTask(callfun)
+    fun runTaskWithConn(onsucc: () -> Unit, msg: String, server: Server, basePath: String, callfun: MyTask<Unit>.(connection: GeneralConnection) -> Unit) {
+        val t = MyTask<Unit> {
+            updateTit("Initializing connection...")
+            val conn = server.getConnection(basePath)
+            updateTit("")
+            conn.onProgress = { progressVal, bytesPerSecond ->
+                val pv = (100 * progressVal).toInt()
+                updateProgr(progressVal, 1.0, "$msg...$pv% (${Helpers.tokMGTPE(bytesPerSecond)}B/s)")
+            }
+            callfun(conn)
+        }
         t.setOnSucceeded { onsucc() }
         t.setOnFailed {
             throw t.exception

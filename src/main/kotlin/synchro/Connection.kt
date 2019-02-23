@@ -263,8 +263,8 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
-    val timeoutms = 6000
-    val ctimeoutms = 10000
+    val timeoutms = 10000
+    val ctimeoutms = 15000
 
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true

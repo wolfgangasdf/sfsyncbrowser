@@ -187,7 +187,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
 
             if (showit || swUIupdate.doit(uiUpdateInterval)) {
                 msg = " [${CF.amap[se.action]}]: $path..."
-                updateProgr(transferredSize.toInt(), totalTransferSize.toInt(), msg)
+                updateProgr(transferredSize, totalTransferSize, msg)
             }
 
             try {

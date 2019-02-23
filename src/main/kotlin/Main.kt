@@ -42,7 +42,7 @@ fun main(args: Array<String>) {
     logger.trace("trace")
 
     logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
-    logger.info("Log file: $logfile")
+    logger.info("Log file: ${logfile.path}")
     DBSettings.logFile = logfile
 
     launch<SSBApp>(*args)

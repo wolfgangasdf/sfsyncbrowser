@@ -16,6 +16,7 @@ import tornadofx.*
 import util.*
 import util.Helpers.dialogInputString
 import util.Helpers.dialogMessage
+import util.Helpers.dialogOkCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
@@ -95,7 +96,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     }
                     field("") {
                         button("Apply permissions").setOnAction {
-                            MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).extChmod(vf.path, vf.permissions) }
+                            MyWorker.runTaskWithConn({ updateBrowser() }, "Chmod", server, basePath) { c -> c.extChmod(vf.path, vf.permissions) }
                         }
                     }
 
@@ -192,7 +193,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             separator()
             item("Rename...") { isDisable = !isNormal() || selectedItem == null || !canRename }.action {
                 dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    MyWorker.runTask({ updateBrowser() }) {server.getConnection(basePath).extRename(selectedItem!!.path, selectedItem!!.getParent() + it) }
+                    MyWorker.runTaskWithConn({ updateBrowser() }, "Rename", server, basePath) { c -> c.extRename(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
             item("Info...") { isDisable = !isNormal() || selectedItem == null }.action {
@@ -204,12 +205,12 @@ class BrowserView(private val server: Server, private val basePath: String, path
             separator()
             item("Duplicate...") { isDisable = !isNormal() || selectedItem == null || !canDuplicate }.action {
                 dialogInputString("Duplicate...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it) }
+                    MyWorker.runTaskWithConn({ updateBrowser() }, "Duplicate", server, basePath) { c -> c.extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
             item("New folder...") { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
                 dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
-                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).mkdirrec(currentPath.value + it, true) }
+                    MyWorker.runTaskWithConn({ updateBrowser() }, "Mkdir", server, basePath) { c -> c.mkdirrec(currentPath.value + it, true) }
                 }
             }
             item("New file...") { isDisable = !isNormal() }.action {
@@ -217,12 +218,14 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
                     val f = File("${tempfolder.path}/$it")
                     if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
-                    MyWorker.runTask({ updateBrowser() }) { server.getConnection(basePath).putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
+                    MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
                 }
             }
             item("Delete") { isDisable = !isNormal() }.action {
-                MyWorker.runTask({ updateBrowser() }) {
-                    selectionModel.selectedItems.forEach { server.getConnection("").deletefile(it.path) }
+                if (dialogOkCancel("Delete files", "Really delete these files?", selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
+                    MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
+                        selectionModel.selectedItems.forEach { c.deletefile(it.path) }
+                    }
                 }
             }
         }
@@ -296,19 +299,18 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         return@setOnDragDropped
                     }
                 }
-                val taskUploadFiles = MyTask<Unit> {
-                    fff.forEach { f ->
-                        updateTit("Uploading file $f...")
-                        server.getConnection("").putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
-                    }
-                }
-                taskUploadFiles.setOnSucceeded {
+
+                MyWorker.runTaskWithConn({
                     logger.info("successfully uploaded files!")
                     de.isDropCompleted = true
                     de.consume()
                     updateBrowser()
+                }, "Uploading", server, "") { c ->
+                    fff.forEach { f ->
+                        updateTit("Uploading file $f...")
+                        c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
+                    }
                 }
-                MyWorker.runTask(taskUploadFiles)
                 de.isDropCompleted = true
             }
             de.consume()
@@ -353,6 +355,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     private fun updateBrowser() {
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
+            updateTit("Initialize connection...")
             // do here because needs to be done in background thread
             canRename = server.getConnection(basePath).canRename()
             canChmod = server.getConnection(basePath).canChmod()
