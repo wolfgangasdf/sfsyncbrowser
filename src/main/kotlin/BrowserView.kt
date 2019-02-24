@@ -4,6 +4,8 @@ import javafx.scene.control.Alert
 import javafx.scene.control.TableColumn
 import javafx.scene.control.TableRow
 import javafx.scene.input.KeyCode
+import javafx.scene.input.KeyCodeCombination
+import javafx.scene.input.KeyCombination
 import javafx.scene.input.TransferMode
 import javafx.scene.layout.Priority
 import javafx.stage.Modality
@@ -191,29 +193,33 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }
             }
             separator()
-            item("Rename...") { isDisable = !isNormal() || selectedItem == null || !canRename }.action {
+            item("Rename...", KeyCodeCombination(KeyCode.R, KeyCombination.META_DOWN))
+            { isDisable = !isNormal() || selectedItem == null || !canRename }.action {
                 dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
                     MyWorker.runTaskWithConn({ updateBrowser() }, "Rename", server, basePath) { c -> c.extRename(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
-            item("Info...") { isDisable = !isNormal() || selectedItem == null }.action {
+            item("Info...", KeyCodeCombination(KeyCode.I, KeyCombination.META_DOWN))
+            { isDisable = !isNormal() || selectedItem == null }.action {
                 openNewWindow(InfoView(selectedItem!!), Modality.APPLICATION_MODAL)
             }
             item("Copy URL") { isDisable = !isNormal() || selectedItem == null }.action {
                 clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${selectedItem!!.path}")
             }
             separator()
-            item("Duplicate...") { isDisable = !isNormal() || selectedItem == null || !canDuplicate }.action {
+            item("Duplicate...", KeyCodeCombination(KeyCode.D, KeyCombination.META_DOWN))
+            { isDisable = !isNormal() || selectedItem == null || !canDuplicate }.action {
                 dialogInputString("Duplicate...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
                     MyWorker.runTaskWithConn({ updateBrowser() }, "Duplicate", server, basePath) { c -> c.extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it) }
                 }
             }
-            item("New folder...") { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
+            item("New folder...", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN, KeyCombination.SHIFT_DOWN))
+            { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
                 dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
                     MyWorker.runTaskWithConn({ updateBrowser() }, "Mkdir", server, basePath) { c -> c.mkdirrec(currentPath.value + it, true) }
                 }
             }
-            item("New file...") { isDisable = !isNormal() }.action {
+            item("New file...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN)) { isDisable = !isNormal() }.action {
                 dialogInputString("Create new file", "Enter file name:", "", "")?.let {
                     val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
                     val f = File("${tempfolder.path}/$it")
@@ -221,7 +227,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
                 }
             }
-            item("Delete") { isDisable = !isNormal() }.action {
+            item("Delete", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN)) { isDisable = !isNormal() }.action {
                 if (dialogOkCancel("Delete files", "Really delete these files?", selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
                     MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
                         selectionModel.selectedItems.forEach { c.deletefile(it.path) }
