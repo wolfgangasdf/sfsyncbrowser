@@ -1,13 +1,12 @@
 import javafx.geometry.Pos
 import javafx.scene.Scene
-import javafx.scene.control.Alert
-import javafx.scene.control.TableColumn
-import javafx.scene.control.TableRow
+import javafx.scene.control.*
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyCodeCombination
 import javafx.scene.input.KeyCombination
 import javafx.scene.input.TransferMode
 import javafx.scene.layout.Priority
+import javafx.scene.layout.VBox
 import javafx.stage.Modality
 import javafx.stage.Stage
 import javafx.util.Callback
@@ -61,6 +60,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
     var selectFoldersCallback: (fl: List<VirtualFile>) -> Unit = {}
     private fun isNormal() = mode == BrowserViewMode.NORMAL
 
+    // mac quicklook lets "space" to close through... this is good in principle, to allow navigation while preview open. implement?
+    private var lastpreviewvf: VirtualFile? = null
+
     private val pathButtonFlowPane = flowpane {
         alignment = Pos.CENTER_LEFT
         paddingAll = 5.0
@@ -68,8 +70,19 @@ class BrowserView(private val server: Server, private val basePath: String, path
         vgap = 5.0
     }
 
-    // mac quicklook lets "space" to close through... this is good in principle, to allow navigation while preview open. implement?
-    private var lastpreviewvf: VirtualFile? = null
+
+    inner class MyMenuitem(text: String, keyCombination: KeyCombination? = null, onaction: () -> Unit): MenuItem(text) {
+        fun withEnableOnSelectionChanged(act: MyMenuitem.(List<VirtualFile>) -> Boolean): MyMenuitem {
+            fileTableView.selectionModel.selectedItems.onChange {
+                isDisable = !act(fileTableView.selectionModel.selectedItems.toList())
+            }
+            return this
+        }
+        init {
+            keyCombination?.apply { accelerator = this }
+            setOnAction { onaction() }
+        }
+    }
 
     inner class InfoView(vf: VirtualFile): MyView() {
         override val root = Form()
@@ -141,100 +154,26 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             row
         }
+
         lazyContextmenu {
-            item("Refresh").action { updateBrowser() }
-            item("Add bookmark") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                server.bookmarks += BrowserBookmark(server, SSP(selectedItem?.path))
-            }
-            fun addFilesync(op: SfsOp) {
-                val newSync = Sync(SyncType.FILE, SSP(selectedItem?.getFileName()), SSP("not synced"),
-                        SSP(""), SSP(selectedItem?.getParent()), SSP(""), server = server).apply {
-                    localfolder.set(DBSettings.getCacheFolder(cacheid.value))
-                    auto.set(true)
-                }
-                server.syncs += newSync
-                MainView.compSyncFile(newSync) {
-                    when (op) {
-                        SfsOp.NONE -> {}
-                        SfsOp.OPEN -> openFile("${newSync.localfolder.value}/${newSync.title.value}")
-                        SfsOp.EDIT -> if (SettingsStore.ssbSettings.editor.value != "")
-                            editFile("${newSync.localfolder.value}/${newSync.title.value}")
-                        else
-                            dialogMessage(Alert.AlertType.ERROR, "Edit file", "Set editor in settings first!", "")
-                    }
-                }
-            }
-            item("Add temporary syncfile") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                addFilesync(SfsOp.NONE)
-            }
-            item("Add temporary syncfile and open") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                addFilesync(SfsOp.OPEN)
-            }
-            item("Add temporary syncfile and edit") { isDisable = !isNormal() || selectedItem?.isFile() != true }.action {
-                addFilesync(SfsOp.EDIT)
-            }
-            item("Add sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                val sname = dialogInputString("New sync", "Enter sync name:", "")
-                var lfolder = "sylocalfolder"
-                chooseDirectory("Select local folder")?.let {
-                    lfolder = if (it.absolutePath.endsWith("/")) it.absolutePath else it.absolutePath + "/"
-                }
-                server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
-                        SSP(""), SSP(lfolder),
-                        SSP(selectedItem!!.path), SSP(""), server=server)
-            }
-            item("Add temporary sync...") { isDisable = !isNormal() || selectedItem?.isDir() != true }.action {
-                val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
-                server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
-                        SSP(""), SSP(""),
-                        SSP(selectedItem!!.path), SSP(""), server=server).apply {
-                    localfolder.set(DBSettings.getCacheFolder(cacheid.value))
-                    auto.set(false)
-                }
-            }
+            this += miRefresh
+            this += miAddBookmark
+            this += miAddTempSync
+            this += miAddTempSyncOpen
+            this += miAddTempSyncEdit
+            this += miAddSync
+            this += miAddCachedSync
             separator()
-            item("Rename...", KeyCodeCombination(KeyCode.R, KeyCombination.META_DOWN))
-            { isDisable = !isNormal() || selectedItem == null || !canRename }.action {
-                dialogInputString("Rename...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    MyWorker.runTaskWithConn({ updateBrowser() }, "Rename", server, basePath) { c -> c.extRename(selectedItem!!.path, selectedItem!!.getParent() + it) }
-                }
-            }
-            item("Info...", KeyCodeCombination(KeyCode.I, KeyCombination.META_DOWN))
-            { isDisable = !isNormal() || selectedItem == null }.action {
-                openNewWindow(InfoView(selectedItem!!), Modality.APPLICATION_MODAL)
-            }
-            item("Copy URL") { isDisable = !isNormal() || selectedItem == null }.action {
-                clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${selectedItem!!.path}")
-            }
+            this += miRename
+            this += miInfo
+            this += miCopyURL
             separator()
-            item("Duplicate...", KeyCodeCombination(KeyCode.D, KeyCombination.META_DOWN))
-            { isDisable = !isNormal() || selectedItem == null || !canDuplicate }.action {
-                dialogInputString("Duplicate...", "Enter new name:", "", selectedItem!!.getFileName())?.let {
-                    MyWorker.runTaskWithConn({ updateBrowser() }, "Duplicate", server, basePath) { c -> c.extDuplicate(selectedItem!!.path, selectedItem!!.getParent() + it) }
-                }
-            }
-            item("New folder...", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN, KeyCombination.SHIFT_DOWN))
-            { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }.action {
-                dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
-                    MyWorker.runTaskWithConn({ updateBrowser() }, "Mkdir", server, basePath) { c -> c.mkdirrec(currentPath.value + it, true) }
-                }
-            }
-            item("New file...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN)) { isDisable = !isNormal() }.action {
-                dialogInputString("Create new file", "Enter file name:", "", "")?.let {
-                    val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
-                    val f = File("${tempfolder.path}/$it")
-                    if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
-                    MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
-                }
-            }
-            item("Delete", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN)) { isDisable = !isNormal() }.action {
-                if (dialogOkCancel("Delete files", "Really delete these files?", selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
-                    MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
-                        selectionModel.selectedItems.forEach { c.deletefile(it.path) }
-                    }
-                }
-            }
+            this += miDuplicate
+            this += miNewFolder
+            this += miNewFile
+            this += miDelete
         }
+
         setOnKeyReleased { ke -> when(ke.code) { // quicklook
              KeyCode.SPACE -> {
                  if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
@@ -336,25 +275,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         } }
     }
 
-    override val root = vbox {
-        prefWidth = 800.0
-        prefHeight = 600.0
-        toolbar {
-            when (mode) {
-                BrowserViewMode.NORMAL -> {}
-                BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
-                    if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
-                    this@BrowserView.close() }
-                BrowserViewMode.SELECTFOLDERS -> button("Select Folder(s)").setOnAction {
-                    selectFoldersCallback(fileTableView.selectionModel.selectedItems.filter { vf -> vf.isDir() })
-                    this@BrowserView.close() }
-            }
-        }
-        this += pathButtonFlowPane
-        this += fileTableView
-        fileTableView.smartResize()
-    }
-
     private var canRename: Boolean = false
     private var canChmod: Boolean = false
     private var canDuplicate: Boolean = false
@@ -400,6 +320,168 @@ class BrowserView(private val server: Server, private val basePath: String, path
             throw taskListLocal.exception
         }
         MyWorker.runTask(taskListLocal)
+    }
+
+
+
+
+
+    private fun addFilesync(op: SfsOp) {
+        val newSync = Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
+                SSP(""), SSP(fileTableView.selectedItem?.getParent()), SSP(""), server = server).apply {
+            localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+            auto.set(true)
+        }
+        server.syncs += newSync
+        MainView.compSyncFile(newSync) {
+            when (op) {
+                SfsOp.NONE -> {}
+                SfsOp.OPEN -> openFile("${newSync.localfolder.value}/${newSync.title.value}")
+                SfsOp.EDIT -> if (SettingsStore.ssbSettings.editor.value != "")
+                    editFile("${newSync.localfolder.value}/${newSync.title.value}")
+                else
+                    dialogMessage(Alert.AlertType.ERROR, "Edit file", "Set editor in settings first!", "")
+            }
+        }
+    }
+
+    private val miRefresh = MyMenuitem("Refresh") {
+        updateBrowser()
+    }
+
+    private val miAddBookmark: MyMenuitem = MyMenuitem("Add bookmark") {
+        server.bookmarks += BrowserBookmark(server, SSP(fileTableView.selectedItem?.path))
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
+
+    private val miAddTempSync: MyMenuitem = MyMenuitem("Add temporary syncfile") {
+        addFilesync(SfsOp.NONE)
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
+
+    private val miAddTempSyncOpen: MyMenuitem = MyMenuitem("Add temporary syncfile and open") {
+        addFilesync(SfsOp.OPEN)
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
+
+    private val miAddTempSyncEdit: MyMenuitem = MyMenuitem("Add temporary syncfile and edit") {
+        addFilesync(SfsOp.EDIT)
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
+
+    private val miAddSync: MyMenuitem = MyMenuitem("Add sync...") {
+        val sname = dialogInputString("New sync", "Enter sync name:", "")
+        var lfolder = "sylocalfolder"
+        chooseDirectory("Select local folder")?.let {
+            lfolder = if (it.absolutePath.endsWith("/")) it.absolutePath else it.absolutePath + "/"
+        }
+        server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
+                SSP(""), SSP(lfolder),
+                SSP(fileTableView.selectedItem!!.path), SSP(""), server=server)
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
+
+    private val miAddCachedSync: MyMenuitem = MyMenuitem("Add sync...") {
+        val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
+        server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
+                SSP(""), SSP(""),
+                SSP(fileTableView.selectedItem!!.path), SSP(""), server=server).apply {
+            localfolder.set(DBSettings.getCacheFolder(cacheid.value))
+            auto.set(false)
+        }
+    }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
+
+    private val miRename: MyMenuitem = MyMenuitem("Rename...", KeyCodeCombination(KeyCode.R, KeyCombination.META_DOWN)) {
+        dialogInputString("Rename...", "Enter new name:", "", fileTableView.selectedItem!!.getFileName())?.let {
+            MyWorker.runTaskWithConn({ updateBrowser() }, "Rename", server, basePath) { c ->
+                c.extRename(fileTableView.selectedItem!!.path, fileTableView.selectedItem!!.getParent() + it) }
+        }
+    }.withEnableOnSelectionChanged { isNormal() && it.size == 1 && canRename }
+
+    private val miInfo: MyMenuitem = MyMenuitem("Info...", KeyCodeCombination(KeyCode.I, KeyCombination.META_DOWN)) {
+        openNewWindow(InfoView(fileTableView.selectedItem!!), Modality.APPLICATION_MODAL)
+    }.withEnableOnSelectionChanged { isNormal() && it.size == 1 }
+
+    private val miCopyURL: MyMenuitem = MyMenuitem("Copy URL") {
+        clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${fileTableView.selectedItem!!.path}")
+    }.withEnableOnSelectionChanged { isNormal() && it.size == 1 }
+
+    private val miDuplicate: MyMenuitem = MyMenuitem("Duplicate...", KeyCodeCombination(KeyCode.D, KeyCombination.META_DOWN)) {
+        dialogInputString("Duplicate...", "Enter new name:", "", fileTableView.selectedItem!!.getFileName())?.let {
+            MyWorker.runTaskWithConn({ updateBrowser() }, "Duplicate", server, basePath) {
+                c -> c.extDuplicate(fileTableView.selectedItem!!.path, fileTableView.selectedItem!!.getParent() + it)
+            }
+        }
+    }.withEnableOnSelectionChanged { isNormal() && it.size == 1 && canDuplicate }
+
+    private val miNewFolder: MyMenuitem = MyMenuitem("New folder...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN, KeyCombination.SHIFT_DOWN)) {
+        dialogInputString("Create new folder", "Enter folder name:", "", "")?.let {
+            MyWorker.runTaskWithConn({ updateBrowser() }, "Mkdir", server, basePath) { c -> c.mkdirrec(currentPath.value + it, true) }
+        }
+    }.apply { isDisable = !listOf(BrowserViewMode.NORMAL, BrowserViewMode.SELECTFOLDER).contains(mode) }
+
+    private val miNewFile: MyMenuitem = MyMenuitem("New file...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN)) {
+        dialogInputString("Create new file", "Enter file name:", "", "")?.let {
+            val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+            val f = File("${tempfolder.path}/$it")
+            if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
+            MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
+        }
+    }.apply { isDisable = !isNormal() }
+
+    private val miDelete: MyMenuitem = MyMenuitem("Delete", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN)) {
+        if (dialogOkCancel("Delete files", "Really delete these files?", fileTableView.selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
+            MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
+                fileTableView.selectionModel.selectedItems.forEach { c.deletefile(it.path) }
+                // TODO folders???
+            }
+        }
+    }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }
+
+
+    override val root = VBox()
+    init {
+        with(root) {
+            prefWidth = 800.0
+            prefHeight = 600.0
+            menubar {
+                isUseSystemMenuBar = true
+                menu("File") {
+                    this += miRefresh
+                    this += miAddBookmark
+                    this += miAddTempSync
+                    this += miAddTempSyncOpen
+                    this += miAddTempSyncEdit
+                    this += miAddSync
+                    this += miAddCachedSync
+                    separator()
+                    this += miRename
+                    this += miInfo
+                    this += miCopyURL
+                    separator()
+                    this += miDuplicate
+                    this += miNewFolder
+                    this += miNewFile
+                    this += miDelete
+                }
+                menu("Edit") {
+                    item("Copy")
+                    item("Paste")
+                }
+            }
+            toolbar {
+                when (mode) {
+                    BrowserViewMode.NORMAL -> {
+                    }
+                    BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
+                        if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
+                        this@BrowserView.close()
+                    }
+                    BrowserViewMode.SELECTFOLDERS -> button("Select Folder(s)").setOnAction {
+                        selectFoldersCallback(fileTableView.selectionModel.selectedItems.filter { vf -> vf.isDir() })
+                        this@BrowserView.close()
+                    }
+                }
+            }
+            this += pathButtonFlowPane
+            this += fileTableView
+            fileTableView.smartResize()
+        }
     }
 
     override fun doAfterShown() {
