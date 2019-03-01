@@ -290,7 +290,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
             val tmpl = mutableListOf<VirtualFile>()
             updateTit("Getting remote file list...")
             server.getConnection(basePath).list(currentPath.value, "", false, true) { it2 ->
-                if (it2.path != currentPath.value) tmpl.add(it2)
+                if (it2.path != currentPath.value &&
+                        (SettingsStore.ssbSettings.showHiddenfiles.value || !it2.getFileName().startsWith("."))) tmpl.add(it2)
             }
             tmpl.sortWith( Comparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) })
             tmpl
@@ -459,8 +460,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     this += miNewFile
                     this += miDelete
                 }
-                menu("Edit") {
-                    item("Copy")
+                menu("View") {
+                    checkmenuitem("Show hidden files", null, null, SettingsStore.ssbSettings.showHiddenfiles).apply {
+                        setOnAction { updateBrowser() }
+                    }
                     item("Paste")
                 }
             }
