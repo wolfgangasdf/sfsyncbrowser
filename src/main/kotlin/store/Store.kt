@@ -119,11 +119,11 @@ class Sync(val type: SyncType, val title: StringProperty, val status: StringProp
     var fileWatcher: FileWatcher? = null
 }
 
-class Protocol(val server: Server, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
+class Protocol(val server: Server, val name: StringProperty, val protocoluri: StringProperty, val doSetPermissions: BooleanProperty, val perms: StringProperty,
                val cantSetDate: BooleanProperty, val baseFolder: StringProperty, val password: StringProperty,
                val tunnelHost: StringProperty, val tunnelMode: StringProperty) {
     fun getmyuri() = MyURI(protocoluri.value)
-    override fun toString(): String = "[Protocol ${protocoluri.value}]"
+    override fun toString(): String = name.value
     fun tunnelHostname() = tunnelHost.value.split(":").first()
     fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }
@@ -194,6 +194,7 @@ object SettingsStore {
             props["se.$idx.currentProtocol"] = server.currentProtocol.value.toString()
             props["se.$idx.protocols"] = server.protocols.size.toString()
             server.protocols.forEachIndexed { idx2, proto ->
+                props["sp.$idx.$idx2.name"] = proto.name.value
                 props["sp.$idx.$idx2.uri"] = proto.protocoluri.value
                 props["sp.$idx.$idx2.cantSetDate"] = proto.cantSetDate.value.toString()
                 props["sp.$idx.$idx2.doSetPermissions"] = proto.doSetPermissions.value.toString()
@@ -254,7 +255,7 @@ object SettingsStore {
                     val server = Server(p2sp("se.$idx.title"),
                             SSP(""), p2ip("se.$idx.currentProtocol"))
                     for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "0").toInt()) {
-                        server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
+                        server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.name"), p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
                                 p2sp("sp.$idx.$idx2.password"), p2sp("sp.$idx.$idx2.tunnelHost"), p2sp("sp.$idx.$idx2.tunnelMode"))
                     }

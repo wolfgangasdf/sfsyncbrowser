@@ -108,7 +108,7 @@ class MainView : View("SSyncBrowser") {
                             openNewWindow(ProtocolView(server.proto.value), Modality.APPLICATION_MODAL)
                         }}
                         button("Add") { action {
-                            Protocol(server, SSP("sftp://user@server:/folder/"), SBP(false),
+                            Protocol(server, SSP("<name>"), SSP("sftp://user@server:/folder/"), SBP(false),
                                     SSP(""), SBP(false),
                                     SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
                                 server.protocols += it
@@ -153,6 +153,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 prefWidth = 600.0
                 fieldset("Protocol") {
+                    field("Name") { textfield(proto.name) }
                     field("URI and password") {
                         valitextfield(proto.protocoluri, uriRegex, "Regex: $uriRegex") { tooltip("'sftp://user@host[:port]' or 'file://") }
                         passwordfield(proto.password) { tooltip("Leave empty for public key authentification")}
