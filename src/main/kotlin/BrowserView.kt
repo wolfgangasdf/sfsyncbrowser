@@ -223,18 +223,12 @@ class BrowserView(private val server: Server, private val basePath: String, path
         setOnDragDropped { de -> // dropped from external
             //println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
             if (de.dragboard.hasFiles()) {
-                //println("drop files ${de.dragboard.files} mode=${de.transferMode}")
-                val fff = de.dragboard.files
-                // check no dirs
-                fff.find { it.isDirectory }?.let {
-                    Helpers.dialogMessage(Alert.AlertType.WARNING, "Drop", "Can't drop folders!", "")
-                    de.isDropCompleted = false
-                    de.consume()
-                    return@setOnDragDropped
-                }
+                // get local base path of file(s)
+                val localBase = de.dragboard.files.first().parent + "/"
+
                 // check overwrites
                 val existing = mutableListOf<VirtualFile>()
-                fff.forEach { f ->
+                de.dragboard.files.forEach { f ->
                     files.find { vf -> vf.getFileName() == f.name }?.let { existing.add(it) }
                 }
                 if (existing.isNotEmpty()) {
@@ -245,6 +239,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
                     }
                 }
 
+                val fff = arrayListOf<File>()
+
+                // expand dirs
+                de.dragboard.files.forEach { f ->
+                    if (f.isDirectory) {
+                        f.walkTopDown().forEach { fff += it }
+                    } else fff += f
+                }
+
                 MyWorker.runTaskWithConn({
                     logger.info("successfully uploaded files!")
                     de.isDropCompleted = true
@@ -253,7 +256,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }, "Uploading", server, "") { c ->
                     fff.forEach { f ->
                         updateTit("Uploading file $f...")
-                        c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}")
+                        println("FFFFF ${f.path} rem: ${currentPath.value}${f.path.removePrefix(localBase)}")
+                        c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.path.removePrefix(localBase)}")
                     }
                 }
                 de.isDropCompleted = true
