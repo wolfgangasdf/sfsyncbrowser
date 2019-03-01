@@ -185,30 +185,37 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }}
         setOnDragDetected { me -> // drag from here...
             // java DnD: can't get finder or explorer drop location ("promised files" not implemented yet), therefore open this window.
-            // mac crashes due to jvm: add to accessibility prefs, gradle dist, run in shell build/macApp/ssyncbrowser.app/Contents/MacOS/JavaAppLauncher
-            val selfiles = selectionModel.selectedItems
-            if (selfiles.isEmpty()) return@setOnDragDetected
-            selfiles.find { it.isDir() }?.let {
-                Helpers.dialogMessage(Alert.AlertType.WARNING, "Drag", "Can't drag folders!", "")
-                me.consume()
-                return@setOnDragDetected
-            }
+            if (selectionModel.selectedItems.isEmpty()) return@setOnDragDetected
+
+            val remoteBase = selectionModel.selectedItems.first().getParent()
             val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+
             val taskGetFile = MyTask<Unit> {
                 updateTit("Downloading files for drag and drop...")
-                selfiles.forEach { vf ->
+                val fff = arrayListOf<VirtualFile>()
+                selectionModel.selectedItems.forEach { selvf ->
+                    if (selvf.isDir()) {
+                        server.getConnection("").list(selvf.path, "", true, true) {
+                            fff += it
+                        }
+                    } else fff += selvf
+                }
+
+                fff.forEach { vf ->
                     updateMsg("Downloading file $vf...")
-                    val lf = "${tempfolder.path}/${vf.getFileName()}"
+                    val lf = "${tempfolder.path}/${vf.path.removePrefix(remoteBase)}"
                     logger.debug("downloading $vf to $lf...")
                     server.getConnection("").getfile("", vf.path, vf.modTime, lf)
                 }
-            }
-            taskGetFile.setOnSucceeded {
-                val newstage = Stage()
-                val dragView = DragView(tempfolder)
-                newstage.scene = Scene(dragView.root)
-                newstage.initModality(Modality.WINDOW_MODAL)
-                newstage.show()
+            }.apply {
+                setOnSucceeded {
+                    val newstage = Stage()
+                    val dragView = DragView(tempfolder)
+                    newstage.scene = Scene(dragView.root)
+                    newstage.initModality(Modality.WINDOW_MODAL)
+                    newstage.show()
+                }
+                setOnFailed { throw exception }
             }
             MyWorker.runTask(taskGetFile)
             me.consume()
@@ -256,7 +263,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }, "Uploading", server, "") { c ->
                     fff.forEach { f ->
                         updateTit("Uploading file $f...")
-                        println("FFFFF ${f.path} rem: ${currentPath.value}${f.path.removePrefix(localBase)}")
                         c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.path.removePrefix(localBase)}")
                     }
                 }
