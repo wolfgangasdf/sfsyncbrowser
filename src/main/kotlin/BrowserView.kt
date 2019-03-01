@@ -1,3 +1,4 @@
+import javafx.beans.property.SimpleBooleanProperty
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
@@ -86,6 +87,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     inner class InfoView(vf: VirtualFile): MyView() {
         override val root = Form()
+        private val recursively = SimpleBooleanProperty(false)
         private val permbps = PosixFilePermission.values().map {
             it to SBP(vf.permissions.contains(it)).apply {
                 onChange { op -> if (op) vf.permissions.add(it) else vf.permissions.remove(it) }
@@ -94,6 +96,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         init {
             with(root) {
                 fieldset("Permissions") {
+                    field("File") { label(vf.path) }
                     field("User") {
                         checkbox("read", permbps[PosixFilePermission.OWNER_READ])
                         checkbox("write", permbps[PosixFilePermission.OWNER_WRITE])
@@ -110,8 +113,31 @@ class BrowserView(private val server: Server, private val basePath: String, path
                         checkbox("execute", permbps[PosixFilePermission.OTHERS_EXECUTE])
                     }
                     field("") {
+                        checkbox("Apply recursively", recursively) {
+                            isDisable = !vf.isDir()
+                            tooltip = Tooltip("For files, only (w,r) are changed!")
+                        }
                         button("Apply permissions").setOnAction {
-                            MyWorker.runTaskWithConn({ updateBrowser() }, "Chmod", server, basePath) { c -> c.extChmod(vf.path, vf.permissions) }
+                            MyWorker.runTaskWithConn({ updateBrowser() }, "Chmod", server, basePath) { c ->
+                                val fff = arrayListOf(vf)
+                                if (vf.isDir() && recursively.value) {
+                                    server.getConnection("").list(vf.path, "", true, true) { vflist ->
+                                        fun checkSetPerm(p: PosixFilePermission) {
+                                            if (vf.permissions.contains(p)) vflist.permissions.add(p) else vflist.permissions.remove(p)
+                                        }
+                                        checkSetPerm(PosixFilePermission.OWNER_WRITE)
+                                        checkSetPerm(PosixFilePermission.OWNER_READ)
+                                        checkSetPerm(PosixFilePermission.GROUP_WRITE)
+                                        checkSetPerm(PosixFilePermission.GROUP_READ)
+                                        checkSetPerm(PosixFilePermission.OTHERS_WRITE)
+                                        checkSetPerm(PosixFilePermission.OTHERS_READ)
+                                        fff += vflist
+                                    }
+                                }
+                                fff.forEach {
+                                    c.extChmod(it.path, it.permissions)
+                                }
+                            }
                         }
                     }
 
