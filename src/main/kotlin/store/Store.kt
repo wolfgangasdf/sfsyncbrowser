@@ -108,7 +108,8 @@ enum class SyncType { NORMAL, FILE, CACHED }
 class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty, val excludeFilter: StringProperty,
            val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(),
-           val auto: BooleanProperty = SBP(false), val disableFullSync: BooleanProperty = SBP(false) ) {
+           val auto: BooleanProperty = SBP(false), val disableFullSync: BooleanProperty = SBP(false),
+           val permsOverride: StringProperty = SSP("")) {
     private fun getNiceName() = when(type) {
         SyncType.NORMAL -> "Sync"
         SyncType.FILE -> "FileSync"
@@ -216,6 +217,7 @@ object SettingsStore {
                 props["sy.$idx.$idx2.excludeFilter"] = sync.excludeFilter.value
                 props["sy.$idx.$idx2.auto"] = sync.auto.value.toString()
                 props["sy.$idx.$idx2.disableFullSync"] = sync.disableFullSync.value.toString()
+                props["sy.$idx.$idx2.permsOverride"] = sync.permsOverride.value.toString()
                 props["sy.$idx.$idx2.subsets"] = sync.subsets.size.toString()
                 sync.subsets.forEachIndexed { iss, subSet ->
                     props["ss.$idx.$idx2.$iss.title"] = subSet.title.value
@@ -263,7 +265,8 @@ object SettingsStore {
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
                                 SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.excludeFilter"), p2sp("sy.$idx.$idx2.cacheid"), server,
-                                auto = p2bp("sy.$idx.$idx2.auto"), disableFullSync = p2bp("sy.$idx.$idx2.disableFullSync"))
+                                auto = p2bp("sy.$idx.$idx2.auto"), disableFullSync = p2bp("sy.$idx.$idx2.disableFullSync"),
+                                permsOverride = p2sp("sy.$idx.$idx2.permsOverride"))
                         if (sync.auto.get()) sync.status.set("need to re-start auto sync!")
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
                             val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), SSP(""), sync=sync)

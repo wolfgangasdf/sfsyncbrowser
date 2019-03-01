@@ -25,6 +25,8 @@ import java.io.File
 
 private val logger = KotlinLogging.logger {}
 
+private const val ttPerms = "Remote permissions to be applied after uploading files/directories, like 'g+w,o+r'"
+
 class Styles : Stylesheet() {
     companion object {
         val thinbutton by cssclass()
@@ -158,7 +160,7 @@ class MainView : View("SSyncBrowser") {
                     field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder'") { } }
                     field("Set permissions") {
                         checkbox("", proto.doSetPermissions) { tooltip("Set permissions on files/directories on remote server?") }
-                        valitextfield(proto.perms, permissionsRegex, "Regex: $permissionsRegex") { tooltip("Remote permissions to be applied after uploading files/directories, like 'g+w,o+r'") }
+                        valitextfield(proto.perms, permissionsRegex, "Regex: $permissionsRegex") { tooltip(ttPerms) }
                     }
                     field("Don't set date") { checkbox("", proto.cantSetDate) {
                         tooltip("E.g., on un-rooted Android devices I can't set the file date via sftp,\nselect this and I will keep track of actual remote times.")
@@ -201,6 +203,8 @@ class MainView : View("SSyncBrowser") {
                         label(sync.type.name)
                         checkbox("Auto", sync.auto).apply { isDisable = true }
                         checkbox("Disable full sync", sync.disableFullSync)
+                        label("Perms ")
+                        valitextfield(sync.permsOverride, permissionsRegex, "Regex: $permissionsRegex") { tooltip("Override permissions from protocol") }
                     }
                     field("Cacheid") {
                         textfield(sync.cacheid) { isEditable = false }

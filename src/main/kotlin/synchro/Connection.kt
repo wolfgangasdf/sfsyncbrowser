@@ -110,6 +110,7 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
     var remoteBasePath: String = protocol.baseFolder.value
+    var permsOverride: String = ""
     protected val debugslow = false
     val interrupted = AtomicBoolean(false)
     abstract fun getfile(localBasePath: String, from: String, mtime: Long, to: String)

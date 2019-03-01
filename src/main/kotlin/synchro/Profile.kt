@@ -47,6 +47,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         updateProgr(50, 100, "initialize remote connection...")
 
         remote = server.getConnection(sync.remoteFolder.value)
+        remote!!.permsOverride = sync.permsOverride.value
 
         if (Helpers.failat == 1) throw UnsupportedOperationException("fail 1")
         profileInitialized = true
