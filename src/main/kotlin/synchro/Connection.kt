@@ -678,7 +678,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
         private var forwarderThread: PortForwarder? = null
         private val portManager = TunnelPortManager()
-        // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
         val sshClient = connect()
         private val session = sshClient.startSession()!!

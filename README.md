@@ -7,11 +7,10 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
 
 * Browse a server, view and edit files. Use drag'n'drop between local fild browser and remote.
 * Single-file synchronization happens automatically.
-* Any remote folder can be synchronized quickly into a cached folder, very useful for offline work.
+* Any remote folder can be synchronized quickly into a cache folder, very useful for offline work.
 * It can start a ssh tunnel automatically if the host is not reachable directly.
-* Quicklook remote files on mac.
 
-* You can define "permanent syncs" for backup and synchronization
+* Define "permanent syncs" for backup and synchronization
   * Works also well with Android devices via ssh also without root (SSHelper etc) where the file attributes (time etc) sometimes can't be set.
   * It keeps a local database to keep track of changes (remote / local) without the need for full syncs.
   * You can define subsets for partial syncs (faster), while the same cache database is used.

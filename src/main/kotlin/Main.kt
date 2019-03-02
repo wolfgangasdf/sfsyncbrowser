@@ -6,6 +6,7 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.PrintStream
 import java.nio.file.Files
+import java.security.Security
 
 // do not initialize logger in Main.kt, first set properties!
 
@@ -44,6 +45,9 @@ fun main(args: Array<String>) {
     logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
     logger.info("Log file: ${logfile.path}")
     DBSettings.logFile = logfile
+
+    // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
+    Security.setProperty("crypto.policy", "unlimited")
 
     launch<SSBApp>(*args)
 }

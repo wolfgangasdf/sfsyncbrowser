@@ -46,7 +46,7 @@ tasks.withType<Jar> {
 
 tasks.withType<ShadowJar> {
     // uses manifest from above!
-    baseName = "app"
+    baseName = "ssyncbrowser"
     classifier = ""
     version = ""
     mergeServiceFiles() // can be essential
@@ -71,8 +71,8 @@ dependencies {
     compile("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     compile("no.tornado:tornadofx:1.7.18")
     compile("io.methvin:directory-watcher:0.9.3")
-    compile("org.bouncycastle:bcprov-jdk15on:1.61")
-    compile("org.bouncycastle:bcpkix-jdk15on:1.61")
+    runtime("org.bouncycastle:bcprov-jdk15on:1.61")
+    runtime("org.bouncycastle:bcpkix-jdk15on:1.61")
 }
 
 tasks.withType<KotlinCompile> {
