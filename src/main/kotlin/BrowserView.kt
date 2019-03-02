@@ -33,7 +33,7 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER, SELECTFOLDERS
 }
 
-class DragView(temppath: File) : View("Drag...") {
+private class DragView(temppath: File) : View("Drag...") {
     private val btDnd = button("The file(s) have been downloaded to ${temppath.path}.\nDrag this to the destination!").apply {
         setOnDragDetected { me ->
             val dragBoard = startDragAndDrop(TransferMode.MOVE) // so tempfiles are removed by OS
@@ -51,6 +51,7 @@ class DragView(temppath: File) : View("Drag...") {
 class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         MyView("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
+    private var oldPath = ""
     private var currentPath = SSP(path).apply {
         onChange { if (it != null) updateBrowser() }
     }
@@ -70,7 +71,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         hgap = 5.0
         vgap = 5.0
     }
-
 
     inner class MyMenuitem(text: String, keyCombination: KeyCombination? = null, onaction: () -> Unit): MenuItem(text) {
         fun withEnableOnSelectionChanged(act: MyMenuitem.(List<VirtualFile>) -> Boolean): MyMenuitem {
@@ -200,15 +200,19 @@ class BrowserView(private val server: Server, private val basePath: String, path
             this += miDelete
         }
 
-        setOnKeyReleased { ke -> when(ke.code) { // quicklook
-             KeyCode.SPACE -> {
-                 if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
-                     lastpreviewvf = selectedItem
-                     getFileIntoTempAndDo(server, selectedItem!!) { Helpers.previewDocument(it) }
-                 }
-             }
-            else -> {}
-        }}
+        setOnKeyReleased { ke ->
+            if (ke.code == KeyCode.SPACE) { // quicklook
+                if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
+                    lastpreviewvf = selectedItem
+                    getFileIntoTempAndDo(server, selectedItem!!) { Helpers.previewDocument(it) }
+                }
+            } else if (ke.code == KeyCode.RIGHT) {
+                if (selectedItem?.isDir() == true) currentPath.set(selectedItem!!.path)
+            } else if (ke.code == KeyCode.LEFT) {
+                currentPath.set(Helpers.getParentFolder(currentPath.value))
+            }
+        }
+
         setOnDragDetected { me -> // drag from here...
             // java DnD: can't get finder or explorer drop location ("promised files" not implemented yet), therefore open this window.
             if (selectionModel.selectedItems.isEmpty()) return@setOnDragDetected
@@ -337,6 +341,11 @@ class BrowserView(private val server: Server, private val basePath: String, path
             files.setAll(taskListLocal.value)
             fileTableView.sort()
             fileTableView.requestResize() ; fileTableView.requestResize() // bug
+            // select last folder or first
+            files.find { f -> f.path == oldPath }?.let { f -> fileTableView.selectionModel.select(f) } ?: fileTableView.selectFirst()
+            fileTableView.scrollTo(fileTableView.selectedItem)
+            oldPath = currentPath.value
+            fileTableView.requestFocus()
             // path buttons
             pathButtonFlowPane.children.clear()
             pathButtonFlowPane.add(label("Path:"))
@@ -358,10 +367,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
         MyWorker.runTask(taskListLocal)
     }
-
-
-
-
 
     private fun addFilesync(op: SfsOp) {
         val newSync = Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
@@ -465,7 +470,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         if (dialogOkCancel("Delete files", "Really delete these files?", fileTableView.selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
             MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
                 fileTableView.selectionModel.selectedItems.forEach { c.deletefile(it.path) }
-                // TODO folders???
             }
         }
     }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }

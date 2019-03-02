@@ -2,17 +2,19 @@
 # Introduction
 
 SSyncBrowser is a file synchronization and remote file browsing program. It supports sftp and local mounts.
-It is by far not as complete as cyberduck or winsftp, but with solid synchronization.
+It is by far not as complete as cyberduck or winsftp, but it is fast (and not much code), with solid synchronization,
+supports multiple bookmarks per server, and multiple protocols per server (like sftp/local mount).
 
-* Browse a server, view and edit files (like cyberduck/winscp). File synchronization happens automatically, folder not.
-* Any folder can be synchronized quickly for data analysis etc. Very useful for offline work.
-* It can start a ssh tunnel automatically.
-* Quicklook on mac
+* Browse a server, view and edit files. Use drag'n'drop between local fild browser and remote.
+* Single-file synchronization happens automatically.
+* Any remote folder can be synchronized quickly into a cached folder, very useful for offline work.
+* It can start a ssh tunnel automatically if the host is not reachable directly.
+* Quicklook remote files on mac.
 
-* You can also define "permanent syncs" for backup and syncing
-  * works also well with Android devices via ssh also without root (SSHelper etc) where the file attributes (time etc) sometimes can't be set.
+* You can define "permanent syncs" for backup and synchronization
+  * Works also well with Android devices via ssh also without root (SSHelper etc) where the file attributes (time etc) sometimes can't be set.
   * It keeps a local database to keep track of changes (remote / local) without the need for full syncs.
-  * You can define subsets for faster operation, while the same cache database is used.
+  * You can define subsets for partial syncs (faster), while the same cache database is used.
 
 
 ### More information
@@ -29,7 +31,7 @@ you can review everything before pressing `Synchronize`.
 
 * There is no sanity check before synchronization, so you can create the paradox to delete a folder but copy a child file.
 This will result in nice synchronization errors, no data loss will happen.
-* The routine that assigns the initial actions after file scan is tested on program startup. Check the code, I find this is safe.
+* The routine that assigns the initial actions after file scan is tested on program startup. Check the code, I find this safe.
 * But I can't be responsible for any data loss, of course.
 
 
@@ -38,16 +40,20 @@ This will result in nice synchronization errors, no data loss will happen.
 * Get the latest [Java JRE 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html). Don't forget to untick the [crapware](https://www.google.com/search?q=java+crapware) installer, and/or [disable it permanently](https://www.java.com/en/download/faq/disable_offers.xml)!
 * [Download the zip](https://github.com/wolfgangasdf/ssyncbrowser-test/releases) for Mac or (Windows, Linux), extract it somewhere and double-click the app (Mac) or
   jar file (Windows, Linux).
+* Everything should be self-explanatory (watch out for tooltips).
+* Remote file browser keyboard shortcuts
 
-Everything should be self-explanatory (watch out for tooltips).
-
+    * right: enter folder
+    * left: go to parent
+    * space: quicklook (on mac)
+    * meta-w: close
 
 ### How to develop, compile & package ###
 
 * Get Oracle JDK 8
 * I use the free community version of [IntelliJ IDEA](https://www.jetbrains.com/idea/download/), just import the project to get started.
 * Package for all platforms: `gradle dist`.
-
+* There is no native code, cross-platform only based on java.
 
 ### Used frameworks ###
 
