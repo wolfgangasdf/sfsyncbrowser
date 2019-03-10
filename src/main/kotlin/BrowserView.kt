@@ -22,6 +22,7 @@ import util.Helpers.dialogOkCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
+import util.Helpers.toThousandsCommas
 import util.Helpers.tokMGTPE
 import java.io.File
 import java.nio.file.Files
@@ -95,8 +96,26 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }.toMap()
         init {
             with(root) {
+                fieldset("Info") {
+                    field("Path") { label(vf.path) }
+                    field("Size") {
+                        label(toThousandsCommas(vf.size))
+                        button("Calculate...") {
+                            isDisable = vf.isFile()
+                            setOnAction {
+                                var size = 0L
+                                MyWorker.runTaskWithConn({
+                                    Helpers.dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vf.path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
+                                }, "Calculate size recursively...", server, basePath) { c ->
+                                    c.list(vf.path, "", true, true) { vflist ->
+                                        size += vflist.size
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 fieldset("Permissions") {
-                    field("File") { label(vf.path) }
                     field("User") {
                         checkbox("read", permbps[PosixFilePermission.OWNER_READ])
                         checkbox("write", permbps[PosixFilePermission.OWNER_WRITE])
@@ -121,7 +140,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                             MyWorker.runTaskWithConn({ updateBrowser() }, "Chmod", server, basePath) { c ->
                                 val fff = arrayListOf(vf)
                                 if (vf.isDir() && recursively.value) {
-                                    server.getConnection("").list(vf.path, "", true, true) { vflist ->
+                                    c.list(vf.path, "", true, true) { vflist ->
                                         fun checkSetPerm(p: PosixFilePermission) {
                                             if (vf.permissions.contains(p)) vflist.permissions.add(p) else vflist.permissions.remove(p)
                                         }

@@ -70,6 +70,7 @@ object Helpers {
             "%.2f%s".format(num, ext)
         } else "%d".format(d)
     }
+    fun toThousandsCommas(l: Long): String = String.format("%,d", l)
 
     fun revealFile(file: java.io.File, gointo: Boolean = false) {
         when {
