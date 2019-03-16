@@ -1,4 +1,6 @@
 import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleIntegerProperty
+import javafx.collections.ObservableList
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
@@ -6,6 +8,7 @@ import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyCodeCombination
 import javafx.scene.input.KeyCombination
 import javafx.scene.input.TransferMode
+import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.VBox
 import javafx.stage.Modality
@@ -86,29 +89,61 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
     }
 
-    inner class InfoView(vf: VirtualFile): MyView() {
+    class TriCheckBox(title: String, property: SimpleIntegerProperty, tristate: Boolean = false): HBox() {
+        private fun statechar(state: Int) = hashMapOf( -1 to "?", 0 to "-", 1 to "+")[state]
+        init {
+            this.alignment = Pos.CENTER_LEFT
+            val b = Button(statechar(property.value))
+            b.style {
+                prefWidth = 20.px
+                padding = box(3.5.px)
+                backgroundInsets = multi(box(5.px))
+            }
+            b.setOnAction {
+                var v = property.value + 1
+                if (v > 1) v = if (tristate) -1 else 0
+                b.text = statechar(v)
+                property.set(v)
+            }
+            val l = Label(title)
+            children += b
+            children += l
+        }
+    }
+
+//    val test = SimpleIntegerProperty(0)
+//    hbox { alignment = Pos.CENTER_LEFT
+//        this += TriCheckBox("test", test, true)
+//        label(test)
+//    }
+
+    inner class InfoView(vfs: ObservableList<VirtualFile>): MyView() {
         override val root = Form()
         private val recursively = SimpleBooleanProperty(false)
-        private val permbps = PosixFilePermission.values().map {
-            it to SBP(vf.permissions.contains(it)).apply {
-                onChange { op -> if (op) vf.permissions.add(it) else vf.permissions.remove(it) }
-            }
-        }.toMap()
         init {
+            val haveDir = vfs.firstOrNull { it.isDir() } != null
+            val dotri = haveDir || vfs.size > 1
+            val permips = PosixFilePermission.values().map {
+                it to if (dotri) SIP(-1) else {
+                    SIP(if (vfs.first().permissions.contains(it)) 1 else 0)
+                }
+            }.toMap()
             with(root) {
                 fieldset("Info") {
-                    field("Path") { label(vf.path) }
+                    field("Path") { label(if (vfs.size > 1) "multiple..." else vfs.first().path) }
                     field("Size") {
-                        label(toThousandsCommas(vf.size))
+                        label(toThousandsCommas(vfs.map { it.size }.sum()))
                         button("Calculate...") {
-                            isDisable = vf.isFile()
+                            isDisable = !haveDir
                             setOnAction {
                                 var size = 0L
                                 MyWorker.runTaskWithConn({
-                                    Helpers.dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vf.path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
+                                    Helpers.dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vfs.first().path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
                                 }, "Calculate size recursively...", server, basePath) { c ->
-                                    c.list(vf.path, "", true, true) { vflist ->
-                                        size += vflist.size
+                                    vfs.forEach { vf ->
+                                        c.list(vf.path, "", true, true) { vflist ->
+                                            size += vflist.size
+                                        }
                                     }
                                 }
                             }
@@ -117,43 +152,60 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 }
                 fieldset("Permissions") {
                     field("User") {
-                        checkbox("read", permbps[PosixFilePermission.OWNER_READ])
-                        checkbox("write", permbps[PosixFilePermission.OWNER_WRITE])
-                        checkbox("execute", permbps[PosixFilePermission.OWNER_EXECUTE])
+                        this += TriCheckBox("read", permips.getValue(PosixFilePermission.OWNER_READ), dotri)
+                        this += TriCheckBox("write", permips.getValue(PosixFilePermission.OWNER_WRITE), dotri)
+                        this += TriCheckBox("execute", permips.getValue(PosixFilePermission.OWNER_EXECUTE), dotri)
                     }
                     field("Group") {
-                        checkbox("read", permbps[PosixFilePermission.GROUP_READ])
-                        checkbox("write", permbps[PosixFilePermission.GROUP_WRITE])
-                        checkbox("execute", permbps[PosixFilePermission.GROUP_EXECUTE])
+                        this += TriCheckBox("read", permips.getValue(PosixFilePermission.GROUP_READ), dotri)
+                        this += TriCheckBox("write", permips.getValue(PosixFilePermission.GROUP_WRITE), dotri)
+                        this += TriCheckBox("execute", permips.getValue(PosixFilePermission.GROUP_EXECUTE), dotri)
                     }
                     field("Others") {
-                        checkbox("read", permbps[PosixFilePermission.OTHERS_READ])
-                        checkbox("write", permbps[PosixFilePermission.OTHERS_WRITE])
-                        checkbox("execute", permbps[PosixFilePermission.OTHERS_EXECUTE])
+                        this += TriCheckBox("read", permips.getValue(PosixFilePermission.OTHERS_READ), dotri)
+                        this += TriCheckBox("write", permips.getValue(PosixFilePermission.OTHERS_WRITE), dotri)
+                        this += TriCheckBox("execute", permips.getValue(PosixFilePermission.OTHERS_EXECUTE), dotri)
                     }
                     field("") {
                         checkbox("Apply recursively", recursively) {
-                            isDisable = !vf.isDir()
-                            tooltip = Tooltip("For files, only (w,r) are changed!")
+                            isDisable = !haveDir
                         }
                         button("Apply permissions").setOnAction {
-                            MyWorker.runTaskWithConn({ updateBrowser() }, "Chmod", server, basePath) { c ->
-                                val fff = arrayListOf(vf)
-                                if (vf.isDir() && recursively.value) {
-                                    c.list(vf.path, "", true, true) { vflist ->
-                                        fun checkSetPerm(p: PosixFilePermission) {
-                                            if (vf.permissions.contains(p)) vflist.permissions.add(p) else vflist.permissions.remove(p)
+                            MyWorker.runTaskWithConn({
+                                updateBrowser()
+                                this@InfoView.close()
+                            }, "Chmod", server, basePath) { c ->
+                                val fff = arrayListOf<VirtualFile>()
+                                fun addFileUpdatePerms(vvf: VirtualFile) {
+                                    fun checkSetPerm(p: PosixFilePermission) {
+                                        when (permips.getValue(p).value) {
+                                            0 -> vvf.permissions.remove(p)
+                                            1 -> vvf.permissions.add(p)
                                         }
-                                        checkSetPerm(PosixFilePermission.OWNER_WRITE)
-                                        checkSetPerm(PosixFilePermission.OWNER_READ)
-                                        checkSetPerm(PosixFilePermission.GROUP_WRITE)
-                                        checkSetPerm(PosixFilePermission.GROUP_READ)
-                                        checkSetPerm(PosixFilePermission.OTHERS_WRITE)
-                                        checkSetPerm(PosixFilePermission.OTHERS_READ)
-                                        fff += vflist
+                                    }
+                                    checkSetPerm(PosixFilePermission.OWNER_WRITE)
+                                    checkSetPerm(PosixFilePermission.OWNER_READ)
+                                    checkSetPerm(PosixFilePermission.OWNER_EXECUTE)
+                                    checkSetPerm(PosixFilePermission.GROUP_WRITE)
+                                    checkSetPerm(PosixFilePermission.GROUP_READ)
+                                    checkSetPerm(PosixFilePermission.GROUP_EXECUTE)
+                                    checkSetPerm(PosixFilePermission.OTHERS_WRITE)
+                                    checkSetPerm(PosixFilePermission.OTHERS_READ)
+                                    checkSetPerm(PosixFilePermission.OTHERS_EXECUTE)
+                                    fff += vvf
+                                }
+                                updateTit("Getting list of files...")
+                                vfs.forEach { vf ->
+                                    addFileUpdatePerms(vf)
+                                    if (vf.isDir() && recursively.value) {
+                                        c.list(vf.path, "", true, true) { vflist ->
+                                            addFileUpdatePerms(vflist)
+                                        }
                                     }
                                 }
+                                updateTit("Applying permissions...")
                                 fff.forEach {
+                                    logger.debug("applying permissions ${it.path} ${it.getPermString()}")
                                     c.extChmod(it.path, it.permissions)
                                 }
                             }
@@ -455,8 +507,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }.withEnableOnSelectionChanged { isNormal() && it.size == 1 && canRename }
 
     private val miInfo: MyMenuitem = MyMenuitem("Info...", KeyCodeCombination(KeyCode.I, KeyCombination.META_DOWN)) {
-        openNewWindow(InfoView(fileTableView.selectedItem!!), Modality.APPLICATION_MODAL)
-    }.withEnableOnSelectionChanged { isNormal() && it.size == 1 }
+        openNewWindow(InfoView(fileTableView.selectionModel.selectedItems), Modality.APPLICATION_MODAL)
+    }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }
 
     private val miCopyURL: MyMenuitem = MyMenuitem("Copy URL") {
         clipboard.putString("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}${fileTableView.selectedItem!!.path}")
