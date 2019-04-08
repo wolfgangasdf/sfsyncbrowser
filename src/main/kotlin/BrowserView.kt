@@ -4,16 +4,12 @@ import javafx.collections.ObservableList
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.*
-import javafx.scene.input.KeyCode
-import javafx.scene.input.KeyCodeCombination
-import javafx.scene.input.KeyCombination
-import javafx.scene.input.TransferMode
+import javafx.scene.input.*
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.VBox
 import javafx.stage.Modality
 import javafx.stage.Stage
-import javafx.util.Callback
 import mu.KotlinLogging
 import store.*
 import synchro.VirtualFile
@@ -38,7 +34,8 @@ enum class BrowserViewMode {
 }
 
 private class DragView(temppath: File) : View("Drag...") {
-    private val btDnd = button("The file(s) have been downloaded to ${temppath.path}.\nDrag this to the destination!").apply {
+    private val btDnd = button("The file(s) have been downloaded to ${temppath.path}.\n" +
+            "Drag this to the destination!\n(Use shift+drag to move files remotely)").apply {
         setOnDragDetected { me ->
             val dragBoard = startDragAndDrop(TransferMode.MOVE) // so tempfiles are removed by OS
             dragBoard.setContent { putFiles(temppath.listFiles().toList()) }
@@ -55,6 +52,9 @@ private class DragView(temppath: File) : View("Drag...") {
 class BrowserView(private val server: Server, private val basePath: String, path: String, private val mode: BrowserViewMode = BrowserViewMode.NORMAL) :
         MyView("${server.getProtocol().protocoluri.value}:${server.getProtocol().baseFolder.value}$basePath$path") {
 
+    companion object {
+        private val dataFormatVFs = DataFormat("VirtualFiles")
+    }
     private var oldPath = ""
     private var currentPath = SSP(path).apply {
         onChange { if (it != null) updateBrowser() }
@@ -110,12 +110,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
             children += l
         }
     }
-
-//    val test = SimpleIntegerProperty(0)
-//    hbox { alignment = Pos.CENTER_LEFT
-//        this += TriCheckBox("test", test, true)
-//        label(test)
-//    }
 
     inner class InfoView(vfs: ObservableList<VirtualFile>): MyView() {
         override val root = Form()
@@ -217,6 +211,68 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
     }
 
+    private fun dropit(de: DragEvent, onto: String) {
+        logger.debug("dropped: have files = ${de.dragboard.hasFiles()}!")
+        //println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
+        if (de.dragboard.hasFiles()) {
+            // get local base path of file(s)
+            val localBase = de.dragboard.files.first().parent + "/"
+
+            // check overwrites
+            val existing = mutableListOf<VirtualFile>()
+            de.dragboard.files.forEach { f ->
+                files.find { vf -> vf.getFileName() == f.name }?.let { existing.add(it) }
+            }
+            if (existing.isNotEmpty()) {
+                if (!Helpers.dialogOkCancel("Drop files...", "Remote files existing, overwrite all or cancel?", existing.joinToString("\n"))) {
+                    de.isDropCompleted = false
+                    de.consume()
+                    return
+                }
+            }
+
+            val fff = arrayListOf<File>()
+
+            // expand dirs
+            de.dragboard.files.forEach { f ->
+                if (f.isDirectory) {
+                    f.walkTopDown().forEach { fff += it }
+                } else fff += f
+            }
+
+            MyWorker.runTaskWithConn({
+                logger.info("successfully uploaded files!")
+                updateBrowser()
+            }, "Uploading", server, "") { c ->
+                fff.forEach { f ->
+                    updateTit("Uploading file $f...")
+                    c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.path.removePrefix(localBase)}")
+                }
+            }
+        } else if (de.dragboard.hasContent(dataFormatVFs)) {
+            val dc = de.dragboard.getContent(dataFormatVFs)
+            MyWorker.runTaskWithConn({
+                logger.info("successfully moved files!")
+                de.isDropCompleted = true
+                de.consume()
+                updateBrowser()
+            }, "Uploading", server, "") { c ->
+                if (dc is List<*>) {
+                    dc.forEach { f ->
+                        if (f is VirtualFile) {
+                            logger.debug("moving file $f to ${onto + f.getFileName()} ...")
+                            updateTit("Renaming file $f to ${onto + f.getFileName()} ...")
+                            c.extRename(f.path, onto + f.getFileName())
+                        }
+                    }
+                }
+            }
+
+            de.isDropCompleted = true
+        }
+
+    }
+
     enum class SfsOp { NONE, OPEN, EDIT }
     private val fileTableView = tableview(files) {
         val colo = SettingsStore.ssbSettings.browsercols.value.let { if (it == "") "1:true;2:true;3:true;4:true" else it }.
@@ -242,15 +298,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
         columns.find { it.userData == 1 }?.let { sortOrder.add(it) }
         isTableMenuButtonVisible = true
         multiSelect(true)
-        rowFactory = Callback {
-            val row = TableRow<VirtualFile>()
-            row.setOnMouseClicked { it2 ->
-                if (it2.clickCount == 2 && row.item.isDir()) {
-                    currentPath.set(row.item.path)
-                }
-            }
-            row
-        }
 
         lazyContextmenu {
             this += miRefresh
@@ -284,92 +331,69 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
         }
 
+        setRowFactory {
+            val row = TableRow<VirtualFile>()
+            row.setOnMouseClicked { it2 ->
+                if (it2.clickCount == 2 && row.item.isDir()) {
+                    currentPath.set(row.item.path)
+                }
+            }
+            row.setOnDragOver { de ->
+                if (de.gestureSource != this) {
+                    //println("dragover: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
+                    if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
+                } else de.acceptTransferModes(TransferMode.MOVE)
+                de.consume()
+            }
+            row.setOnDragDropped { de ->
+                if (row.item == null || row.item.isDir())
+                    dropit(de, if (row.item != null) row.item.path else currentPath.value)
+                de.consume()
+            }
+            row
+        }
         setOnDragDetected { me -> // drag from here...
             // java DnD: can't get finder or explorer drop location ("promised files" not implemented yet), therefore open this window.
             if (selectionModel.selectedItems.isEmpty()) return@setOnDragDetected
+            if (me.isShiftDown) { // internal drag
+                val db = startDragAndDrop(TransferMode.MOVE)
+                val content = ClipboardContent()
+                content[dataFormatVFs] = selectionModel.selectedItems.toList()
+                db.setContent(content)
+            } else { // external drag
+                val remoteBase = selectionModel.selectedItems.first().getParent()
+                val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
 
-            val remoteBase = selectionModel.selectedItems.first().getParent()
-            val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+                val taskGetFile = MyTask<Unit> {
+                    updateTit("Downloading files for drag and drop...")
+                    val fff = arrayListOf<VirtualFile>()
+                    selectionModel.selectedItems.forEach { selvf ->
+                        if (selvf.isDir()) {
+                            server.getConnection("").list(selvf.path, "", true, true) {
+                                fff += it
+                            }
+                        } else fff += selvf
+                    }
 
-            val taskGetFile = MyTask<Unit> {
-                updateTit("Downloading files for drag and drop...")
-                val fff = arrayListOf<VirtualFile>()
-                selectionModel.selectedItems.forEach { selvf ->
-                    if (selvf.isDir()) {
-                        server.getConnection("").list(selvf.path, "", true, true) {
-                            fff += it
-                        }
-                    } else fff += selvf
+                    fff.forEach { vf ->
+                        updateMsg("Downloading file $vf...")
+                        val lf = "${tempfolder.path}/${vf.path.removePrefix(remoteBase)}"
+                        logger.debug("downloading $vf to $lf...")
+                        server.getConnection("").getfile("", vf.path, vf.modTime, lf)
+                    }
+                }.apply {
+                    setOnSucceeded {
+                        val newstage = Stage()
+                        val dragView = DragView(tempfolder)
+                        newstage.scene = Scene(dragView.root)
+                        newstage.initModality(Modality.WINDOW_MODAL)
+                        newstage.show()
+                    }
+                    setOnFailed { throw exception }
                 }
-
-                fff.forEach { vf ->
-                    updateMsg("Downloading file $vf...")
-                    val lf = "${tempfolder.path}/${vf.path.removePrefix(remoteBase)}"
-                    logger.debug("downloading $vf to $lf...")
-                    server.getConnection("").getfile("", vf.path, vf.modTime, lf)
-                }
-            }.apply {
-                setOnSucceeded {
-                    val newstage = Stage()
-                    val dragView = DragView(tempfolder)
-                    newstage.scene = Scene(dragView.root)
-                    newstage.initModality(Modality.WINDOW_MODAL)
-                    newstage.show()
-                }
-                setOnFailed { throw exception }
+                MyWorker.runTask(taskGetFile)
             }
-            MyWorker.runTask(taskGetFile)
             me.consume()
-        }
-        setOnDragOver { de ->
-            if (de.gestureSource != this) {
-                //println("dragover: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
-                if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
-            }
-            de.consume()
-        }
-        setOnDragDropped { de -> // dropped from external
-            //println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
-            if (de.dragboard.hasFiles()) {
-                // get local base path of file(s)
-                val localBase = de.dragboard.files.first().parent + "/"
-
-                // check overwrites
-                val existing = mutableListOf<VirtualFile>()
-                de.dragboard.files.forEach { f ->
-                    files.find { vf -> vf.getFileName() == f.name }?.let { existing.add(it) }
-                }
-                if (existing.isNotEmpty()) {
-                    if (!Helpers.dialogOkCancel("Drop files...", "Remote files existing, overwrite all or cancel?", existing.joinToString("\n"))) {
-                        de.isDropCompleted = false
-                        de.consume()
-                        return@setOnDragDropped
-                    }
-                }
-
-                val fff = arrayListOf<File>()
-
-                // expand dirs
-                de.dragboard.files.forEach { f ->
-                    if (f.isDirectory) {
-                        f.walkTopDown().forEach { fff += it }
-                    } else fff += f
-                }
-
-                MyWorker.runTaskWithConn({
-                    logger.info("successfully uploaded files!")
-                    de.isDropCompleted = true
-                    de.consume()
-                    updateBrowser()
-                }, "Uploading", server, "") { c ->
-                    fff.forEach { f ->
-                        updateTit("Uploading file $f...")
-                        c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.path.removePrefix(localBase)}")
-                    }
-                }
-                de.isDropCompleted = true
-            }
-            de.consume()
         }
 
         fun saveColumnsettings() {
@@ -389,6 +413,25 @@ class BrowserView(private val server: Server, private val basePath: String, path
     private var canRename: Boolean = false
     private var canChmod: Boolean = false
     private var canDuplicate: Boolean = false
+
+    private fun getPathButton(text: String, setPath: String): Button {
+        return Button(text).apply {
+            setOnAction { currentPath.set(setPath) }
+            setOnDragOver { de ->
+                if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
+                if (de.dragboard.hasContent(dataFormatVFs)) de.acceptTransferModes(TransferMode.MOVE)
+                de.consume()
+            }
+            setOnDragDropped { de ->
+                logger.debug("drop: ${de.dragboard}")
+                if (de.dragboard.hasFiles() || de.dragboard.hasContent(dataFormatVFs)) {
+                    logger.debug("internal drop ${de.dragboard} setp=$setPath")
+                    dropit(de, setPath)
+                }
+                de.consume()
+            }
+        }
+    }
 
     private fun updateBrowser() {
         val taskListLocal = MyTask<MutableList<VirtualFile>> {
@@ -426,11 +469,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 pl += tmpp.removeSuffix("/")
                 tmpp = Helpers.getParentFolder(tmpp)
             }
-            pathButtonFlowPane.add(button("[base]") { action { currentPath.set("") }})
+            pathButtonFlowPane.add(getPathButton("[base]", ""))
             pl.reversed().forEach { it2 ->
-                pathButtonFlowPane.add(button(Helpers.getFileName(it2)!!) {
-                    action { currentPath.set("$it2/") }
-                })
+                pathButtonFlowPane.add(getPathButton(Helpers.getFileName(it2)!!, "$it2/"))
             }
         }
         taskListLocal.setOnFailed {
@@ -478,7 +519,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         addFilesync(SfsOp.EDIT)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
 
-    private val miAddSync: MyMenuitem = MyMenuitem("Add sync...") {
+    private val miAddSync: MyMenuitem = MyMenuitem("Add permanent sync...") {
         val sname = dialogInputString("New sync", "Enter sync name:", "")
         var lfolder = "sylocalfolder"
         chooseDirectory("Select local folder")?.let {
@@ -489,7 +530,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 SSP(fileTableView.selectedItem!!.path), SSP(""), server=server)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
-    private val miAddCachedSync: MyMenuitem = MyMenuitem("Add sync...") {
+    private val miAddCachedSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
         val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
         server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
                 SSP(""), SSP(""),

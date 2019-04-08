@@ -32,6 +32,7 @@ import util.Helpers.toJavaPathSeparator
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
+import java.io.Serializable
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -76,7 +77,7 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 }
 
 // if ends on "/", is dir except for "" which is also dir (basepath)
-class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile> {
+class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile>, Serializable {
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 

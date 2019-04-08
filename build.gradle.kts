@@ -19,8 +19,8 @@ plugins {
     kotlin("jvm") version "1.3.21"
     id("idea")
     id("application")
-    id("com.github.ben-manes.versions") version "0.20.0"
-    id("com.github.johnrengelman.shadow") version "4.0.4"
+    id("com.github.ben-manes.versions") version "0.21.0"
+    id("com.github.johnrengelman.shadow") version "5.0.0"
     id("edu.sc.seis.macAppBundle") version "2.3.0"
 }
 
