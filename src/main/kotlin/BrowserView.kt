@@ -330,7 +330,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 currentPath.set(Helpers.getParentFolder(currentPath.value))
             }
         }
-
+        // empty tableview doesn't show placeholder-rows, so have to do these two https://stackoverflow.com/questions/16992631
+        setOnDragOver { de ->
+            if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
+            de.consume()
+        }
+        setOnDragDropped { de ->
+            logger.debug("drop on tableview")
+            dropit(de, currentPath.value)
+            de.consume()
+        }
         setRowFactory {
             val row = TableRow<VirtualFile>()
             row.setOnMouseClicked { it2 ->
@@ -340,13 +349,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             row.setOnDragOver { de ->
                 if (de.gestureSource != this) {
-                    //println("dragover: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
                     if (de.dragboard.hasFiles()) de.acceptTransferModes(TransferMode.COPY)
                 } else de.acceptTransferModes(TransferMode.MOVE)
                 de.consume()
             }
             row.setOnDragDropped { de ->
-                if (row.item == null || row.item.isDir())
+                logger.debug("drop on row.item=${row.item}")
+                if (row.item?.isDir() == true)
                     dropit(de, if (row.item != null) row.item.path else currentPath.value)
                 de.consume()
             }
@@ -532,6 +541,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     private val miAddCachedSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
         val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
+        // TODO make ini action = use remote!
         server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
                 SSP(""), SSP(""),
                 SSP(fileTableView.selectedItem!!.path), SSP(""), server=server).apply {

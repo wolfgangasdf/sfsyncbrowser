@@ -25,7 +25,7 @@ plugins {
 }
 
 tasks.withType<Wrapper> {
-    gradleVersion = "5.1.1"
+    gradleVersion = "5.3.1"
 }
 
 application {
@@ -66,11 +66,11 @@ repositories {
 dependencies {
     compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinversion")
     compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    compile("io.github.microutils:kotlin-logging:1.6.25")
+    compile("io.github.microutils:kotlin-logging:1.6.26")
     compile("com.hierynomus:sshj:0.27.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     compile("no.tornado:tornadofx:1.7.18")
-    compile("io.methvin:directory-watcher:0.9.3")
+    compile("io.methvin:directory-watcher:0.9.4")
     runtime("org.bouncycastle:bcprov-jdk15on:1.61")
     runtime("org.bouncycastle:bcpkix-jdk15on:1.61")
 }

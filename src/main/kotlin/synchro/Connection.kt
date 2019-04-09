@@ -613,7 +613,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             defaultConfig.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
             val ssh = SSHClient(defaultConfig)
             ssh.addHostKeyVerifier(MyHostKeyVerifier())
-            ssh.timeout = timeoutms // TODO timeouts don't work: if wifi disabled after connected, quit ssb hangs.
+            ssh.timeout = timeoutms
             ssh.connectTimeout = ctimeoutms
             ssh.connect(hostname, port)
             ssh.connection.keepAlive.keepAliveInterval = 2 // KeepaliveRunner makes 5 retries...

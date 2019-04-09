@@ -58,6 +58,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
         stage.setOnCloseRequest {
             val filesyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.FILE } }.flatten()
             if (filesyncs.isNotEmpty()) {
+                // TODO: check for modifications cache <> local!
                 if (SettingsStore.ssbSettings.onExitRemoveFilesyncs.value ||
                         Helpers.dialogOkCancel("File syncs existing", "File syncs existing. Remove them, including the local file?",
                                     filesyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {

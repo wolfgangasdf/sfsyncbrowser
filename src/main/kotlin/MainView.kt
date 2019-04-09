@@ -133,6 +133,7 @@ class MainView : View("SSyncBrowser") {
                             openNewWindow(BrowserView(server, "", ""))
                         } }
                         button("Remove server") { action {
+                            // TODO: confirm, also check for existing file/cache/normal syncs!
                             val iter = server.syncs.iterator()
                             while (iter.hasNext()) server.removeSync(iter.next())
                             SettingsStore.servers.remove(server)
@@ -244,6 +245,7 @@ class MainView : View("SSyncBrowser") {
                             }
                         } }
                         button("Remove sync") { action {
+                            // TODO confirm, check for cache <> local modification
                             sync.server.removeSync(sync)
                         } }
                     }
