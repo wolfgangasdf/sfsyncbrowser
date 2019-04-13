@@ -29,16 +29,17 @@ import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
 import util.Helpers.toJavaPathSeparator
+import util.MFile
 import java.io.Closeable
-import java.io.File
 import java.io.IOException
 import java.io.Serializable
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.UnknownHostException
-import java.nio.file.*
-import java.nio.file.attribute.FileTime
+import java.nio.file.DirectoryNotEmptyException
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.attribute.PosixFilePermissions
 import java.security.PublicKey
@@ -81,12 +82,11 @@ class VirtualFile(var path: String, var modTime: Long, var size: Long, var permi
     // modtime in milliseconds since xxx
     constructor() : this("", 0, 0)
 
-    // gets file/folder name, "" if "/" or "" without trailing "/" for dirs!
-    fun getFileName(): String = File(path).name
+    fun getFileName(): String = MFile.getIPFileName(path) // gets file/folder name, "" if "/" or "", without trailing "/" for dirs!
     fun getPermString(): String = PosixFilePermissions.toString(permissions)
-    fun getParent(): String = File(path).parent?.let { if (it.endsWith("/")) it else "$it/" } ?: "/"
-    fun getFileNameBrowser(): String = File(path).name + if (isDir()) "/" else ""
-    fun getFileExtension(): String = File(getFileName()).extension
+    fun getParent(): String = MFile.getIPFileParent(path)?.let { if (it.endsWith("/")) it else "$it/" } ?: "/"
+    fun getFileNameBrowser(): String = MFile.getIPFileName(path) + if (isDir()) "/" else ""
+    fun getFileExtension(): String = MFile.getIPFileExt(path)
     fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
 
     override fun toString(): String = "[$path]:$modTime,$size"
@@ -154,32 +154,32 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun extRename(oldPath: String, newPath: String) {
         val (cp, _) = checkIsDir(oldPath)
         logger.debug("locrename: $remoteBasePath$cp -> $remoteBasePath$newPath ")
-        Files.move(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"))
+        MFile.move("$remoteBasePath$cp", "$remoteBasePath$newPath")
     }
     override fun extChmod(path: String, newPerms: Set<PosixFilePermission>) {
-        Files.setPosixFilePermissions(Paths.get("$remoteBasePath$path"), newPerms)
+        MFile("$remoteBasePath$path").setPosixFilePermissions(newPerms)
     }
 
     override fun extDuplicate(oldPath: String, newPath: String) {
         val (cp, _) = checkIsDir(oldPath)
-        Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get("$remoteBasePath$newPath"), StandardCopyOption.COPY_ATTRIBUTES)
+        MFile.copy("$remoteBasePath$cp", "$remoteBasePath$newPath", StandardCopyOption.COPY_ATTRIBUTES)
     }
 
     override fun cleanUp() {}
 
     override fun deletefile(what: String) {
         val (cp, _) = checkIsDir(what)
-        val fp = Paths.get("$remoteBasePath$cp")
+        val fp = MFile("$remoteBasePath$cp")
         try {
-            Files.delete(fp)
+            fp.deleteThrow()
         } catch (e: DirectoryNotEmptyException) {
-            val dir = Files.newDirectoryStream(fp).toList()
+            val dir = fp.newDirectoryStreamList()
             if (runUIwait {
                         dialogOkCancel("Warning", "Directory \n $cp \n not empty, DELETE ALL?", "Content:\n" +
-                                dir.asSequence().map { it.toFile().name }.joinToString("\n"))
+                                dir.asSequence().map { it.name }.joinToString("\n"))
                     }) {
-                dir.forEach { Files.delete(it) }
-                Files.delete(fp)
+                dir.forEach { it.deleteThrow() }
+                fp.deleteThrow()
                 return
             }
         }
@@ -190,12 +190,12 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         val remoteabspath = if (remotePath == "") "$remoteBasePath$cp" else "$remoteBasePath$remotePath"
         logger.debug("putfile: from=$from isdir=$isdir remabspath=$remoteabspath")
         if (isdir) { // ensure that target path exists
-            if (!Files.exists(Paths.get(remoteabspath).parent)) {
+            if (!MFile(remoteabspath).parent()!!.exists()) {
                 logger.debug("creating folder $cp")
-                mkdirrec(Paths.get(remoteabspath).parent.toString())
+                mkdirrec(MFile(remoteabspath).parent()!!.internalPath)
             }
         }
-        Files.copy(Paths.get("$localBasePath$cp"), Paths.get(remoteabspath), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+        MFile.copy("$localBasePath$cp", remoteabspath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
         return mtime
     }
 
@@ -203,12 +203,12 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun getfile(localBasePath: String, from: String, mtime: Long, to: String) {
         val (cp, isdir) = checkIsDir(from)
         if (isdir) { // ensure that target path exists
-            Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
+            MFile(to).createDirectories() // simply create parents if necessary, avoids separate check
         } else {
-            Files.createDirectories(Paths.get(to).parent)
-            Files.copy(Paths.get("$remoteBasePath$cp"), Paths.get(to), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+            MFile(to).parent()!!.createDirectories()
+            MFile.copy("$remoteBasePath$cp", to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
         }
-        Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
+        MFile(to).setLastModifiedTime(mtime)
     }
 
     override fun getfile(localBasePath: String, from: String, mtime: Long) {
@@ -220,7 +220,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     // include the subfolder but root "/" is not allowed!
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
-        fun parseContent(cc: Path, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
+        fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             // on mac 10.8 with oracle java 7, filenames are encoded with strange 'decomposed unicode'. grr
             // this is in addition to the bug that LC_CTYPE is not set. grrr
             // don't use cc.getPath directly!!
@@ -231,31 +231,31 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             // fixedPath is without trailing "/" for dirs!
             //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
             var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
-            if (Files.isDirectory(cc, *linkOptions) && strippedPath != "") strippedPath += "/"
-            if (Files.isDirectory(cc, *linkOptions) || Files.isRegularFile(cc, *linkOptions)) {
-                val vf = VirtualFile(strippedPath, Files.getLastModifiedTime(cc).toMillis(), Files.size(cc),
-                        Files.getPosixFilePermissions(cc))
+            if (cc.isDirectory(*linkOptions) && strippedPath != "") strippedPath += "/"
+            if (cc.isDirectory(*linkOptions) || cc.isRegularFile(*linkOptions)) {
+                val vf = VirtualFile(strippedPath, cc.getLastModifiedTime(), cc.getSize(),
+                        cc.getPosixFilePermissions())
                 if (vf.isNotFiltered(filterregexp)) {
                     if (debugslow) Thread.sleep(500)
                     action(vf)
-                    if (Files.isDirectory(cc, *linkOptions) && goDeeper) {
-                        val dir = Files.newDirectoryStream(cc)
+                    if (cc.isDirectory(*linkOptions) && goDeeper) {
+                        val dir = cc.newDirectoryStreamList()
                         for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
-                        dir.close()
+                        // dir.close() // TODO had to remove this...
                     }
                 }
             }
         }
 
-        val sp = Paths.get(remoteBasePath + subfolder)
-        if (Files.exists(sp)) {
+        val sp = MFile(remoteBasePath + subfolder)
+        if (sp.exists()) {
             parseContent(sp, goDeeper = true, forceFollowSymlinks = true)
         }
         logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
     }
 
     override fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean) {
-        Files.createDirectories(Paths.get(if (addRemoteBasePath) "$remoteBasePath$absolutePath" else absolutePath))
+        MFile(if (addRemoteBasePath) "$remoteBasePath$absolutePath" else absolutePath).createDirectories()
     }
 
     override fun isAlive() = true
@@ -352,8 +352,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             if (changeperms) {
                 val perms = sftpc.perms(rp).toMutableList()
                 Helpers.permissionsParseRegex.findAll(protocol.perms.value).forEach { r ->
-                    val whowhat = r.groupValues[1] + r.groupValues[3]
-                    val fp = when(whowhat) {
+                    val fp = when(r.groupValues[1] + r.groupValues[3]) {
                         "ur" -> FilePermission.USR_R
                         "uw" -> FilePermission.USR_W
                         "ux" -> FilePermission.USR_X
@@ -379,7 +378,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             mtime // dirs don't need mtime
         } else {
             try {
-                if (!Files.isReadable(Paths.get("$localBasePath$cp"))) throw IllegalStateException("can't read file $cp")
+                if (!MFile("$localBasePath$cp").isReadable()) throw IllegalStateException("can't read file $cp")
                 sftpt.upload("$localBasePath$cp", rp) // use this in place of sftpc.put to not always set file attrs
                 if (protocol.doSetPermissions.value) setAttr(true, rp)
                 else if (!protocol.cantSetDate.value) setAttr(false, rp)
@@ -403,18 +402,19 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun getfile(localBasePath: String, from: String, mtime: Long, to: String) {
         val (cp, isdir) = checkIsDir(from)
+        val tof = MFile(to)
         if (isdir) {
-            Files.createDirectories(Paths.get(to)) // simply create parents if necessary, avoids separate check
-            Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
+            tof.createDirectories() // simply create parents if necessary, avoids separate check
+            tof.setLastModifiedTime(mtime)
         } else {
-            Files.createDirectories(Paths.get(to).parent)
+            tof.parent()?.let { if (!it.exists()) it.createDirectories() }
             // copy-then-move: sftpt.download erases local file if it exists also if remote file can't be read
-            val tmpf = createTempFile("sfsync-tempfile", ".dat")
-            sftpt.download("$remoteBasePath$cp", tmpf.absolutePath)
-            Files.move(tmpf.toPath(), Paths.get(to), StandardCopyOption.REPLACE_EXISTING)
+            val tmpf = MFile.createTempFile("sfsync-tempfile", ".dat")
+            sftpt.download("$remoteBasePath$cp", tmpf.internalPath)
+            MFile.move(tmpf.internalPath, to, StandardCopyOption.REPLACE_EXISTING)
             if (transferListener!!.bytesTotal != transferListener!!.bytesTransferred)
                 throw IllegalStateException("filesize mismatch: ${transferListener!!.bytesTotal} <> ${transferListener!!.bytesTransferred}")
-            Files.setLastModifiedTime(Paths.get(to), FileTime.fromMillis(mtime))
+            tof.setLastModifiedTime(mtime)
         }
     }
 
@@ -446,7 +446,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 logger.debug("sftp: resolving symlink $cp...")
                 do {
                     sftpc.readlink(cp).let {
-                        cp = if (!it.startsWith("/")) "${Paths.get(cp).parent}/$it" else it
+                        cp = if (!it.startsWith("/")) "${MFile(cp).getParent()}/$it" else it
                     }
                     logger.debug("sftp: resolving symlink, next: $cp")
                     try { rriattributes = sftpc.lstat(cp) }
@@ -514,11 +514,11 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     // see ConsoleKnownHostsVerifier
-    class MyHostKeyVerifier : OpenSSHKnownHosts(DBSettings.knownHostsFile) {
+    class MyHostKeyVerifier : OpenSSHKnownHosts(DBSettings.knownHostsFile.file) {
         override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
-            return if (runUIwait { Helpers.dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
+            return if (runUIwait { dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
                                 "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK to connect and add to SFSync's known_hosts.") }) {
-                entries.add(OpenSSHKnownHosts.HostEntry(null, hostname, KeyType.fromKey(key), key))
+                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
                 write()
                 true
             } else false
@@ -527,7 +527,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         override fun hostKeyChangedAction(hostname: String?, key: PublicKey?): Boolean {
             return if (runUIwait { dialogOkCancel("SFTP server verification", "Host key of server $hostname has changed!",
                                 "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK if you are 100% sure if this change was intended.") }) {
-                entries.add(OpenSSHKnownHosts.HostEntry(null, hostname, KeyType.fromKey(key), key))
+                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
                 write()
                 true
             } else false

@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 
-val kotlinversion = "1.3.21"
+val kotlinversion = "1.3.30"
 
 buildscript {
     repositories {
@@ -16,7 +16,7 @@ group = "com.wolle.ssyncbrowser"
 version = "1.0-SNAPSHOT"
 
 plugins {
-    kotlin("jvm") version "1.3.21"
+    kotlin("jvm") version "1.3.30"
     id("idea")
     id("application")
     id("com.github.ben-manes.versions") version "0.21.0"

@@ -21,7 +21,6 @@ import util.Helpers.relPathRegex
 import util.Helpers.revealFile
 import util.Helpers.uriRegex
 import util.Helpers.valitextfield
-import java.io.File
 
 private val logger = KotlinLogging.logger {}
 
@@ -61,8 +60,8 @@ class MainView : View("SSyncBrowser") {
                     }
                     DBSettings.logFile?.let {f ->
                         field("Log file") {
-                            textfield(f.path) { isDisable = true }
-                            button("Open log file").setOnAction { Helpers.openFile(f.path) }
+                            textfield(f.internalPath) { isDisable = true }
+                            button("Open log file").setOnAction { Helpers.openFile(f) }
                         }
                     }
                 }
@@ -222,7 +221,7 @@ class MainView : View("SSyncBrowser") {
                                 sync.localfolder.set(if (dir.absolutePath.endsWith("/")) dir.absolutePath else dir.absolutePath + "/")
                             }
                         }
-                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value)) }
+                        button("Reveal").setOnAction { revealFile(MFile(sync.localfolder.value)) }
                     }
 
                     field("Remote folder") {
@@ -256,7 +255,7 @@ class MainView : View("SSyncBrowser") {
                     }
                     field("Local folder") {
                         label(sync.localfolder)
-                        button("Reveal").setOnAction { revealFile(File(sync.localfolder.value), true) }
+                        button("Reveal").setOnAction { revealFile(MFile(sync.localfolder.value), true) }
                     }
                     field("Remote folder") {
                         label(sync.remoteFolder)
@@ -299,8 +298,8 @@ class MainView : View("SSyncBrowser") {
                             }
                         } }
                         button("Add new folder (local)") { action {
-                            val dir = chooseDirectoryRel("Select local folder", File(subset.sync.localfolder.value))
-                            if (dir != null) subset.subfolders += dir.path + "/"
+                            val dir = chooseDirectoryRel("Select local folder", MFile(subset.sync.localfolder.value))
+                            if (dir != null) subset.subfolders += dir.internalPath + "/"
                         } }
                         button("Remove selected folder") { action {
                             if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)
@@ -321,7 +320,7 @@ class MainView : View("SSyncBrowser") {
     // this is better than writing generic type TtvThing, which gets messy!
     private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
         private val changeListener = ChangeListener<Any> { _, _, _ ->
-            Event.fireEvent(this, TreeItem.TreeModificationEvent<Any>(TreeItem.valueChangedEvent<Any>(), this))
+            Event.fireEvent(this, TreeModificationEvent<Any>(valueChangedEvent<Any>(), this))
         }
         init {
             when (ele) {
@@ -386,7 +385,7 @@ class MainView : View("SSyncBrowser") {
                             SubsetSettingsPane.compSync(allsubset)
                         }
                         button("Reveal local") { addClass(Styles.thinbutton) }.setOnAction {
-                            revealFile(File(what.localfolder.value))
+                            revealFile(MFile(what.localfolder.value))
                         }
                         label(what.status)
                     }
@@ -493,7 +492,7 @@ class MainView : View("SSyncBrowser") {
             sync.fileWatcher?.stop()
             openNewWindow(SyncView(sync.server, sync, successfulSyncCallback))
             if (sync.auto.value) {
-                sync.fileWatcher = FileWatcher(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value).watch {
+                sync.fileWatcher = FileWatcher(MFile(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value)).watch {
                     runLater { compSyncFile(sync, successfulSyncCallback) }
                 }
             }

@@ -82,7 +82,6 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         val swUIupdate = StopWatch()
 
         fun acLocRem(vf: VirtualFile, isloc: Boolean, updact: (VirtualFile) -> Unit) {
-            logger.debug("found loc=$isloc : $vf")
             if (swUIupdate.doit(uiUpdateInterval)) updact(vf)
 
             cache.cache.merge(vf.path,

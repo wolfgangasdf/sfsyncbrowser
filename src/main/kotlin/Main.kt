@@ -2,10 +2,10 @@ import mu.KotlinLogging
 import store.DBSettings
 import tornadofx.launch
 import util.Helpers
+import util.MFile
 import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.PrintStream
-import java.nio.file.Files
 import java.security.Security
 
 // do not initialize logger in Main.kt, first set properties!
@@ -31,8 +31,8 @@ fun main(args: Array<String>) {
     System.setProperty(org.slf4j.simple.SimpleLogger.DATE_TIME_FORMAT_KEY, "yyyy-MM-dd HH:mm:ss:SSS")
     System.setProperty(org.slf4j.simple.SimpleLogger.LOG_FILE_KEY, "System.out") // and use intellij "grep console" plugin
 
-    val logfile = Files.createTempFile("reftool5log",".txt").toFile()
-    logps = FileOutputStream(logfile)
+    val logfile = MFile.createTempFile("reftool5log",".txt")
+    logps = FileOutputStream(logfile.file)
 
     val logger = KotlinLogging.logger {} // after set properties!
 
@@ -43,7 +43,7 @@ fun main(args: Array<String>) {
     logger.trace("trace")
 
     logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
-    logger.info("Log file: ${logfile.path}")
+    logger.info("Log file: ${logfile.getOSPath()}")
     DBSettings.logFile = logfile
 
     // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())

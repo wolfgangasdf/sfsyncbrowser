@@ -60,7 +60,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
             if (filesyncs.isNotEmpty()) {
                 // TODO: check for modifications cache <> local!
                 if (SettingsStore.ssbSettings.onExitRemoveFilesyncs.value ||
-                        Helpers.dialogOkCancel("File syncs existing", "File syncs existing. Remove them, including the local file?",
+                        dialogOkCancel("File syncs existing", "File syncs existing. Remove them, including the local file?",
                                     filesyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {
                     val iter = filesyncs.iterator()
                     while (iter.hasNext()) {
@@ -80,7 +80,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
             Helpers.runUIwait {
                 if (!dialogOkCancel("SFSync Error", "Lock file exists",
                         "If you are sure that no other Sfsync instance is running, press OK to remove the lockfile, " +
-                                "otherwise cancel!\nLockfile: " + DBSettings.lockFile.absolutePath))
+                                "otherwise cancel!\nLockfile: " + DBSettings.lockFile))
                     System.exit(1)
             }
         }

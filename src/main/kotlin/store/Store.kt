@@ -10,7 +10,7 @@ import javafx.beans.property.StringProperty
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import mu.KotlinLogging
-import store.DBSettings.getCacheFilename
+import store.DBSettings.getCacheFilePath
 import synchro.*
 import synchro.Actions.ALLACTIONS
 import synchro.Actions.A_CACHEONLY
@@ -26,11 +26,6 @@ import util.Helpers.dformat
 import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
 import util.Helpers.tokMGTPE
-import java.io.File
-import java.io.FileReader
-import java.io.FileWriter
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.*
 
 private val logger = KotlinLogging.logger {}
@@ -55,38 +50,38 @@ object DBSettings {
             }
             else -> throw Exception("operating system not found")
         }
-        if (!Files.exists(Paths.get(dbdir))) {
+        if (!MFile(dbdir).exists()) {
             logger.info("creating db dir $dbdir")
-            Files.createDirectories(Paths.get(dbdir))
+            MFile(dbdir).createDirectories()
         }
     }
 
-    val lockFile = java.io.File("$settpath/SSB.lock")
-    var logFile: File? = null
-    val knownHostsFile = java.io.File("$settpath/known_hosts")
+    val lockFile = MFile("$settpath/SSB.lock")
+    var logFile: MFile? = null
+    val knownHostsFile = MFile("$settpath/known_hosts")
 
     init {
         knownHostsFile.createNewFile()
     }
 
-    fun getSettingPath(): String = "$settpath/ssyncbrowser.properties"
+    fun getSettingFile(): MFile = MFile("$settpath/ssyncbrowser.properties")
 
     fun getLock(): Boolean = lockFile.createNewFile()
 
     fun releaseLock(): Boolean = lockFile.delete()
 
-    fun getCacheFilename(cacheid: String) = "$dbdir/$cacheid-cache.txt"
+    fun getCacheFilePath(cacheid: String) = "$dbdir/$cacheid-cache.txt"
 
     fun getCacheFolder(cacheid: String) = "$dbdir/$cacheid-cache/" // for temp and file syncs
 
     fun removeCacheFile(cacheid: String) {
         logger.info("delete cache database $cacheid")
-        File(getCacheFilename(cacheid)).delete()
+        MFile(getCacheFilePath(cacheid)).delete()
     }
     fun removeCacheFolder(cacheid: String) {
         logger.info("delete cache folder $cacheid")
-        val f = File(getCacheFolder(cacheid))
-        f.listFiles()?.forEach {
+        val f = MFile(getCacheFolder(cacheid))
+        f.listFiles().forEach {
             logger.info("deleting $it")
             it.delete()
         }
@@ -106,7 +101,7 @@ enum class SyncType { NORMAL, FILE, CACHED }
 
 // title is filepath for file sync
 class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty, val excludeFilter: StringProperty,
-           val cacheid: StringProperty = SSP(java.util.Date().time.toString()), val server: Server,
+           val cacheid: StringProperty = SSP(Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(),
            val auto: BooleanProperty = SBP(false), val disableFullSync: BooleanProperty = SBP(false),
            val permsOverride: StringProperty = SSP("")) {
@@ -159,6 +154,7 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
             }
         }
         connection!!.assignRemoteBasePath(remoteFolder)
+        connection!!.interrupted.set(false)
         return connection!!
     }
     fun closeConnection() {
@@ -229,17 +225,17 @@ object SettingsStore {
                 }
             }
         }
-        val fw = FileWriter(DBSettings.getSettingPath())
+        val fw = DBSettings.getSettingFile().newFileWriter()
         props.store(fw, null)
         logger.info("settings saved!")
     }
 
     private fun loadSettings() {
-        logger.info("load settings ${DBSettings.getSettingPath()}")
+        logger.info("load settings ${DBSettings.getSettingFile()}")
         servers.clear()
-        if (File(DBSettings.getSettingPath()).exists()) {
+        if (DBSettings.getSettingFile().exists()) {
             val propsx = Properties()
-            val fr = FileReader(DBSettings.getSettingPath())
+            val fr = DBSettings.getSettingFile().newFileReader()
             propsx.load(fr)
             val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
             if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
@@ -287,7 +283,7 @@ object SettingsStore {
     }
 
     fun shutdown() {
-        SettingsStore.servers.forEach { it.closeConnection() }
+        servers.forEach { it.closeConnection() }
     }
 
     init {
@@ -329,16 +325,16 @@ class SyncEntry(var action: Int,
 
     fun status() = SSP(this, "status", CF.amap[action])
     fun detailsLocal() = SSP(this, "detailsl",
-            if (lSize != -1L) dformat().format(java.util.Date(lTime)) + "(" + tokMGTPE(lSize) + ")" else "none")
+            if (lSize != -1L) dformat().format(Date(lTime)) + "(" + tokMGTPE(lSize) + ")" else "none")
 
     fun detailsRemote() = SSP(this, "detailsr",
-            if (rSize != -1L) dformat().format(java.util.Date(rTime)) + "(" + tokMGTPE(rSize) + ")" else "none")
+            if (rSize != -1L) dformat().format(Date(rTime)) + "(" + tokMGTPE(rSize) + ")" else "none")
 
     fun detailsRCache() = SSP(this, "detailsrc",
-            if (cSize != -1L) dformat().format(java.util.Date(rcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
+            if (cSize != -1L) dformat().format(Date(rcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
     fun detailsLCache() = SSP(this, "detailslc",
-            if (cSize != -1L) dformat().format(java.util.Date(lcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
+            if (cSize != -1L) dformat().format(Date(lcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
     //  fun isDir = path.endsWith("/")
     fun isEqual(): Boolean =
@@ -463,13 +459,13 @@ class Cache(private val cacheid: String) {
         logger.info("load cache database...$cacheid")
         iniCache()
 
-        val fff = Paths.get(getCacheFilename(cacheid))
-        if (!Files.exists(fff)) {
+        val fff = MFile(getCacheFilePath(cacheid))
+        if (!fff.exists()) {
             logger.info("create cache file!")
-            if (!Files.exists(fff.parent)) Files.createDirectories(fff.parent)
-            Files.createFile(fff)
+            if (!fff.parent()!!.exists()) fff.parent()!!.createDirectories()
+            fff.createNewFile()
         }
-        val br = Files.newBufferedReader(fff, filecharset)
+        val br = fff.newBufferedReader(filecharset)
         val cacheVersion = br.readLine()
         if (cacheVersion == cacheversion) {
 
@@ -494,9 +490,9 @@ class Cache(private val cacheid: String) {
 
     fun saveCache() {
         logger.info("save cache database...$cacheid")
-        val fff = java.io.File(getCacheFilename(cacheid))
+        val fff = MFile(getCacheFilePath(cacheid))
         if (fff.exists()) fff.delete()
-        val out = java.io.BufferedWriter(java.io.FileWriter(fff), 1000000)
+        val out = fff.newBufferedWriter(1000000)
         out.write(cacheversion + "\n")
         for ((path, cf: SyncEntry) in cache) {
             out.write("" + cf.lcTime + "," + cf.rcTime + "," + cf.cSize + "," + path + "\n")

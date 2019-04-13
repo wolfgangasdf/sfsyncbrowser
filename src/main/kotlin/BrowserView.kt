@@ -23,8 +23,6 @@ import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
 import util.Helpers.toThousandsCommas
 import util.Helpers.tokMGTPE
-import java.io.File
-import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
 
 private val logger = KotlinLogging.logger {}
@@ -33,12 +31,12 @@ enum class BrowserViewMode {
     NORMAL, SELECTFOLDER, SELECTFOLDERS
 }
 
-private class DragView(temppath: File) : View("Drag...") {
-    private val btDnd = button("The file(s) have been downloaded to ${temppath.path}.\n" +
+private class DragView(temppath: MFile) : View("Drag...") {
+    private val btDnd = button("The file(s) have been downloaded to $temppath.\n" +
             "Drag this to the destination!\n(Use shift+drag to move files remotely)").apply {
         setOnDragDetected { me ->
             val dragBoard = startDragAndDrop(TransferMode.MOVE) // so tempfiles are removed by OS
-            dragBoard.setContent { putFiles(temppath.listFiles().toList()) }
+            dragBoard.setContent { putFiles(temppath.listFiles().map { it.file }.toList()) }
             me.consume()
         }
         setOnDragDone { de ->
@@ -132,7 +130,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                             setOnAction {
                                 var size = 0L
                                 MyWorker.runTaskWithConn({
-                                    Helpers.dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vfs.first().path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
+                                    dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vfs.first().path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
                                 }, "Calculate size recursively...", server, basePath) { c ->
                                     vfs.forEach { vf ->
                                         c.list(vf.path, "", true, true) { vflist ->
@@ -224,20 +222,20 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 files.find { vf -> vf.getFileName() == f.name }?.let { existing.add(it) }
             }
             if (existing.isNotEmpty()) {
-                if (!Helpers.dialogOkCancel("Drop files...", "Remote files existing, overwrite all or cancel?", existing.joinToString("\n"))) {
+                if (!dialogOkCancel("Drop files...", "Remote files existing, overwrite all or cancel?", existing.joinToString("\n"))) {
                     de.isDropCompleted = false
                     de.consume()
                     return
                 }
             }
 
-            val fff = arrayListOf<File>()
+            val fff = arrayListOf<MFile>()
 
             // expand dirs
             de.dragboard.files.forEach { f ->
                 if (f.isDirectory) {
-                    f.walkTopDown().forEach { fff += it }
-                } else fff += f
+                    f.walkTopDown().forEach { fff += MFile(it) }
+                } else fff += MFile(f)
             }
 
             MyWorker.runTaskWithConn({
@@ -246,7 +244,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }, "Uploading", server, "") { c ->
                 fff.forEach { f ->
                     updateTit("Uploading file $f...")
-                    c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.path.removePrefix(localBase)}")
+                    c.putfile("", f.internalPath, f.lastModified(), "${currentPath.value}${f.internalPath.removePrefix(localBase)}")
                 }
             }
         } else if (de.dragboard.hasContent(dataFormatVFs)) {
@@ -355,7 +353,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             row.setOnDragDropped { de ->
                 logger.debug("drop on row.item=${row.item}")
-                if (row.item?.isDir() == true)
+                if (row.item == null || row.item?.isDir() == true)
                     dropit(de, if (row.item != null) row.item.path else currentPath.value)
                 de.consume()
             }
@@ -371,7 +369,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 db.setContent(content)
             } else { // external drag
                 val remoteBase = selectionModel.selectedItems.first().getParent()
-                val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
+                val tempfolder = MFile.createTempDirectory("ssyncbrowsertemp")
 
                 val taskGetFile = MyTask<Unit> {
                     updateTit("Downloading files for drag and drop...")
@@ -386,7 +384,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
                     fff.forEach { vf ->
                         updateMsg("Downloading file $vf...")
-                        val lf = "${tempfolder.path}/${vf.path.removePrefix(remoteBase)}"
+                        logger.debug("rb=$remoteBase vfpath=${vf.path}")
+                        val lf = "${tempfolder.internalPath}/${vf.path.removePrefix(remoteBase)}"
                         logger.debug("downloading $vf to $lf...")
                         server.getConnection("").getfile("", vf.path, vf.modTime, lf)
                     }
@@ -499,9 +498,9 @@ class BrowserView(private val server: Server, private val basePath: String, path
         MainView.compSyncFile(newSync) {
             when (op) {
                 SfsOp.NONE -> {}
-                SfsOp.OPEN -> openFile("${newSync.localfolder.value}/${newSync.title.value}")
+                SfsOp.OPEN -> openFile(MFile("${newSync.localfolder.value}/${newSync.title.value}"))
                 SfsOp.EDIT -> if (SettingsStore.ssbSettings.editor.value != "")
-                    editFile("${newSync.localfolder.value}/${newSync.title.value}")
+                    editFile(MFile("${newSync.localfolder.value}/${newSync.title.value}"))
                 else
                     dialogMessage(Alert.AlertType.ERROR, "Edit file", "Set editor in settings first!", "")
             }
@@ -581,10 +580,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     private val miNewFile: MyMenuitem = MyMenuitem("New file...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN)) {
         dialogInputString("Create new file", "Enter file name:", "", "")?.let {
-            val tempfolder = Files.createTempDirectory("ssyncbrowsertemp").toFile()
-            val f = File("${tempfolder.path}/$it")
-            if (!f.createNewFile()) throw Exception("Error creating file ${f.path}")
-            MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.path, f.lastModified(), "${currentPath.value}${f.name}") }
+            val tempfolder = MFile.createTempDirectory("ssyncbrowsertemp")
+            val f = MFile("${tempfolder.internalPath}/$it")
+            if (!f.createNewFile()) throw Exception("Error creating file $f")
+            MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.internalPath, f.lastModified(), "${currentPath.value}${f.name}") }
         }
     }.apply { isDisable = !isNormal() }
 

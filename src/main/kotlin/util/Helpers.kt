@@ -22,16 +22,10 @@ import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
-import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URISyntaxException
-import java.nio.ByteBuffer
 import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
@@ -72,20 +66,20 @@ object Helpers {
     }
     fun toThousandsCommas(l: Long): String = String.format("%,d", l)
 
-    fun revealFile(file: java.io.File, gointo: Boolean = false) {
+    fun revealFile(file: MFile, gointo: Boolean = false) {
         when {
-            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("open", if (gointo) "" else "-R", file.path))
-            Helpers.isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.path}")
-            Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
+            isMac() -> Runtime.getRuntime().exec(arrayOf("open", if (gointo) "" else "-R", file.getOSPath()))
+            isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.getOSPath()}")
+            isLinux() -> error("not supported OS, tell me how to do it!")
             else -> error("not supported OS, tell me how to do it!")
         }
     }
 
-    fun openFile(path: String) {
-        if (Desktop.isDesktopSupported() && path != "") {
+    fun openFile(file: MFile) {
+        if (Desktop.isDesktopSupported() && file.internalPath != "") {
             val desktop = Desktop.getDesktop()
             if (desktop.isSupported(Desktop.Action.OPEN)) {
-                desktop.open(File(path))
+                desktop.open(file.file)
             }
         }
     }
@@ -99,34 +93,29 @@ object Helpers {
         }
     }
 
-    fun editFile(path: String) {
+    fun editFile(file: MFile) {
         when {
-            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("/usr/bin/open", "-a", SettingsStore.ssbSettings.editor.value, path))
-            Helpers.isWin() -> Runtime.getRuntime().exec(arrayOf(SettingsStore.ssbSettings.editor.value, path))
-            Helpers.isLinux() -> error("not supported OS, tell me how to do it!")
+            isMac() -> Runtime.getRuntime().exec(arrayOf("/usr/bin/open", "-a", SettingsStore.ssbSettings.editor.value, file.getOSPath()))
+            isWin() -> Runtime.getRuntime().exec(arrayOf(SettingsStore.ssbSettings.editor.value, file.getOSPath()))
+            isLinux() -> error("not supported OS, tell me how to do it!")
             else -> error("not supported OS, tell me how to do it!")
         }
     }
 
     fun showNotification(title: String, subtitle: String, msg: String) { // should probably use https://github.com/jcgay/send-notification
         when {
-            Helpers.isMac() -> Runtime.getRuntime().exec(arrayOf("osascript", "-e", "display notification \"$msg\" with title \"$title\" subtitle \"$subtitle\""))
+            isMac() -> Runtime.getRuntime().exec(arrayOf("osascript", "-e", "display notification \"$msg\" with title \"$title\" subtitle \"$subtitle\""))
             else -> error("not supported OS, tell me how to do it!")
         }
     }
 
-    fun readFileToString(fn: Path): String {
-        val enc = Files.readAllBytes(fn)
-        return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(enc)).toString()
-    }
-
-    fun getFileIntoTempAndDo(server: Server, vf: VirtualFile, action: (f: File) -> Unit) {
-        val taskGetFile = MyTask<File> {
+    fun getFileIntoTempAndDo(server: Server, vf: VirtualFile, action: (f: MFile) -> Unit) {
+        val taskGetFile = MyTask<MFile> {
             updateTit("Downloading file $vf...")
-            val rf = Files.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
-            logger.debug("downloading into ${rf.toFile().absolutePath}...")
-            server.getConnection("").getfile("", vf.path, vf.modTime, rf.toFile().absolutePath)
-            rf.toFile()
+            val rf = MFile.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
+            logger.debug("downloading into ${rf.internalPath}...")
+            server.getConnection("").getfile("", vf.path, vf.modTime, rf.internalPath)
+            rf
         }
         taskGetFile.setOnSucceeded { action(taskGetFile.value) }
         MyWorker.runTask(taskGetFile)
@@ -143,10 +132,10 @@ object Helpers {
     fun getFileName(path: String) =
             path.split("/").dropLastWhile { it.isEmpty() }.lastOrNull()
 
-    fun chooseDirectoryRel(title: String? = null, initialDirectory: File, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): File? {
+    fun chooseDirectoryRel(title: String? = null, initialDirectory: MFile, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): MFile? {
         // there is no way to allow opening multiple directories locally, also not via FileChooser!
-        val res = chooseDirectory(title, initialDirectory, owner, op)
-        if (res?.startsWith(initialDirectory.path) == true)
+        val res = chooseDirectory(title, initialDirectory.file, owner, op)?.asMFile()
+        if (res?.internalPath?.startsWith(initialDirectory.internalPath) == true)
             return res.relativeTo(initialDirectory)
         return null
     }
@@ -163,14 +152,14 @@ object Helpers {
     // after MyWorker etc changes, test all if exceptions propagate as intended!
     const val failat = 0 // 0..5 currently
 
-    val filecharset: Charset = java.nio.charset.Charset.forName("UTF-8")
+    val filecharset: Charset = Charset.forName("UTF-8")
 
     // do some quicklook-like thing. returns only after window closed!
-    fun previewDocument(file: File) {
+    fun previewDocument(file: MFile) {
         runLater { // otherwise task doesn't close, unclear why
             when {
                 isMac() -> {
-                    ProcessBuilder("qlmanage", "-p", file.absolutePath).start().waitFor()
+                    ProcessBuilder("qlmanage", "-p", file.getOSPath()).start().waitFor()
                 }
                 else -> logger.info("Quicklook is not implemented on this platform.")
             }
@@ -187,20 +176,20 @@ object Helpers {
         if (resource != null) {
             when(resource.protocol) {
                 "file" -> try {
-                    d = Date(File(resource.toURI()).lastModified())
+                    d = Date(MFile(resource.toURI()).lastModified())
                 } catch (ignored: URISyntaxException) {
                 }
                 "jar" -> {
                     val path = resource.path
-                    d = Date(File(path.substring(5, path.indexOf("!"))).lastModified())
+                    d = Date(MFile(path.substring(5, path.indexOf("!"))).lastModified())
                 }
                 "zip" -> {
                     val path = resource.path
-                    val jarFileOnDisk = File(path.substring(0, path.indexOf("!")))
+                    val jarFileOnDisk = MFile(path.substring(0, path.indexOf("!")))
                     //long jfodLastModifiedLong = jarFileOnDisk.lastModified ();
                     //Date jfodLasModifiedDate = new Date(jfodLastModifiedLong);
                     try {
-                        JarFile(jarFileOnDisk).use { jf ->
+                        JarFile(jarFileOnDisk.file).use { jf ->
                             val ze = jf.getEntry(path.substring(path.indexOf("!") + 2))//Skip the ! and the /
                             val zeTimeLong = ze.time
                             val zeTimeDate = Date(zeTimeLong)
@@ -325,7 +314,7 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
     }
 }
 
-object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
+object MyWorker: Dialog<ButtonType>() {
     private val taskList = FXCollections.observableArrayList<MyTask<*>>()
 
     private val taskListView = listview(taskList) {
@@ -423,27 +412,27 @@ object MyWorker: Dialog<javafx.scene.control.ButtonType>() {
         t.setOnFailed {
             throw t.exception
         }
-        MyWorker.runTask(t)
+        runTask(t)
     }
 
 }
 
-class FileWatcher(val path: String) {
+class FileWatcher(val file: MFile) {
     private var dw: DirectoryWatcher? = null
     private var lastmod = 0L
 
-    private fun lastMod(): Long = File(path).lastModified()
+    private fun lastMod(): Long = file.lastModified()
 
     // this doesn't work with directories, watches file mod time to avoid double notifications.
-    fun watch(callback: (String) -> Unit ): FileWatcher {
-        logger.info("filewatcher: watching $path")
+    fun watch(callback: (MFile) -> Unit ): FileWatcher {
+        logger.info("filewatcher: watching $file")
         lastmod = lastMod()
-        dw = DirectoryWatcher.builder().path(Paths.get(path)).listener { dce ->
+        dw = DirectoryWatcher.builder().path(file.asPath()).listener { dce ->
             val newlastmod = lastMod()
-            logger.debug("filewatcher($path, $lastmod, $newlastmod): $dce")
+            logger.debug("filewatcher($file, $lastmod, $newlastmod): $dce")
             if (newlastmod != lastmod) {
                 lastmod = newlastmod
-                callback(path)
+                callback(file)
             }
         }.fileHashing(false).build()
         dw?.watchAsync()
@@ -451,7 +440,7 @@ class FileWatcher(val path: String) {
     }
 
     fun stop() {
-        logger.info("filewatcher: stop watching $path")
+        logger.info("filewatcher: stop watching $file")
         dw?.close()
     }
 }

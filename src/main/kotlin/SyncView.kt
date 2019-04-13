@@ -26,15 +26,13 @@ import synchro.Profile
 import tornadofx.*
 import util.Helpers.dformat
 import util.Helpers.dialogMessage
-import util.Helpers.readFileToString
 import util.Helpers.revealFile
 import util.Helpers.runUIwait
 import util.Helpers.showNotification
+import util.MFile
 import util.MyTask
 import util.MyWorker
 import util.SSP
-import java.io.File
-import java.nio.file.Files
 import java.util.*
 
 private val logger = KotlinLogging.logger {}
@@ -257,7 +255,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             val se2 = fileTableView.selectedItem
             if (se2 != null) {
                 if (se2.se.lSize >= 0) {
-                    revealFile(File(profile.local!!.remoteBasePath + "/" + se2.path))
+                    revealFile(MFile(profile.local!!.remoteBasePath + "/" + se2.path))
                 }
             }
         }
@@ -323,9 +321,9 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
         fun getList() = listOf(changes,all,problems)
         fun getFilter(s: String): List<Int> {
             return when(s) {
-                Filters.all -> ALLACTIONS
-                Filters.changes -> ALLACTIONS.filter { it != A_ISEQUAL && it != A_UNCHECKED }
-                Filters.problems -> listOf(A_UNKNOWN, A_UNCHECKED, A_SKIP, A_CACHEONLY, A_SYNCERROR)
+                all -> ALLACTIONS
+                changes -> ALLACTIONS.filter { it != A_ISEQUAL && it != A_UNCHECKED }
+                problems -> listOf(A_UNKNOWN, A_UNCHECKED, A_SKIP, A_CACHEONLY, A_SYNCERROR)
                 else -> ALLACTIONS
             }
         }
@@ -345,12 +343,12 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             val se2 = fileTableView.selectedItem
             if (se2 != null) {
                 if (se2.se.lSize + se2.se.rSize < 100000) {
-                    val lf = Files.createTempFile("sfsync-localfile", ".tmp")
-                    val rf = Files.createTempFile("sfsync-remotefile", ".tmp")
+                    val lf = MFile.createTempFile("sfsync-localfile", ".tmp")
+                    val rf = MFile.createTempFile("sfsync-remotefile", ".tmp")
                     profile.local!!.getfile("", se2.path, se2.se.lTime, lf.toString())
                     profile.remote!!.getfile("", se2.path, se2.se.rTime, rf.toString())
-                    val lfc = readFileToString(lf)
-                    val rfc = readFileToString(rf)
+                    val lfc = lf.readFileToString()
+                    val rfc = rf.readFileToString()
                     val diff = diff_match_patch().apply {
                         Diff_Timeout = 10.0f
                     }
