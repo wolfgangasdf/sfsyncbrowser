@@ -28,7 +28,6 @@ import util.Helpers
 import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
 import util.Helpers.runUIwait
-import util.Helpers.toJavaPathSeparator
 import util.MFile
 import java.io.Closeable
 import java.io.IOException
@@ -221,17 +220,10 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
         fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
-            // on mac 10.8 with oracle java 7, filenames are encoded with strange 'decomposed unicode'. grr
-            // this is in addition to the bug that LC_CTYPE is not set. grrr
-            // don't use cc.getPath directly!!
             val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
             if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
-            val javaPath = toJavaPathSeparator(cc.toString())
-            val fixedPath = java.text.Normalizer.normalize(javaPath, java.text.Normalizer.Form.NFC)
-            // fixedPath is without trailing "/" for dirs!
-            //logger.debug("javap=$javaPath fp=$fixedPath rbp=$remoteBasePath")
-            var strippedPath: String = if (fixedPath == remoteBasePath.dropLast(1)) "" else fixedPath.substring(remoteBasePath.length)
-            if (cc.isDirectory(*linkOptions) && strippedPath != "") strippedPath += "/"
+            var strippedPath: String = if (cc.internalPath == remoteBasePath.dropLast(1)) "" else cc.internalPath.substring(remoteBasePath.length)
+            if (cc.isDirectory(*linkOptions) && strippedPath != "" && !strippedPath.endsWith("/")) strippedPath += "/"
             if (cc.isDirectory(*linkOptions) || cc.isRegularFile(*linkOptions)) {
                 val vf = VirtualFile(strippedPath, cc.getLastModifiedTime(), cc.getSize(),
                         cc.getPosixFilePermissions())

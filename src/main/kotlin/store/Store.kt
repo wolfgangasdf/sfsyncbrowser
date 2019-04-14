@@ -485,7 +485,7 @@ class Cache(private val cacheid: String) {
         }
         br.close()
         updateObservableBuffer()
-        logger.info("cache database loaded!")
+        logger.info("cache database loaded (${cache.size} entries)!")
     }
 
     fun saveCache() {

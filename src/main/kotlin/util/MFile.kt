@@ -35,9 +35,10 @@ class MFile(val internalPath: String) {
         fun createTempFile(prefix: String, suffix: String) = MFile(Files.createTempFile(prefix, suffix).toFile())
         fun createTempDirectory(prefix: String) = MFile(Files.createTempDirectory(prefix))
         fun ipFromFile(f: File): String {
+            val ap = java.text.Normalizer.normalize(f.absolutePath, java.text.Normalizer.Form.NFC) // make sure it's in canonical form
             return when {
-                isWin -> f.absolutePath // TODO win
-                else -> f.absolutePath
+                isWin -> ap // TODO win
+                else -> ap
             }
         }
         fun ospathFromIP(ip: String): String = when {
