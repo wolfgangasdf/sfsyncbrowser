@@ -126,7 +126,8 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                     runUIwait { profile.cache.updateObservableBuffer() }
                     fileTableView.resizeColumnsToFitContent()
                     logger.debug("havechanges=$haveChanges")
-                    val canSync = updateSyncButton(allow = true)
+                    syncEnabled = true
+                    val canSync = updateSyncButton()
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
                         runSynchronize()
@@ -135,7 +136,8 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                         runSynchronize()
                     } else {
                         logger.info("Finished compare")
-                        updateSyncButton(allow = true)
+                        syncEnabled = true
+                        updateSyncButton()
                     }
                 }
                 taskCompFiles.setOnFailed { handleFailed(taskCompFiles) }
@@ -175,11 +177,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             handleCancelled()
         }
         MyWorker.runTask(taskSynchronize)
-    }
-
-    private fun updateSyncButton(allow: Boolean): Boolean {
-        syncEnabled = allow
-        return updateSyncButton()
     }
 
     private fun updateSyncButton(): Boolean { // returns true if can synchronize
@@ -238,8 +235,8 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
 
     private val mbAdvanced = menubutton("Advanced...") {
         item("Debug info").setOnAction {
+//            profile.cache.dumpAll()
             logger.debug("SE: " + fileTableView.selectedItem)
-            // profile.cache.dumpAll()
         }
         item("Make local as remote").setOnAction {
             profile.iniLocalAsRemote()

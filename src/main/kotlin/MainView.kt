@@ -292,15 +292,15 @@ class MainView : View("SSyncBrowser") {
                         button("Compare & Sync!") { action {
                             compSync(subset)
                         } }
-                        button("Add new folder(s) (remote)") { action {
+                        button("Add folder(s) (remote)") { action {
                             val bv = openNewWindow(BrowserView(subset.sync.server, subset.sync.remoteFolder.value, "", BrowserViewMode.SELECTFOLDERS), Modality.APPLICATION_MODAL)
                             bv.selectFoldersCallback = {
                                 it.forEach { vf -> subset.subfolders += vf.path }
                             }
                         } }
-                        button("Add new folder (local)") { action {
+                        button("Add folder (local)") { action {
                             val dir = chooseDirectoryRel("Select local folder", MFile(subset.sync.localfolder.value))
-                            if (dir != null) subset.subfolders += dir.internalPath + "/"
+                            if (dir != null) subset.subfolders += "$dir/"
                         } }
                         button("Remove selected folder") { action {
                             if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)

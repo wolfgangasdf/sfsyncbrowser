@@ -42,8 +42,10 @@ class MFile(val internalPath: String) {
         fun createTempFile(prefix: String, suffix: String) = MFile(Files.createTempFile(prefix, suffix).toFile())
         fun createTempDirectory(prefix: String) = MFile(Files.createTempDirectory(prefix))
         fun fromOSPath(p: String) = MFile(File(p))
+        fun normalizePath(p: String) = java.text.Normalizer.normalize(p, java.text.Normalizer.Form.NFC)!! // make sure it's in canonical UTF8 form
+
         fun ipFromFile(f: File): String {
-            val ap = java.text.Normalizer.normalize(f.absolutePath, java.text.Normalizer.Form.NFC) // make sure it's in canonical form
+            val ap = normalizePath(f.absolutePath)
             return when {
                 isWin -> {
                     when {
@@ -76,6 +78,7 @@ class MFile(val internalPath: String) {
         fun getIPFileName(ip: String): String = ip.removeSuffix("/").substringAfterLast("/")
         fun getIPFileExt(ip: String) = getIPFileName(ip).substringAfterLast(".")
         fun getIPFileParent(ip: String): String? = ip.removeSuffix("/").substringBeforeLast("/")
+        fun getIPrelativeTo(ip: String, ipbase: String) = ip.removePrefix(ipbase)
 
         fun testit() {
             if (isWin) {
@@ -156,7 +159,6 @@ class MFile(val internalPath: String) {
         val enc = Files.readAllBytes(file.toPath())
         return StandardCharsets.UTF_8.decode(ByteBuffer.wrap(enc)).toString()
     }
-    fun relativeTo(base: MFile) = file.relativeTo(base.file).asMFile()
     fun lastModified() = file.lastModified()
 
     // direct copies from File or Path

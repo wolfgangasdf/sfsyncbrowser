@@ -77,9 +77,8 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 }
 
 // if ends on "/", is dir except for "" which is also dir (basepath)
-class VirtualFile(var path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile>, Serializable {
-    // modtime in milliseconds since xxx
-    constructor() : this("", 0, 0)
+class VirtualFile(path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile>, Serializable {
+    var path: String = MFile.normalizePath(path)
 
     fun getFileName(): String = MFile.getIPFileName(path) // gets file/folder name, "" if "/" or "", without trailing "/" for dirs!
     fun getPermString(): String = PosixFilePermissions.toString(permissions)
@@ -452,10 +451,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             if (!listOf(FileMode.Type.DIRECTORY, FileMode.Type.REGULAR).contains(rriattributes.type)) {
                 logger.error("Not a regular file or directory, ignoring: $rripath : $rriattributes")
             } else {
-                val vf = VirtualFile().apply {
-                    path = rripath.substring(remoteBasePath.length)
-                    modTime = rriattributes.mtime * 1000
-                    size = rriattributes.size
+                val vf = VirtualFile(rripath.substring(remoteBasePath.length), rriattributes.mtime * 1000, rriattributes.size).apply {
                     permissions = filePermissions2posix(rriattributes.permissions)
                     if (rriattributes.type == FileMode.Type.DIRECTORY && !path.endsWith("/")) path += "/"
                     if (path == "/") path = ""

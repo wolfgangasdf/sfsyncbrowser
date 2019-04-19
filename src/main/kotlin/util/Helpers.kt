@@ -128,11 +128,12 @@ object Helpers {
     fun getFileName(path: String) =
             path.split("/").dropLastWhile { it.isEmpty() }.lastOrNull()
 
-    fun chooseDirectoryRel(title: String? = null, initialDirectory: MFile, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): MFile? {
+    // returns aaa/bb/
+    fun chooseDirectoryRel(title: String? = null, initialDirectory: MFile, owner: Window? = null, op: DirectoryChooser.() -> Unit = {}): String? {
         // there is no way to allow opening multiple directories locally, also not via FileChooser!
         val res = chooseDirectory(title, initialDirectory.file, owner, op)?.asMFile()
         if (res?.internalPath?.startsWith(initialDirectory.internalPath) == true)
-            return res.relativeTo(initialDirectory)
+            return MFile.getIPrelativeTo(res.internalPath, initialDirectory.internalPath)
         return null
     }
 
