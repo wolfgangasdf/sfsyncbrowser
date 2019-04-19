@@ -438,7 +438,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 logger.debug("sftp: resolving symlink $cp...")
                 do {
                     sftpc.readlink(cp).let {
-                        cp = if (!it.startsWith("/")) "${MFile(cp).getParent()}/$it" else it
+                        cp = if (!it.startsWith("/")) "${MFile(cp).parent()!!.internalPath}/$it" else it
                     }
                     logger.debug("sftp: resolving symlink, next: $cp")
                     try { rriattributes = sftpc.lstat(cp) }

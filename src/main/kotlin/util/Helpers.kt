@@ -22,14 +22,10 @@ import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
-import java.io.IOException
 import java.net.URI
-import java.net.URISyntaxException
 import java.nio.charset.Charset
-import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
-import java.util.jar.JarFile
 import kotlin.math.floor
 
 
@@ -164,45 +160,6 @@ object Helpers {
                 else -> logger.info("Quicklook is not implemented on this platform.")
             }
         }
-    }
-
-    // https://stackoverflow.com/a/22404140
-    fun getClassBuildTime(): Date? {
-        var d: Date? = null
-        val currentClass = object : Any() {
-
-        }.javaClass.enclosingClass
-        val resource = currentClass.getResource(currentClass.simpleName + ".class")
-        if (resource != null) {
-            when(resource.protocol) {
-                "file" -> try {
-                    d = Date(MFile(resource.toURI()).lastModified())
-                } catch (ignored: URISyntaxException) {
-                }
-                "jar" -> {
-                    val path = resource.path
-                    d = Date(MFile(path.substring(5, path.indexOf("!"))).lastModified())
-                }
-                "zip" -> {
-                    val path = resource.path
-                    val jarFileOnDisk = MFile(path.substring(0, path.indexOf("!")))
-                    //long jfodLastModifiedLong = jarFileOnDisk.lastModified ();
-                    //Date jfodLasModifiedDate = new Date(jfodLastModifiedLong);
-                    try {
-                        JarFile(jarFileOnDisk.file).use { jf ->
-                            val ze = jf.getEntry(path.substring(path.indexOf("!") + 2))//Skip the ! and the /
-                            val zeTimeLong = ze.time
-                            val zeTimeDate = Date(zeTimeLong)
-                            d = zeTimeDate
-                        }
-                    } catch (ignored: IOException) {
-                    } catch (ignored: RuntimeException) {
-                    }
-
-                }
-            }
-        }
-        return d
     }
 
     // If it hangs, most likely a GUI thread hangs which made a thread which called this

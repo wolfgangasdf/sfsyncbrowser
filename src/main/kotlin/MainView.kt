@@ -54,7 +54,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 prefWidth = 600.0
                 fieldset("About") {
-                    field("Build time") { textfield(Helpers.getClassBuildTime().toString()) { isDisable = true } }
+                    field("Build time") { textfield(MFile.getClassBuildTime().toString()) { isDisable = true } }
                     button("Open homepage...").setOnAction {
                         Helpers.openURL("https://github.com/wolfgangasdf/ssyncbrowser-test")
                     }
@@ -83,8 +83,9 @@ class MainView : View("SSyncBrowser") {
                     field("Editor path") {
                         textfield(SettingsStore.ssbSettings.editor) { tooltip("Full path to external editor program") }
                         button("Choose...").setOnAction {
-                            val fl = chooseFile("Select editor program", arrayOf(ef))
-                            fl.first().let {f -> SettingsStore.ssbSettings.editor.set(f.path) }
+                            chooseFile("Select editor program", arrayOf(ef)).asMFile().firstOrNull()?.let {
+                                SettingsStore.ssbSettings.editor.set(it.internalPath)
+                            }
                         }
                     }
                 }
@@ -216,9 +217,9 @@ class MainView : View("SSyncBrowser") {
                     field("Local folder") {
                         valitextfield(sync.localfolder, absPathRegex, "absolute!") { tooltip("Local base folder such as '/localdir'") }
                         button("Choose...").setOnAction {
-                            val dir = chooseDirectory("Select local folder")
-                            if (dir != null) if (dir.isDirectory) {
-                                sync.localfolder.set(if (dir.absolutePath.endsWith("/")) dir.absolutePath else dir.absolutePath + "/")
+                            val dir = chooseDirectory("Select local folder")?.asMFile()
+                            if (dir != null) if (dir.isDirectory()) {
+                                sync.localfolder.set(if (dir.internalPath.endsWith("/")) dir.internalPath else dir.internalPath + "/")
                             }
                         }
                         button("Reveal").setOnAction { revealFile(MFile(sync.localfolder.value)) }
@@ -387,6 +388,10 @@ class MainView : View("SSyncBrowser") {
                         button("Reveal local") { addClass(Styles.thinbutton) }.setOnAction {
                             revealFile(MFile(what.localfolder.value))
                         }
+                        if (what.type != SyncType.FILE)
+                            button("Browse remote") { addClass(Styles.thinbutton) }.setOnAction {
+                                openNewWindow(BrowserView(what.server, "", what.remoteFolder.value))
+                            }
                         label(what.status)
                     }
                     is SubSet -> {
@@ -409,6 +414,15 @@ class MainView : View("SSyncBrowser") {
 
     override val root = vbox {
         prefWidth = 800.0
+        menubar {
+            isUseSystemMenuBar = true
+            menu("Help") {
+                item("About").setOnAction {
+                    openNewWindow(AboutView(), Modality.APPLICATION_MODAL)
+                }
+                item("Test MFile").setOnAction { MFile.testit() }
+            }
+        }
         this += ttv
         hbox {
             button("Add server") { action {
@@ -423,22 +437,6 @@ class MainView : View("SSyncBrowser") {
             button("save sett") { action {
                 SettingsStore.saveSettings()
             } }
-            button("test") { action {
-                val testtask = MyTask<Unit> {
-                    updateTit("Getting remote file list...")
-                    Thread.sleep(500L)
-                    updateProgr(10,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
-                    Thread.sleep(500L)
-                    updateProgr(20,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
-                    Thread.sleep(500L)
-                    updateProgr(30,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
-                    Thread.sleep(500L)
-                    updateProgr(40,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
-                    Thread.sleep(500L)
-                    updateProgr(50,100," asdjkfdg skdfghs kdfgs kdfjg sdkjfg skdjfg ksdjfg ksdjfg skjdfg skjdfg ksdjfg ksdjfg ksdjfg skdfg skdjfg skdfg skdjfgh sdkjfg skdjfg ")
-                }
-                MyWorker.runTask(testtask)
-            } }
         }
         this += settingsview
     }
@@ -448,14 +446,6 @@ class MainView : View("SSyncBrowser") {
         Screen.getPrimary().bounds.let {
             currentStage!!.x = 0.1 * it.width
             currentStage!!.y = 0.1 * it.height
-        }
-        menubar {
-            isUseSystemMenuBar = true
-            menu("Help") {
-                item("About").setOnAction {
-                    openNewWindow(AboutView(), Modality.APPLICATION_MODAL)
-                }
-            }
         }
         ttv.setOnMouseClicked { me ->
             val src = ttv.selectedValue

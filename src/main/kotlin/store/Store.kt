@@ -35,21 +35,13 @@ object DBSettings {
     private var dbdir = ""
 
     init {
-        when {
-            Helpers.isMac() -> {
-                settpath = System.getProperty("user.home") + "/Library/Application Support/SSyncBrowser"
-                dbdir = "$settpath/cache"
-            }
-            Helpers.isLinux() -> {
-                settpath = System.getProperty("user.home") + "/.ssyncbrowser"
-                dbdir = "$settpath/cache"
-            }
-            Helpers.isWin() -> {
-                settpath = Helpers.toJavaPathSeparator(System.getenv("APPDATA")) + "/SSyncBrowser"
-                dbdir = "$settpath/cache"
-            }
+        settpath = MFile.fromOSPath(when {
+            Helpers.isMac() -> System.getProperty("user.home") + "/Library/Application Support/SSyncBrowser"
+            Helpers.isLinux() -> System.getProperty("user.home") + "/.ssyncbrowser"
+            Helpers.isWin() -> Helpers.toJavaPathSeparator(System.getenv("APPDATA")) + "\\SSyncBrowser"
             else -> throw Exception("operating system not found")
-        }
+        }).internalPath
+        dbdir = "$settpath/cache"
         if (!MFile(dbdir).exists()) {
             logger.info("creating db dir $dbdir")
             MFile(dbdir).createDirectories()

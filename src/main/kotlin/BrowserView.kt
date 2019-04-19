@@ -530,8 +530,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
     private val miAddSync: MyMenuitem = MyMenuitem("Add permanent sync...") {
         val sname = dialogInputString("New sync", "Enter sync name:", "")
         var lfolder = "sylocalfolder"
-        chooseDirectory("Select local folder")?.let {
-            lfolder = if (it.absolutePath.endsWith("/")) it.absolutePath else it.absolutePath + "/"
+        chooseDirectory("Select local folder")?.asMFile()?.let {
+            lfolder = if (it.internalPath.endsWith("/")) it.internalPath else it.internalPath + "/"
         }
         server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
                 SSP(""), SSP(lfolder),
