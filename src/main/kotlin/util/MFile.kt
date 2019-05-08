@@ -165,7 +165,7 @@ class MFile(val internalPath: String) {
     fun exists() = file.exists()
     fun createDirectories() { Files.createDirectories(this.asPath()) }
     fun createNewFile() = file.createNewFile()
-    fun listFiles() = file.listFiles().map { MFile(it) }
+    fun listFiles() = file.listFiles().orEmpty().map { MFile(it) }
     fun parent() = asPath().parent?.let { MFile(it) }
     fun newBufferedReader(filecharset: Charset): BufferedReader = Files.newBufferedReader(asPath(), filecharset)
     fun newBufferedWriter(sz: Int): BufferedWriter = BufferedWriter(FileWriter(file), sz)
