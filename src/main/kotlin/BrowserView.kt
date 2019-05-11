@@ -21,6 +21,7 @@ import util.Helpers.dialogOkCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
+import util.Helpers.runUIwait
 import util.Helpers.toThousandsCommas
 import util.Helpers.tokMGTPE
 import java.nio.file.attribute.PosixFilePermission
@@ -212,26 +213,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
     private fun dropit(de: DragEvent, onto: String) {
         logger.debug("dropped: have files = ${de.dragboard.hasFiles()}!")
         //println("dragdropped: hasfiles=${de.dragboard.hasFiles()} source=${de.gestureSource} de=$de db=${de.dragboard}")
-        if (de.dragboard.hasFiles()) {
+        if (de.dragboard.hasFiles()) { // drop of local file
             // get local base path of file(s)
             val localBase = de.dragboard.files.first().parent + "/"
 
-            // check overwrites
-            val existing = mutableListOf<VirtualFile>()
-            de.dragboard.files.forEach { f ->
-                files.find { vf -> vf.getFileName() == f.name }?.let { existing.add(it) }
-            }
-            if (existing.isNotEmpty()) {
-                if (!dialogOkCancel("Drop files...", "Remote files existing, overwrite all or cancel?", existing.joinToString("\n"))) {
-                    de.isDropCompleted = false
-                    de.consume()
-                    return
-                }
-            }
-
             val fff = arrayListOf<MFile>()
 
-            // expand dirs
+            // get drop file & dir list
             de.dragboard.files.forEach { f ->
                 if (f.isDirectory) {
                     f.walkTopDown().forEach { fff += MFile(it) }
@@ -243,11 +231,14 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 updateBrowser()
             }, "Uploading", server, "") { c ->
                 fff.forEach { f ->
-                    updateTit("Uploading file $f...")
-                    c.putfile("", f.internalPath, f.lastModified(), "${currentPath.value}${f.internalPath.removePrefix(localBase)}")
+                    updateTit("Uploading file $f")
+                    val rp = "$onto${f.internalPath.removePrefix(localBase)}"
+                    val doit = if (c.listSingleFile(rp) == null) true else
+                        runUIwait { dialogOkCancel("Drop files...", "Remote file existing, overwrite all or cancel?", c.remoteBasePath + rp) }
+                    if (doit) c.putfile("", f.internalPath, f.lastModified(), rp)
                 }
             }
-        } else if (de.dragboard.hasContent(dataFormatVFs)) {
+        } else if (de.dragboard.hasContent(dataFormatVFs)) { // remote -> remote drop
             val dc = de.dragboard.getContent(dataFormatVFs)
             MyWorker.runTaskWithConn({
                 logger.info("successfully moved files!")
@@ -258,9 +249,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 if (dc is List<*>) {
                     dc.forEach { f ->
                         if (f is VirtualFile) {
-                            logger.debug("moving file $f to ${onto + f.getFileName()} ...")
-                            updateTit("Renaming file $f to ${onto + f.getFileName()} ...")
-                            c.extRename(f.path, onto + f.getFileName())
+                            val rp = onto + f.getFileName()
+                            logger.debug("moving file $f to $rp ...")
+                            updateTit("Renaming file $f to $rp ...")
+                            val doit = if (c.listSingleFile(onto + f.getFileName()) == null) true else {
+                                if (runUIwait { dialogOkCancel("Drop files...", "Remote file existing, overwrite all or cancel?", c.remoteBasePath + rp) }) {
+                                    c.deletefile(rp)
+                                    true
+                                } else false
+                            }
+                            if (doit) c.extRename(f.path, rp)
                         }
                     }
                 }
@@ -353,8 +351,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
             }
             row.setOnDragDropped { de ->
                 logger.debug("drop on row.item=${row.item}")
-                if (row.item == null || row.item?.isDir() == true)
-                    dropit(de, if (row.item != null) row.item.path else currentPath.value)
+                val onto = if (row.item == null || row.item?.isDir() == false) currentPath.value
+                                       else if (row.item.isDir()) row.item.path else null
+                logger.debug("  onto=$onto")
+                if (onto != null) dropit(de, onto)
                 de.consume()
             }
             row

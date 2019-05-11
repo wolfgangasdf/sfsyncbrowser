@@ -77,6 +77,7 @@ class MyURI(var protocol: String, var username: String, var host: String, var po
 }
 
 // if ends on "/", is dir except for "" which is also dir (basepath)
+// always below remoteBasePath!
 class VirtualFile(path: String, var modTime: Long, var size: Long, var permissions: MutableSet<PosixFilePermission> = mutableSetOf()) : Comparable<VirtualFile>, Serializable {
     var path: String = MFile.normalizePath(path)
 
@@ -119,6 +120,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean = false)
     abstract fun deletefile(what: String)
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit)
+    abstract fun listSingleFile(remotePath: String): VirtualFile?
     abstract fun isAlive(): Boolean
 
     // extended functions only for some connections
@@ -215,13 +217,15 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         getfile(localBasePath, from, mtime, lp)
     }
 
+    private fun stripPath(full: String) = if (full == remoteBasePath.dropLast(1)) "" else full.substring(remoteBasePath.length)
+
     // include the subfolder but root "/" is not allowed!
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
         fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
             if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
-            var strippedPath: String = if (cc.internalPath == remoteBasePath.dropLast(1)) "" else cc.internalPath.substring(remoteBasePath.length)
+            var strippedPath: String = stripPath(cc.internalPath)
             if (cc.isDirectory(*linkOptions) && strippedPath != "" && !strippedPath.endsWith("/")) strippedPath += "/"
             if (cc.isDirectory(*linkOptions) || cc.isRegularFile(*linkOptions)) {
                 val vf = VirtualFile(strippedPath, cc.getLastModifiedTime(), cc.getSize(),
@@ -243,6 +247,11 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
             parseContent(sp, goDeeper = true, forceFollowSymlinks = true)
         }
         logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
+    }
+
+    override fun listSingleFile(remotePath: String): VirtualFile? {
+        val sp = MFile(remoteBasePath + remotePath)
+        return if (sp.exists()) VirtualFile(stripPath(sp.internalPath), sp.getLastModifiedTime(), sp.getSize(), sp.getPosixFilePermissions()) else null
     }
 
     override fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean) {
@@ -480,6 +489,11 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             doaction(sp, sftpsp, true) { parseContent(it) }
         }
         logger.debug("parsing done")
+    }
+
+    override fun listSingleFile(remotePath: String): VirtualFile? {
+        val sftpsp = sftpexists(remoteBasePath + remotePath)
+        return if (sftpsp == null) null else VirtualFile(remotePath.substring(remoteBasePath.length), sftpsp.mtime * 1000, sftpsp.size)
     }
 
     private val filePermissions2posix = mapOf(
