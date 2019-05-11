@@ -490,7 +490,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     private fun addFilesync(op: SfsOp) {
         val newSync = Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
-                SSP(""), SSP(fileTableView.selectedItem?.getParent()), SSP(""), server = server).apply {
+                SSP(""), SSP(fileTableView.selectedItem?.getParent()), server = server).apply {
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(true)
         }
@@ -535,7 +535,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         }
         server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
                 SSP(""), SSP(lfolder),
-                SSP(fileTableView.selectedItem!!.path), SSP(""), server=server)
+                SSP(fileTableView.selectedItem!!.path), server=server)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miAddCachedSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
@@ -543,7 +543,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         // TODO make ini action = use remote!
         server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
                 SSP(""), SSP(""),
-                SSP(fileTableView.selectedItem!!.path), SSP(""), server=server).apply {
+                SSP(fileTableView.selectedItem!!.path), server=server).apply {
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(false)
         }

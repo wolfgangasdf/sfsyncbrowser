@@ -124,7 +124,7 @@ class MainView : View("SSyncBrowser") {
                         button("Add new sync") { action {
                             Sync(SyncType.NORMAL, SSP("syname"),
                                 SSP(""), SSP("sylocalfolder"),
-                                SSP("syremotefolder"), SSP(""), server=server).let {
+                                SSP("syremotefolder"), server=server).let {
                                 server.syncs += it
                                 selectItem(it)
                             }
@@ -236,7 +236,12 @@ class MainView : View("SSyncBrowser") {
                             }
                         }
                     }
-                    field("Exclude filter") { textfield(sync.excludeFilter) }
+                    field("Exclude filter") {
+                        textfield(sync.excludeFilter) { tooltip("Regular expression like (\\.DS_Store)|(\\._.*)") }
+                        button("Reset to OS default").setOnAction {
+                            sync.excludeFilter.set( Helpers.defaultOSexcludeFilter() )
+                        }
+                    }
                     field {
                         button("Add new subset") { action {
                             SubSet(SSP("ssname"), SSP(""), sync = sync).let {

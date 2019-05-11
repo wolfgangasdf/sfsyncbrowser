@@ -92,7 +92,8 @@ class SSBSettings(val editor: StringProperty = SSP(""),
 enum class SyncType { NORMAL, FILE, CACHED }
 
 // title is filepath for file sync
-class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty, val excludeFilter: StringProperty,
+class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
+           val excludeFilter: StringProperty = SSP(Helpers.defaultOSexcludeFilter()),
            val cacheid: StringProperty = SSP(Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(),
            val auto: BooleanProperty = SBP(false), val disableFullSync: BooleanProperty = SBP(false),

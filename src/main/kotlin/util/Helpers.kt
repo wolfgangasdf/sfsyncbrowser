@@ -40,6 +40,12 @@ object Helpers {
     fun isLinux() = System.getProperty("os.name").toLowerCase().matches("(.*nix)|(.*nux)".toRegex())
     fun isWin() = System.getProperty("os.name").toLowerCase().contains("win")
 
+    fun defaultOSexcludeFilter() = when {
+        isMac() -> "(\\.DS_Store)|(\\._.*)"
+        isLinux() -> ""
+        else -> "(\\~\\$)"
+    }
+
     fun dformat() = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
     fun tokMGTPE(d: Double): String {
