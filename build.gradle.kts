@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 
-val kotlinversion = "1.3.30"
+val kotlinversion = "1.3.31"
 
 buildscript {
     repositories {
@@ -16,7 +16,7 @@ group = "com.wolle.ssyncbrowser"
 version = "1.0-SNAPSHOT"
 
 plugins {
-    kotlin("jvm") version "1.3.30"
+    kotlin("jvm") version "1.3.31"
     id("idea")
     id("application")
     id("com.github.ben-manes.versions") version "0.21.0"
@@ -69,8 +69,8 @@ dependencies {
     compile("io.github.microutils:kotlin-logging:1.6.26")
     compile("com.hierynomus:sshj:0.27.0")
     compile("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
-    compile("no.tornado:tornadofx:1.7.18")
-    compile("io.methvin:directory-watcher:0.9.4")
+    compile("no.tornado:tornadofx:1.7.19")
+    compile("io.methvin:directory-watcher:0.9.5")
     runtime("org.bouncycastle:bcprov-jdk15on:1.61")
     runtime("org.bouncycastle:bcpkix-jdk15on:1.61")
 }

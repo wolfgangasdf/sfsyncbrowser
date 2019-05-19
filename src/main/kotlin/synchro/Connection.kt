@@ -144,6 +144,17 @@ abstract class GeneralConnection(val protocol: Protocol) {
         return Pair(resp, isdir)
     }
 
+    // helper for browserview
+    fun listRecursively(what: List<VirtualFile>): ArrayList<VirtualFile> {
+        val fff = arrayListOf<VirtualFile>()
+        what.forEach { selvf ->
+            if (selvf.isDir())
+                list(selvf.path, "", true, true) { fff += it }
+            else fff += selvf
+        }
+        return fff
+    }
+
     abstract fun cleanUp()
 }
 

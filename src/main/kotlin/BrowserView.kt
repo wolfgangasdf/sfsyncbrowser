@@ -59,7 +59,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         onChange { if (it != null) updateBrowser() }
     }
 
-    private val files = mutableListOf<VirtualFile>().observable()
+    private val files = mutableListOf<VirtualFile>().asObservable()
 
     var selectFolderCallback: (f: VirtualFile) -> Unit = {}
     var selectFoldersCallback: (fl: List<VirtualFile>) -> Unit = {}
@@ -373,15 +373,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
                 val taskGetFile = MyTask<Unit> {
                     updateTit("Downloading files for drag and drop...")
-                    val fff = arrayListOf<VirtualFile>()
-                    selectionModel.selectedItems.forEach { selvf ->
-                        if (selvf.isDir()) {
-                            server.getConnection("").list(selvf.path, "", true, true) {
-                                fff += it
-                            }
-                        } else fff += selvf
-                    }
-
+                    val fff = server.getConnection("").listRecursively(selectionModel.selectedItems.toList())
                     fff.forEach { vf ->
                         updateMsg("Downloading file $vf...")
                         logger.debug("rb=$remoteBase vfpath=${vf.path}")
@@ -588,9 +580,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }.apply { isDisable = !isNormal() }
 
     private val miDelete: MyMenuitem = MyMenuitem("Delete", KeyCodeCombination(KeyCode.BACK_SPACE, KeyCombination.META_DOWN)) {
-        if (dialogOkCancel("Delete files", "Really delete these files?", fileTableView.selectionModel.selectedItems.joinToString { "${it.path}\n" })) {
-            MyWorker.runTaskWithConn({ updateBrowser() }, "Delete", server, "") { c ->
-                fileTableView.selectionModel.selectedItems.forEach { c.deletefile(it.path) }
+        MyWorker.runTaskWithConn({
+            updateBrowser()
+        }, "Delete files...", server, basePath) { c ->
+            updateMsg("Searching for files...")
+            val fff = c.listRecursively(fileTableView.selectionModel.selectedItems.toList()).reversed() // reversed delete!
+            updateMsg("Confirm...")
+            if (runUIwait { dialogOkCancel("Delete files", "Really delete these files?", fff.joinToString("\n") { it.path })}) {
+                updateMsg("Delete...")
+                fff.forEach { c.deletefile(it.path) }
             }
         }
     }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }
