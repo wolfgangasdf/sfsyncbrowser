@@ -17,6 +17,7 @@ import tornadofx.addStageIcon
 import tornadofx.reloadStylesheetsOnFocus
 import util.Helpers
 import util.Helpers.dialogOkCancel
+import javax.imageio.ImageIO
 import kotlin.random.Random
 
 private val logger = KotlinLogging.logger {}
@@ -72,6 +73,9 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
             }
         }
         super.start(stage)
+        // Dock icon
+        if (Helpers.isMac()) java.awt.Taskbar.getTaskbar().iconImage = ImageIO.read(this::class.java.getResource("/icons/icon_256x256.png"))
+
     }
 
     init {
