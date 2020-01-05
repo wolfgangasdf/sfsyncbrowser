@@ -51,7 +51,7 @@ This will result in nice synchronization errors, no data loss will happen.
 
 * Get Oracle JDK 8
 * I use the free community version of [IntelliJ IDEA](https://www.jetbrains.com/idea/download/), just import the project to get started.
-* Package for all platforms: `gradle dist`.
+* Package for all platforms: `./gradlew dist`.
 * There is no native code, cross-platform only based on java.
 
 ### Used frameworks ###

@@ -43,20 +43,20 @@ javafx {
     version = "12"
     modules("javafx.base", "javafx.controls", "javafx.web")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
-    configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "compile"
+    configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"
 }
 val javaFXOptions = the<JavaFXOptions>()
 
 dependencies {
-    compile("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
-    compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    compile("io.github.microutils:kotlin-logging:1.7.8")
-    compile("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
-    compile("no.tornado:tornadofx:2.0.0-SNAPSHOT")
-    compile("com.hierynomus:sshj:0.27.0")
-    compile("io.methvin:directory-watcher:0.9.5")
-    runtime("org.bouncycastle:bcprov-jdk15on:1.61")
-    runtime("org.bouncycastle:bcpkix-jdk15on:1.61")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
+    implementation("io.github.microutils:kotlin-logging:1.7.8")
+    implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
+    implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT")
+    implementation("com.hierynomus:sshj:0.27.0")
+    implementation("io.methvin:directory-watcher:0.9.6")
+    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.64")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.64")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
