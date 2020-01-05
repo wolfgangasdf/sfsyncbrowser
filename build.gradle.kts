@@ -30,7 +30,8 @@ plugins {
 
 application {
     mainClassName = "MainKt"
-    //defaultTasks = tasks.run
+    applicationDefaultJvmArgs = listOf("-Dprism.verbose=true", "-Dprism.order=sw", // use software renderer
+            "--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED") // javafx 13 tornadofx bug: https://github.com/edvin/tornadofx/issues/899#issuecomment-569709223
 }
 
 repositories {
@@ -40,7 +41,7 @@ repositories {
 }
 
 javafx {
-    version = "12"
+    version = "13"
     modules("javafx.base", "javafx.controls", "javafx.web")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"

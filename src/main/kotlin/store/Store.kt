@@ -422,7 +422,7 @@ class Cache(private val cacheid: String) {
                         logger.debug("changed se2: " + se2.toStringNice())
                         cache[se2.path] = se2.se
                     }
-                } else throw NotImplementedError("obslist wants to do something else! ")
+                } else throw NotImplementedError("obslist wants to do something else! $op")
             }
         }
     }

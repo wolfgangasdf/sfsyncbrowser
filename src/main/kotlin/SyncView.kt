@@ -2,7 +2,7 @@
 import diffmatchpatch.diff_match_patch
 import javafx.scene.control.Alert
 import javafx.scene.control.Button
-import javafx.scene.layout.Priority
+import javafx.scene.control.TableView
 import javafx.scene.paint.Color
 import mu.KotlinLogging
 import store.Server
@@ -124,7 +124,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                     val haveChanges = taskCompFiles.get()
                     btCompare.isDisable = false
                     runUIwait { profile.cache.updateObservableBuffer() }
-                    fileTableView.resizeColumnsToFitContent()
                     logger.debug("havechanges=$haveChanges")
                     syncEnabled = true
                     val canSync = updateSyncButton()
@@ -203,20 +202,23 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
 
     private val fileTableView = tableview(profile.cache.observableList) {
         isEditable = false
-        readonlyColumn("Local", SyncEntry2::se).cellFormat {
+        columnResizePolicy = TableView.UNCONSTRAINED_RESIZE_POLICY //BUG: SmartResize & contentWidth: no horiz scroll shown
+        multiSelect(true)
+
+        readonlyColumn("Local", SyncEntry2::se).fixedWidth(200.0).cellFormat {
             text = it.detailsLocal().value
         }
-        readonlyColumn("Status", SyncEntry2::se).cellFormat {
+        readonlyColumn("Status", SyncEntry2::se).fixedWidth(50.0).cellFormat {
             text = it.status().value
             style {
                 backgroundColor = multi(CF.stringToColor(it.status().value))
                 textFill = Color.BLACK
             }
         }
-        readonlyColumn("Remote", SyncEntry2::se).cellFormat {
+        readonlyColumn("Remote", SyncEntry2::se).fixedWidth(200.0).cellFormat {
             text = it.detailsRemote().value
         }
-        readonlyColumn("Path", SyncEntry2::path).remainingWidth().cellFormat {
+        readonlyColumn("Path", SyncEntry2::path).fixedWidth(2000.0).cellFormat {
             text = it
             tooltip {
                 setOnShowing {
@@ -229,8 +231,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
         selectionModel.selectedItems.onChange {
             updateActionButtons()
         }
-        multiSelect(true)
-        vgrow = Priority.ALWAYS
     }
 
     private val mbAdvanced = menubutton("Advanced...") {

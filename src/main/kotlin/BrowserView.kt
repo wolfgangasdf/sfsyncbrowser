@@ -134,7 +134,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                                     dialogMessage(Alert.AlertType.INFORMATION, "Info", "Path: ${vfs.first().path}\nRecursive size: ${toThousandsCommas(size)} bytes", "")
                                 }, "Calculate size recursively...", server, basePath) { c ->
                                     vfs.forEach { vf ->
-                                        c.list(vf.path, "", true, true) { vflist ->
+                                        c.list(vf.path, "", recursive = true, resolveSymlinks = true) { vflist ->
                                             size += vflist.size
                                         }
                                     }
@@ -191,7 +191,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                                 vfs.forEach { vf ->
                                     addFileUpdatePerms(vf)
                                     if (vf.isDir() && recursively.value) {
-                                        c.list(vf.path, "", true, true) { vflist ->
+                                        c.list(vf.path, "", recursive = true, resolveSymlinks = true) { vflist ->
                                             addFileUpdatePerms(vflist)
                                         }
                                     }
@@ -278,7 +278,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 1 -> column("Name", VirtualFile::getFileNameBrowser).remainingWidth().apply { sortType = TableColumn.SortType.ASCENDING }
                 2 -> column("Size", VirtualFile::size).apply { cellFormat { text = tokMGTPE(it) } }
                 3 -> column("Perms", VirtualFile::getPermString)
-                4 -> column("Modtime", VirtualFile::modTime).apply { cellFormat { text = Helpers.dformat().format(it) } }
+                4 -> column("Modtime", VirtualFile::modTime).apply {
+                    cellFormat { text = Helpers.dformat().format(it) }
+                    minWidth = 150.0
+                }
                 else -> { error("Unknown column number ${col.first}") ; null }
             }?.let {
                 it.userData = col.first
@@ -443,7 +446,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
             val tmpl = mutableListOf<VirtualFile>()
             updateTit("Getting remote file list...")
-            server.getConnection(basePath).list(currentPath.value, "", false, true) { it2 ->
+            server.getConnection(basePath).list(currentPath.value, "", recursive = false, resolveSymlinks = true) { it2 ->
                 if (it2.path != currentPath.value &&
                         (SettingsStore.ssbSettings.showHiddenfiles.value || !it2.getFileName().startsWith("."))) tmpl.add(it2)
             }
