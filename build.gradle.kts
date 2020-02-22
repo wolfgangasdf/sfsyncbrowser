@@ -80,11 +80,12 @@ runtime {
 }
 
 open class CrossPackage : DefaultTask() {
-    var execfilename = "execfilename"
-    var macicnspath = "macicnspath" // name should be execfilename.icns
+    @org.gradle.api.tasks.Input var execfilename = "execfilename"
+    @org.gradle.api.tasks.Input var macicnspath = "macicnspath"
 
     @TaskAction
     fun crossPackage() {
+        File("${project.buildDir.path}/crosspackage/").mkdirs()
         project.runtime.targetPlatforms.get().forEach { (t, _) ->
             println("targetplatform: $t")
             val imgdir = "${project.runtime.imageDir.get()}/${project.name}-$t"
@@ -149,25 +150,13 @@ open class CrossPackage : DefaultTask() {
                     // touch folder to update Finder
                     File(appp).setLastModified(System.currentTimeMillis())
                     // zip it
-                    ant.withGroovyBuilder {
-                        "zip"("destfile" to "${project.buildDir.path}/crosspackage/$execfilename-mac.zip",
-                                "basedir" to "${project.buildDir.path}/crosspackage/mac") {
-                        }
-                    }
+                    org.gradle.kotlin.dsl.support.zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-mac.zip"), File("${project.buildDir.path}/crosspackage/mac"))
                 }
                 "win" -> {
-                    ant.withGroovyBuilder {
-                        "zip"("destfile" to "${project.buildDir.path}/crosspackage/$execfilename-win.zip",
-                                "basedir" to imgdir) {
-                        }
-                    }
+                    org.gradle.kotlin.dsl.support.zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-win.zip"), File(imgdir))
                 }
                 "linux" -> {
-                    ant.withGroovyBuilder {
-                        "zip"("destfile" to "${project.buildDir.path}/crosspackage/$execfilename-linux.zip",
-                                "basedir" to imgdir) {
-                        }
-                    }
+                    org.gradle.kotlin.dsl.support.zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-linux.zip"), File(imgdir))
                 }
             }
         }
