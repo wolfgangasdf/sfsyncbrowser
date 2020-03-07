@@ -19,6 +19,7 @@ import util.Helpers
 import util.Helpers.dialogOkCancel
 import javax.imageio.ImageIO
 import kotlin.random.Random
+import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -52,14 +53,13 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
         SettingsStore.saveSettings()
         SettingsStore.shutdown()
         DBSettings.releaseLock()
-        System.exit(0)
+        exitProcess(0)
     }
 
     override fun start(stage: Stage) {
         stage.setOnCloseRequest {
             val filesyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.FILE } }.flatten()
             if (filesyncs.isNotEmpty()) {
-                // TODO: check for modifications cache <> local!
                 if (SettingsStore.ssbSettings.onExitRemoveFilesyncs.value ||
                         dialogOkCancel("File syncs existing", "File syncs existing. Remove them, including the local file?",
                                     filesyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {
@@ -67,6 +67,18 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
                     while (iter.hasNext()) {
                         val sync = iter.next()
                         logger.info("Exit: removing temporary file sync $sync !")
+                        sync.server.removeSync(sync)
+                    }
+                }
+            }
+            val cachedsyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.CACHED } }.flatten()
+            if (cachedsyncs.isNotEmpty()) {
+                if (dialogOkCancel("Cached syncs existing", "Cached syncs existing. Remove them, including all local files?",
+                        cachedsyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {
+                    val iter = cachedsyncs.iterator()
+                    while (iter.hasNext()) {
+                        val sync = iter.next()
+                        logger.info("Exit: removing cached sync $sync !")
                         sync.server.removeSync(sync)
                     }
                 }
@@ -85,7 +97,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
                 if (!dialogOkCancel("SFSync Error", "Lock file exists",
                         "If you are sure that no other Sfsync instance is running, press OK to remove the lockfile, " +
                                 "otherwise cancel!\nLockfile: " + DBSettings.lockFile))
-                    System.exit(1)
+                    exitProcess(1)
             }
         }
         addStageIcon(Image(resources["/icons/icon_16x16.png"]))

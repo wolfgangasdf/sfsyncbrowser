@@ -149,7 +149,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
         val fff = arrayListOf<VirtualFile>()
         what.forEach { selvf ->
             if (selvf.isDir())
-                list(selvf.path, "", true, true) { fff += it }
+                list(selvf.path, "", recursive = true, resolveSymlinks = true) { fff += it }
             else fff += selvf
         }
         return fff
@@ -261,6 +261,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun listSingleFile(remotePath: String): VirtualFile? {
+        logger.debug("listsinglefile: $remotePath")
         val sp = MFile(remoteBasePath + remotePath)
         return if (sp.exists()) VirtualFile(stripPath(sp.internalPath), sp.getLastModifiedTime(), sp.getSize(), sp.getPosixFilePermissions()) else null
     }
@@ -503,6 +504,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun listSingleFile(remotePath: String): VirtualFile? {
+        logger.debug("listsinglefile: $remotePath")
         val sftpsp = sftpexists(remoteBasePath + remotePath)
         return if (sftpsp == null) null else VirtualFile(remotePath.substring(remoteBasePath.length), sftpsp.mtime * 1000, sftpsp.size)
     }

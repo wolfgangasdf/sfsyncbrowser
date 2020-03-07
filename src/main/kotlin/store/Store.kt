@@ -27,6 +27,7 @@ import util.Helpers.filecharset
 import util.Helpers.getSortedFilteredList
 import util.Helpers.tokMGTPE
 import java.util.*
+import kotlin.math.abs
 
 private val logger = KotlinLogging.logger {}
 
@@ -71,13 +72,8 @@ object DBSettings {
         MFile(getCacheFilePath(cacheid)).delete()
     }
     fun removeCacheFolder(cacheid: String) {
-        logger.info("delete cache folder $cacheid")
-        val f = MFile(getCacheFolder(cacheid))
-        f.listFiles().forEach {
-            logger.info("deleting $it")
-            it.delete()
-        }
-        f.delete()
+        logger.info("delete cache folder $cacheid recursively")
+        MFile(getCacheFolder(cacheid)).deleteRecursively()
     }
 }
 
@@ -314,7 +310,7 @@ class SyncEntry(var action: Int,
                 var delete: Boolean = false
 ) {
     var hasCachedParent = false // only used for folders!
-    private fun sameTime(t1: Long, t2: Long): Boolean = Math.abs(t1 - t2) < 2000 // in milliseconds
+    private fun sameTime(t1: Long, t2: Long): Boolean = abs(t1 - t2) < 2000 // in milliseconds
 
     fun status() = SSP(this, "status", CF.amap[action])
     fun detailsLocal() = SSP(this, "detailsl",

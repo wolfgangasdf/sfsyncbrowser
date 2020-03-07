@@ -12,7 +12,6 @@ import javafx.concurrent.Task
 import javafx.event.EventTarget
 import javafx.scene.control.*
 import javafx.scene.layout.Priority
-import javafx.scene.web.WebView
 import javafx.stage.*
 import mu.KotlinLogging
 import store.Server
@@ -22,11 +21,18 @@ import synchro.VirtualFile
 import tornadofx.*
 import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
+import java.io.File
+import java.io.IOException
 import java.net.URI
+import java.net.URISyntaxException
 import java.nio.charset.Charset
+import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
+import java.util.jar.JarFile
 import kotlin.math.floor
+import kotlin.math.ln
+import kotlin.math.pow
 
 
 private val logger = KotlinLogging.logger {}
@@ -51,18 +57,18 @@ object Helpers {
     fun tokMGTPE(d: Double): String {
         var num = d
         var ext = ""
-        val expo = minOf(floor(Math.log(d) / Math.log(1000.0)).toInt(), 6)
+        val expo = minOf(floor(ln(d) / ln(1000.0)).toInt(), 6)
         if (expo > 0) {
             ext = "kMGTPE" [expo - 1].toString()
-            num = d / Math.pow(1000.0, expo.toDouble())
+            num = d / 1000.0.pow(expo.toDouble())
         }
         return "%.1f%s".format(num, ext)
     }
     fun tokMGTPE(d: Long): String {
-        val expo = minOf(floor(Math.log(d.toDouble()) / Math.log(1000.0)).toInt(), 6)
+        val expo = minOf(floor(ln(d.toDouble()) / ln(1000.0)).toInt(), 6)
         return if (expo > 0) {
             val ext = "kMGTPE" [expo - 1].toString()
-            val num = d / Math.pow(1000.0, expo.toDouble())
+            val num = d / 1000.0.pow(expo.toDouble())
             "%.2f%s".format(num, ext)
         } else "%d".format(d)
     }
@@ -172,11 +178,31 @@ object Helpers {
     // If it hangs, most likely a GUI thread hangs which made a thread which called this
     fun <T>runUIwait( f: () -> T) : T {
         return if (!Platform.isFxApplicationThread()) {
-            val query = FutureTask<T>(Callable<T> { f() })
+            val query = FutureTask(Callable { f() })
             Platform.runLater(query)
             query.get()
         } else {
             f()
+        }
+    }
+
+    fun dialogYesNoCancel(titletext: String, header: String, content: String): Int {
+        return Alert(Alert.AlertType.CONFIRMATION, "", ButtonType.YES, ButtonType.NO, ButtonType.CANCEL).apply {
+            //initOwner(stage)
+            (dialogPane.scene.window as Stage).isAlwaysOnTop = true
+            title = titletext
+            headerText = header
+            if (content != "") {
+                dialogPane.content = textarea(content) {
+                    isEditable = false
+                }
+            }
+        }.showAndWait().orElse(ButtonType.NO).let {
+            when(it) {
+                ButtonType.OK -> 1
+                ButtonType.CANCEL -> -1
+                else -> 0
+            }
         }
     }
 
@@ -186,7 +212,11 @@ object Helpers {
             (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
-            contentText = content
+            if (content != "") {
+                dialogPane.content = textarea(content) {
+                    isEditable = false
+                }
+            }
         }.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK
     }
 
@@ -200,22 +230,16 @@ object Helpers {
         }.showAndWait().orElse(null)
     }
 
-    fun dialogMessage(type: Alert.AlertType, titletext: String, header: String, htmlmsg: String) {
+    fun dialogMessage(type: Alert.AlertType, titletext: String, header: String, content: String) {
         Alert(type).apply {
             //if (stage.owner.nonEmpty) initOwner(stage)
             (dialogPane.scene.window as Stage).isAlwaysOnTop = true
             title = titletext
             headerText = header
-            if (htmlmsg != "") {
-                val sp2 = ScrollPane().apply {
-                    // optional html message
-                    content = WebView().apply {
-                        engine.loadContent(htmlmsg)
-                    }
-                    isFitToWidth = true
-                    isFitToHeight = true
+            if (content != "") {
+                dialogPane.content = textarea(content) {
+                    isEditable = false
                 }
-                dialogPane.content = sp2
             }
         }.showAndWait()
     }
@@ -257,6 +281,44 @@ object Helpers {
         }
         return into
     }
+
+    fun getClassBuildTime(): Date? { // https://stackoverflow.com/a/22404140
+        var d: Date? = null
+        val currentClass = object : Any() {
+
+        }.javaClass.enclosingClass
+        val resource = currentClass.getResource(currentClass.simpleName + ".class")
+        if (resource != null) {
+            when(resource.protocol) {
+                "file" -> try {
+                    d = Date(File(resource.toURI()).lastModified())
+                } catch (ignored: URISyntaxException) {
+                }
+                "jar" -> {
+                    val path = resource.path
+                    d = Date(File(path.substring(5, path.indexOf("!"))).lastModified())
+                }
+                "zip" -> {
+                    val path = resource.path
+                    val jarFileOnDisk = File(path.substring(0, path.indexOf("!")))
+                    //long jfodLastModifiedLong = jarFileOnDisk.lastModified ();
+                    //Date jfodLasModifiedDate = new Date(jfodLastModifiedLong);
+                    try {
+                        JarFile(jarFileOnDisk).use { jf ->
+                            val ze = jf.getEntry(path.substring(path.indexOf("!") + 2))//Skip the ! and the /
+                            val zeTimeLong = ze.time
+                            val zeTimeDate = Date(zeTimeLong)
+                            d = zeTimeDate
+                        }
+                    } catch (ignored: IOException) {
+                    } catch (ignored: RuntimeException) {
+                    }
+
+                }
+            }
+        }
+        return d
+    }
 }
 
 // all other solutions didn't work well...
@@ -266,8 +328,14 @@ open class MyTask<T>(val callfun: MyTask<T>.() -> T): Task<T>() {
         return callfun()
     }
 
-    fun updateTit(title: String?) { runLater { updateTitle(title) } }
-    fun updateMsg(msg: String?) { runLater { updateMessage(msg) } }
+    fun updateTit(title: String?) { runLater {
+        logger.debug("task: title=$title")
+        updateTitle(title)
+    } }
+    fun updateMsg(msg: String?) { runLater {
+        logger.debug("task: msg=$msg")
+        updateMessage(msg)
+    } }
 
     fun updateProgr(workDone: Int, max: Int, msg: String) = updateProgr(workDone.toDouble(), max.toDouble(), msg)
     fun updateProgr(workDone: Double, max: Double, msg: String) {

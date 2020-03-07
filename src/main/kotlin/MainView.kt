@@ -54,7 +54,7 @@ class MainView : View("SSyncBrowser") {
             with(root) {
                 prefWidth = 600.0
                 fieldset("About") {
-                    field("Build time") { textfield(MFile.getClassBuildTime().toString()) { isDisable = true } }
+                    field("Build time") { textfield(Helpers.getClassBuildTime().toString()) { isDisable = true } }
                     button("Open homepage...").setOnAction {
                         Helpers.openURL("https://github.com/wolfgangasdf/ssyncbrowser-test")
                     }
@@ -326,7 +326,7 @@ class MainView : View("SSyncBrowser") {
     // this is better than writing generic type TtvThing, which gets messy!
     private inner class MyTreeItem(ele: Any) : TreeItem<Any>(ele) {
         private val changeListener = ChangeListener<Any> { _, _, _ ->
-            Event.fireEvent(this, TreeModificationEvent<Any>(valueChangedEvent<Any>(), this))
+            Event.fireEvent(this, TreeModificationEvent(valueChangedEvent<Any>(), this))
         }
         init {
             when (ele) {
@@ -355,7 +355,7 @@ class MainView : View("SSyncBrowser") {
     }
 
     private val ttv = treeview<Any> {
-        root = TreeItem<Any>("root")
+        root = TreeItem("root")
         populate({ ite -> MyTreeItem(ite)}) { parent ->
             val value = parent.value
             when {

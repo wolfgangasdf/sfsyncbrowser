@@ -1,6 +1,7 @@
 import mu.KotlinLogging
 import store.DBSettings
 import tornadofx.launch
+import util.Helpers
 import util.MFile
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -41,7 +42,7 @@ fun main(args: Array<String>) {
     logger.debug("debug")
     logger.trace("trace")
 
-    logger.info("SSyncBrowser built ${MFile.getClassBuildTime().toString()}")
+    logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
     logger.info("Log file: ${logfile.getOSPath()}")
     DBSettings.logFile = logfile
 

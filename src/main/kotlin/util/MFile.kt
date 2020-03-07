@@ -110,49 +110,12 @@ class MFile(val internalPath: String) {
                 d?.let { printit(it) }
             }
         }
-
-        fun getClassBuildTime(): Date? { // https://stackoverflow.com/a/22404140
-            var d: Date? = null
-            val currentClass = object : Any() {
-
-            }.javaClass.enclosingClass
-            val resource = currentClass.getResource(currentClass.simpleName + ".class")
-            if (resource != null) {
-                when(resource.protocol) {
-                    "file" -> try {
-                        d = Date(File(resource.toURI()).lastModified())
-                    } catch (ignored: URISyntaxException) {
-                    }
-                    "jar" -> {
-                        val path = resource.path
-                        d = Date(File(path.substring(5, path.indexOf("!"))).lastModified())
-                    }
-                    "zip" -> {
-                        val path = resource.path
-                        val jarFileOnDisk = File(path.substring(0, path.indexOf("!")))
-                        //long jfodLastModifiedLong = jarFileOnDisk.lastModified ();
-                        //Date jfodLasModifiedDate = new Date(jfodLastModifiedLong);
-                        try {
-                            JarFile(jarFileOnDisk).use { jf ->
-                                val ze = jf.getEntry(path.substring(path.indexOf("!") + 2))//Skip the ! and the /
-                                val zeTimeLong = ze.time
-                                val zeTimeDate = Date(zeTimeLong)
-                                d = zeTimeDate
-                            }
-                        } catch (ignored: IOException) {
-                        } catch (ignored: RuntimeException) {
-                        }
-
-                    }
-                }
-            }
-            return d
-        }
-    } // companion
+   } // companion
 
     constructor(f: File) : this(ipFromFile(f))
     constructor(p: Path) : this(ipFromFile(p.toFile()))
 
+    val asVFPath: String get() = internalPath + if (isDirectory()) "/" else ""
     fun asPath(): Path = file.toPath()
     fun getOSPath() = ospathFromIP(internalPath)
     fun readFileToString(): String {
@@ -175,6 +138,7 @@ class MFile(val internalPath: String) {
     fun setPosixFilePermissions(perms: Set<PosixFilePermission>) { Files.setPosixFilePermissions(asPath(), perms) }
     fun getPosixFilePermissions(): MutableSet<PosixFilePermission> = Files.getPosixFilePermissions(asPath())
     fun delete() = file.delete()
+    fun deleteRecursively() = file.deleteRecursively()
     fun deleteThrow() { Files.delete(asPath()) } // this throws exception if failed
     fun setLastModifiedTime(mtime: Long) { Files.setLastModifiedTime(asPath(), FileTime.fromMillis(mtime)) }
     fun getLastModifiedTime() = Files.getLastModifiedTime(asPath()).toMillis()

@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 
-val kotlinversion = "1.3.61"
+val kotlinversion = "1.3.70"
 
 buildscript {
     repositories {
@@ -20,11 +20,11 @@ println("Current Java version: ${JavaVersion.current()}")
 if (JavaVersion.current().toString() != "13") throw GradleException("Use Java 13")
 
 plugins {
-    kotlin("jvm") version "1.3.61"
+    kotlin("jvm") version "1.3.70"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.8"
-    id("com.github.ben-manes.versions") version "0.27.0"
+    id("com.github.ben-manes.versions") version "0.28.0"
     id("org.beryx.runtime") version "1.8.0"
 }
 
@@ -42,7 +42,7 @@ repositories {
 
 javafx {
     version = "13"
-    modules("javafx.base", "javafx.controls", "javafx.web")
+    modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"
 }
@@ -55,7 +55,7 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT")
     implementation("com.hierynomus:sshj:0.27.0")
-    implementation("io.methvin:directory-watcher:0.9.6")
+    implementation("io.methvin:directory-watcher:0.9.9")
     runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.64")
     runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.64")
 
@@ -72,7 +72,7 @@ runtime {
     options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
     // first row: suggestedModules
     modules.set(listOf("java.desktop", "java.logging", "java.prefs", "java.xml", "jdk.unsupported", "jdk.jfr", "jdk.jsobject", "jdk.xml.dom",
-            "jdk.crypto.cryptoki","jdk.crypto.ec")) // for some https (apod: ec)
+            "jdk.crypto.cryptoki","jdk.crypto.ec")) // needed?
 
     if (cPlatforms.contains("mac")) targetPlatform("mac", System.getenv("JDK_MAC_HOME"))
     if (cPlatforms.contains("win")) targetPlatform("win", System.getenv("JDK_WIN_HOME"))
@@ -196,5 +196,9 @@ tasks.withType<KotlinCompile> {
 
 task("dist") {
     dependsOn("crosspackage")
-    doLast { println("Created zips in build/crosspackage") }
+    doLast {
+        println("Deleting build/[image,jre,install]")
+        project.delete(project.runtime.imageDir.get(), project.runtime.jreDir.get(), "${project.buildDir.path}/install")
+        println("Created zips in build/crosspackage")
+    }
 }

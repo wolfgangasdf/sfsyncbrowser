@@ -18,6 +18,7 @@ import util.*
 import util.Helpers.dialogInputString
 import util.Helpers.dialogMessage
 import util.Helpers.dialogOkCancel
+import util.Helpers.dialogYesNoCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
 import util.Helpers.openFile
@@ -233,9 +234,10 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 fff.forEach { f ->
                     updateTit("Uploading file $f")
                     val rp = "$onto${f.internalPath.removePrefix(localBase)}"
-                    val doit = if (c.listSingleFile(rp) == null) true else
-                        runUIwait { dialogOkCancel("Drop files...", "Remote file existing, overwrite all or cancel?", c.remoteBasePath + rp) }
-                    if (doit) c.putfile("", f.internalPath, f.lastModified(), rp)
+                    val doit = if (c.listSingleFile(rp) == null) 1 else
+                        runUIwait { dialogYesNoCancel("Drop files...", "Remote file existing, overwrite?", c.remoteBasePath + rp) }
+                    if (doit == 1) c.putfile("", f.asVFPath, f.lastModified(), rp)
+                    else if (doit == -1) return@runTaskWithConn
                 }
             }
         } else if (de.dragboard.hasContent(dataFormatVFs)) { // remote -> remote drop
@@ -252,13 +254,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
                             val rp = onto + f.getFileName()
                             logger.debug("moving file $f to $rp ...")
                             updateTit("Renaming file $f to $rp ...")
-                            val doit = if (c.listSingleFile(onto + f.getFileName()) == null) true else {
-                                if (runUIwait { dialogOkCancel("Drop files...", "Remote file existing, overwrite all or cancel?", c.remoteBasePath + rp) }) {
-                                    c.deletefile(rp)
-                                    true
-                                } else false
+                            val doit = if (c.listSingleFile(onto + f.getFileName()) == null) 1 else {
+                                val doit2 = runUIwait { dialogYesNoCancel("Drop files...", "Remote file existing, overwrite/delete it?", c.remoteBasePath + rp) }
+                                if ( doit2 == 1) c.deletefile(rp)
+                                doit2
                             }
-                            if (doit) c.extRename(f.path, rp)
+                            if (doit == 1) c.extRename(f.path, rp)
+                            else if (doit == -1) return@runTaskWithConn
                         }
                     }
                 }
@@ -578,7 +580,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             val tempfolder = MFile.createTempDirectory("ssyncbrowsertemp")
             val f = MFile("${tempfolder.internalPath}/$it")
             if (!f.createNewFile()) throw Exception("Error creating file $f")
-            MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.internalPath, f.lastModified(), "${currentPath.value}${f.name}") }
+            MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.asVFPath, f.lastModified(), "${currentPath.value}${f.name}") }
         }
     }.apply { isDisable = !isNormal() }
 
