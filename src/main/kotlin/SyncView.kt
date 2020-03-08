@@ -32,7 +32,6 @@ import util.Helpers.showNotification
 import util.MFile
 import util.MyTask
 import util.MyWorker
-import util.SSP
 import java.util.*
 
 private val logger = KotlinLogging.logger {}
@@ -77,21 +76,26 @@ object CF {
     }
 }
 
-@Suppress("BooleanLiteralArgument")
 class SyncView(private val server: Server, private val sync: Sync, private val subset: SubSet) : MyView("Sync view $server $sync $subset") {
     // single-file constructor
-    private var isSingleFileSync = false
+    private var useNewFiles = false
+    private var runCompareAndSync = false // after shown, run compare and sync (if no conflict)
     private var afterSuccessfulSyncCallback: () -> Unit = {}
-    constructor(server: Server, sync: Sync, successfulSyncCallback: () -> Unit): this(server, sync, // single file sync
-            SubSet(SSP(""), SSP(""), sync = sync).apply {
-                subfolders += sync.title.value // this is filepath!
-            }) {
-        isSingleFileSync = true
-        afterSuccessfulSyncCallback = successfulSyncCallback
-    }
-
     private var profile = Profile(server, sync, subset)
     private var syncEnabled = false
+
+    companion object {
+        fun syncViewSingleFile(sync: Sync, successfulSyncCallback: () -> Unit) = SyncView(sync.server, sync, // single file sync view
+                SubSet.singlefile(sync)).apply {
+            useNewFiles = true
+            runCompareAndSync = true
+            afterSuccessfulSyncCallback = successfulSyncCallback
+        }
+        fun syncViewTempIniSync(sync: Sync) = SyncView(sync.server, sync, SubSet.all(sync)).apply {
+            useNewFiles = true
+            runCompareAndSync = true
+        }
+    }
 
     private fun handleFailed(task: MyTask<*>) {
         runUIwait {
@@ -111,22 +115,22 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
     }
 
     private fun runCompare(runSyncIfPossible: Boolean = false) {
-        logger.info("Compare...")
+        logger.info("runCompare: server=$server sync=$sync subset=$subset")
         btSync.isDisable = true
         val ctask = MyTask<Unit> {
             updateTit("A Compare files")
             updateProgr(0, 100, "Initialize local and remote...")
             val taskIni = profile.taskIni()
-            val taskCompFiles = profile.taskCompFiles(isSingleFileSync)
+            val taskCompFiles = profile.taskCompFiles(useNewFiles)
             taskIni.setOnSucceeded {
                 updateProgr(50, 100, "Run comparison...")
                 taskCompFiles.setOnSucceeded {
                     val haveChanges = taskCompFiles.get()
                     btCompare.isDisable = false
                     runUIwait { profile.cache.updateObservableBuffer() }
-                    logger.debug("havechanges=$haveChanges")
                     syncEnabled = true
                     val canSync = updateSyncButton()
+                    logger.info("==> havechanges=$haveChanges canSync=$canSync runSyncIfPossible=$runSyncIfPossible")
                     if (!haveChanges && canSync) {
                         logger.info("Finished compare, no changes found. Synchronizing...")
                         runSynchronize()
@@ -153,12 +157,13 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
     }
 
     private fun runSynchronize() {
+        logger.info("runSynchronize: server=$server sync=$sync subset=$subset")
         val taskSynchronize = profile.taskSynchronize()
         taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
             showNotification("Ssyncbrowser: successfully synchronized", "Server: ${server.title.value}",
-                    if (isSingleFileSync) sync.title.value else "Sync: ${sync.title.value} Subset: ${subset.title.value}")
-            if (subset.title.value == "<all>" || isSingleFileSync)
+                    if (subset.isSingleFile) sync.title.value else "Sync: ${sync.title.value} Subset: ${subset.title.value}")
+            if (subset.isAll || subset.isSingleFile)
                 sync.status.set("synchronized ${dformat().format(Date())}")
             else
                 subset.status.set("synchronized ${dformat().format(Date())}")
@@ -299,12 +304,12 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             btSkip.isDisable = false
             if (legal) {
                 if (allEqual) {
-                    if (existCheck == Pair(true, true)) btRmBoth.isDisable = false
+                    if (existCheck == Pair(first = true, second = true)) btRmBoth.isDisable = false
                 } else {
                     when (existCheck) {
-                        Pair(true,true) -> listOf(btUseLocal,btUseRemote,btMerge,btRmBoth).forEach { it.isDisable = false }
-                        Pair(true,false) -> listOf(btUseLocal,btRmLocal).forEach { it.isDisable = false }
-                        Pair(false,true) -> listOf(btUseRemote,btRmRemote).forEach { it.isDisable = false }
+                        Pair(first = true, second = true) -> listOf(btUseLocal,btUseRemote,btMerge,btRmBoth).forEach { it.isDisable = false }
+                        Pair(first = true, second = false) -> listOf(btUseLocal,btRmLocal).forEach { it.isDisable = false }
+                        Pair(first = false, second = true) -> listOf(btUseRemote,btRmRemote).forEach { it.isDisable = false }
                     }
                 }
             }
@@ -376,6 +381,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
     }
 
     override fun doAfterShown() {
-        runCompare(isSingleFileSync)
+        runCompare(runCompareAndSync)
     }
 }

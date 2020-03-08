@@ -85,7 +85,7 @@ class SSBSettings(val editor: StringProperty = SSP(""),
                   val showHiddenfiles: BooleanProperty = SBP(false)
 )
 
-enum class SyncType { NORMAL, FILE, CACHED }
+enum class SyncType { NORMAL, FILE, TEMP }
 
 // title is filepath for file sync
 class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
@@ -97,7 +97,7 @@ class Sync(val type: SyncType, val title: StringProperty, val status: StringProp
     private fun getNiceName() = when(type) {
         SyncType.NORMAL -> "Sync"
         SyncType.FILE -> "FileSync"
-        SyncType.CACHED -> "TempSync"
+        SyncType.TEMP -> "TempSync"
     }
     override fun toString() = "[${getNiceName()}] ${title.value}"
     var fileWatcher: FileWatcher? = null
@@ -112,10 +112,20 @@ class Protocol(val server: Server, val name: StringProperty, val protocoluri: St
     fun tunnelPort() = tunnelHost.value.split(":").getOrElse(1) { "22" }.toInt()
 }
 
-class SubSet(val title: StringProperty, val status: StringProperty,
+class SubSet(val title: StringProperty, val status: StringProperty, // if title is empty, single file subset!
              val subfolders: ObservableList<String> = getSortedFilteredList(),
              val sync: Sync) {
     override fun toString() = "[SubSet] ${title.value}"
+    val isAll: Boolean get() = title.value == "<all>"
+    val isSingleFile: Boolean get() = title.value == "<singlefile>"
+    companion object {
+        fun all(sync: Sync) = SubSet(SSP("<all>"), SSP(""), sync = sync).apply {
+            subfolders += "" // this is needed for tasklist[local,remote]!
+        }
+        fun singlefile(sync: Sync) = SubSet(SSP("<singlefile>"), SSP(""), sync = sync).apply {
+            subfolders += sync.title.value // this is filepath!
+        }
+    }
 }
 
 class BrowserBookmark(val server: Server, val path: StringProperty) {
@@ -348,16 +358,16 @@ class SyncEntry(var action: Int,
             }
 
 
-    fun compareSetAction(newcache: Boolean): SyncEntry {
+    fun compareSetAction(useNewFiles: Boolean): SyncEntry {
         action = -9
         if (lSize == -1L && rSize == -1L) { // cache only?
             action = A_CACHEONLY
         } else if (isEqual()) { // just equal?
             action = A_ISEQUAL
         } else if (cSize == -1L) { // not in remote cache
-            action = if (newcache) { // not equal, not in cache because cache new
+            action = if (!useNewFiles) { // not equal, not in cache
                 A_UNKNOWN
-            } else { // not in cache but cache not new: new file?
+            } else { // not in cache but useNewFiles: use file no matter from where if no conflict
                 if (lSize != -1L && rSize == -1L) A_USELOCAL // new local (cache not new)
                 else if (lSize == -1L && rSize != -1L) A_USEREMOTE // new remote (cache not new)
                 else A_UNKNOWN // not in cache but both present
@@ -425,6 +435,7 @@ class Cache(private val cacheid: String) {
 
     @Suppress("unused")
     fun dumpAll() {
+        logger.debug("--- cache dumpall:")
         cache.iterate { _, path, se -> logger.debug("$path: $se") }
     }
 

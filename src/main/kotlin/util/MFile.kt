@@ -5,15 +5,12 @@ import mu.KotlinLogging
 import tornadofx.chooseDirectory
 import tornadofx.chooseFile
 import java.io.*
-import java.net.URISyntaxException
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermission
-import java.util.*
-import java.util.jar.JarFile
 
 private val logger = KotlinLogging.logger {}
 
@@ -134,7 +131,7 @@ class MFile(val internalPath: String) {
     fun newBufferedWriter(sz: Int): BufferedWriter = BufferedWriter(FileWriter(file), sz)
     fun newFileWriter() = FileWriter(file)
     fun newFileReader() = FileReader(file)
-    fun newDirectoryStreamList() = Files.newDirectoryStream(asPath()).map { MFile(it) }
+    fun newDirectoryStreamList() = Files.newDirectoryStream(asPath()).use { dir -> dir.map { MFile(it) } }
     fun setPosixFilePermissions(perms: Set<PosixFilePermission>) { Files.setPosixFilePermissions(asPath(), perms) }
     fun getPosixFilePermissions(): MutableSet<PosixFilePermission> = Files.getPosixFilePermissions(asPath())
     fun delete() = file.delete()

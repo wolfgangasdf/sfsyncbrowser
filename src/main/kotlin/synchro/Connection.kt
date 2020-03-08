@@ -1,4 +1,3 @@
-@file:Suppress("ConstantConditionIf")
 
 package synchro
 
@@ -235,7 +234,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
         fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
-            if (Helpers.failat == 4) throw UnsupportedOperationException("fail 4")
             var strippedPath: String = stripPath(cc.internalPath)
             if (cc.isDirectory(*linkOptions) && strippedPath != "" && !strippedPath.endsWith("/")) strippedPath += "/"
             if (cc.isDirectory(*linkOptions) || cc.isRegularFile(*linkOptions)) {
@@ -247,7 +245,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
                     if (cc.isDirectory(*linkOptions) && goDeeper) {
                         val dir = cc.newDirectoryStreamList()
                         for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
-                        // dir.close() // TODO had to remove this...
                     }
                 }
             }
@@ -485,7 +482,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
 
         fun parseContent(folder: String) {
-            if (Helpers.failat == 3) throw UnsupportedOperationException("fail 3")
             val rris = sftpc.ls(folder)
             for (rri in rris.sortedBy { it.name }) {
                 // if (stopRequested) return
@@ -712,10 +708,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         sftpc.sftpEngine.timeoutMs = timeoutms
         transferListener = MyTransferListener()
         sftpt.transferListener = transferListener
-
         sftpt.preserveAttributes = false // don't set permissions from local, mostly doesn't make sense! Either by user or not at all.
-
-        if (Helpers.failat == 2) throw UnsupportedOperationException("fail 2")
     }
 
     override fun isAlive() = pfsftp.sshClient.isConnected

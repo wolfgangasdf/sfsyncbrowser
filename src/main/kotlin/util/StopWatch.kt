@@ -1,5 +1,3 @@
-@file:Suppress("unused", "MemberVisibilityCanBePrivate")
-
 package util
 
 import mu.KotlinLogging
@@ -7,20 +5,20 @@ import mu.KotlinLogging
 private val logger = KotlinLogging.logger {}
 
 
-// all in seconds!
-class StopWatch {
+@Suppress("unused", "MemberVisibilityCanBePrivate")
+class StopWatch { // all in seconds!
     var deltaSecs: Double = 0.0
     private var startNanos = System.nanoTime()
     fun doit(interval: Double): Boolean =
-            if (getTime() > interval) {
+            if (getElapsedTime() > interval) {
                 restart()
                 true
             } else false
 
 
-    fun getTime() = (System.nanoTime() - startNanos) / 1e9
+    private fun getElapsedTime(): Double = (System.nanoTime() - startNanos) / 1e9
     fun getTimeRestart(): Double {
-        val x = getTime()
+        val x = getElapsedTime()
         restart()
         return x
     }
@@ -35,7 +33,7 @@ class StopWatch {
     }
 
     fun printLapTime(msg: String) {
-        logger.info(msg + getTime())
+        logger.info(msg + getElapsedTime())
     }
 
     fun restart() {

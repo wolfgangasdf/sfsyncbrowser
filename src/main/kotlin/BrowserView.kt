@@ -7,7 +7,6 @@ import javafx.scene.control.*
 import javafx.scene.input.*
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
-import javafx.scene.layout.VBox
 import javafx.stage.Modality
 import javafx.stage.Stage
 import mu.KotlinLogging
@@ -303,11 +302,11 @@ class BrowserView(private val server: Server, private val basePath: String, path
         lazyContextmenu {
             this += miRefresh
             this += miAddBookmark
-            this += miAddTempSync
-            this += miAddTempSyncOpen
-            this += miAddTempSyncEdit
+            this += miAddTempSyncFile
+            this += miAddTempSyncFileOpen
+            this += miAddTempSyncFileEdit
             this += miAddSync
-            this += miAddCachedSync
+            this += miAddTempSync
             separator()
             this += miRename
             this += miInfo
@@ -512,15 +511,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
         server.bookmarks += BrowserBookmark(server, SSP(fileTableView.selectedItem?.path))
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
-    private val miAddTempSync: MyMenuitem = MyMenuitem("Add temporary syncfile") {
+    private val miAddTempSyncFile: MyMenuitem = MyMenuitem("Add temporary syncfile") {
         addFilesync(SfsOp.NONE)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
 
-    private val miAddTempSyncOpen: MyMenuitem = MyMenuitem("Add temporary syncfile and open") {
+    private val miAddTempSyncFileOpen: MyMenuitem = MyMenuitem("Add temporary syncfile and open") {
         addFilesync(SfsOp.OPEN)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
 
-    private val miAddTempSyncEdit: MyMenuitem = MyMenuitem("Add temporary syncfile and edit") {
+    private val miAddTempSyncFileEdit: MyMenuitem = MyMenuitem("Add temporary syncfile and edit") {
         addFilesync(SfsOp.EDIT)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isFile() == true }
 
@@ -535,15 +534,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 SSP(fileTableView.selectedItem!!.path), server=server)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
-    private val miAddCachedSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
+    private val miAddTempSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
         val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
-        // TODO make ini action = use remote!
-        server.syncs += Sync(SyncType.CACHED, SSP(sname?:"syname"),
-                SSP(""), SSP(""),
+        val newSync = Sync(SyncType.TEMP, SSP(sname?:"syname"),
+                SSP("not synced"), SSP(""),
                 SSP(fileTableView.selectedItem!!.path), server=server).apply {
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(false)
         }
+        server.syncs += newSync
+        MainView.compSyncTemp(newSync)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miRename: MyMenuitem = MyMenuitem("Rename...", KeyCodeCombination(KeyCode.R, KeyCombination.META_DOWN)) {
@@ -599,56 +599,53 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }
 
 
-    override val root = VBox()
-    init {
-        with(root) {
-            prefWidth = 800.0
-            prefHeight = 600.0
-            menubar {
-                isUseSystemMenuBar = true
-                menu("File") {
-                    this += miRefresh
-                    this += miAddBookmark
-                    this += miAddTempSync
-                    this += miAddTempSyncOpen
-                    this += miAddTempSyncEdit
-                    this += miAddSync
-                    this += miAddCachedSync
-                    separator()
-                    this += miRename
-                    this += miInfo
-                    this += miCopyURL
-                    separator()
-                    this += miDuplicate
-                    this += miNewFolder
-                    this += miNewFile
-                    this += miDelete
-                }
-                menu("View") {
-                    checkmenuitem("Show hidden files", null, null, SettingsStore.ssbSettings.showHiddenfiles).apply {
-                        setOnAction { updateBrowser() }
-                    }
-                    item("Paste")
-                }
+    override val root = vbox {
+        prefWidth = 800.0
+        prefHeight = 600.0
+        menubar {
+            isUseSystemMenuBar = true
+            menu("File") {
+                this += miRefresh
+                this += miAddBookmark
+                this += miAddTempSyncFile
+                this += miAddTempSyncFileOpen
+                this += miAddTempSyncFileEdit
+                this += miAddSync
+                this += miAddTempSync
+                separator()
+                this += miRename
+                this += miInfo
+                this += miCopyURL
+                separator()
+                this += miDuplicate
+                this += miNewFolder
+                this += miNewFile
+                this += miDelete
             }
-            toolbar {
-                when (mode) {
-                    BrowserViewMode.NORMAL -> {
-                    }
-                    BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
-                        if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
-                        this@BrowserView.close()
-                    }
-                    BrowserViewMode.SELECTFOLDERS -> button("Select Folder(s)").setOnAction {
-                        selectFoldersCallback(fileTableView.selectionModel.selectedItems.filter { vf -> vf.isDir() })
-                        this@BrowserView.close()
-                    }
+            menu("View") {
+                checkmenuitem("Show hidden files", null, null, SettingsStore.ssbSettings.showHiddenfiles).apply {
+                    setOnAction { updateBrowser() }
                 }
+                item("Paste")
             }
-            this += pathButtonFlowPane
-            this += fileTableView
-            fileTableView.smartResize()
         }
+        toolbar {
+            when (mode) {
+                BrowserViewMode.NORMAL -> {
+                }
+                BrowserViewMode.SELECTFOLDER -> button("Select Folder").setOnAction {
+                    if (fileTableView.selectedItem?.isDir() == true) selectFolderCallback(fileTableView.selectedItem!!)
+                    this@BrowserView.close()
+                }
+                BrowserViewMode.SELECTFOLDERS -> button("Select Folder(s)").setOnAction {
+                    selectFoldersCallback(fileTableView.selectionModel.selectedItems.filter { vf -> vf.isDir() })
+                    this@BrowserView.close()
+                }
+            }
+        }
+        this += pathButtonFlowPane
+        this += fileTableView
+        fileTableView.smartResize()
     }
 
     override fun doAfterShown() {

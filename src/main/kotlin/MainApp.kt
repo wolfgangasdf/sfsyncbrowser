@@ -71,7 +71,7 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
                     }
                 }
             }
-            val cachedsyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.CACHED } }.flatten()
+            val cachedsyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.TEMP } }.flatten()
             if (cachedsyncs.isNotEmpty()) {
                 if (dialogOkCancel("Cached syncs existing", "Cached syncs existing. Remove them, including all local files?",
                         cachedsyncs.joinToString("\n") { sy -> "${sy.server.title.value}: ${sy.title.value}" })) {

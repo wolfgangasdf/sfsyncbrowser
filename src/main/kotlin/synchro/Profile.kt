@@ -1,5 +1,3 @@
-@file:Suppress("ConstantConditionIf")
-
 package synchro
 
 import javafx.concurrent.Worker
@@ -49,13 +47,13 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         remote = server.getConnection(sync.remoteFolder.value)
         remote!!.permsOverride = sync.permsOverride.value
 
-        if (Helpers.failat == 1) throw UnsupportedOperationException("fail 1")
         profileInitialized = true
         updateProgr(100, 100, "done!")
     }
 
 
-    fun taskCompFiles(isSingleFileSync: Boolean = false) = MyTask<Boolean> {
+    fun taskCompFiles(useNewFiles: Boolean = false) = MyTask<Boolean> {
+        logger.info("taskCompFiles: usenewfiles=$useNewFiles server=$server sync=$sync subfolder=$subfolder")
         updateTit("CompareFiles...")
         val sw = StopWatch() // for timing meas
 
@@ -82,8 +80,8 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         val swUIupdate = StopWatch()
 
         fun acLocRem(vf: VirtualFile, isloc: Boolean, updact: (VirtualFile) -> Unit) {
+            //logger.debug("aclocrem: isloc=$isloc vf=$vf")
             if (swUIupdate.doit(uiUpdateInterval)) updact(vf)
-
             cache.cache.merge(vf.path,
                     SyncEntry(A_UNCHECKED, if (isloc) vf.modTime else 0, if (isloc) vf.size else -1,
                             if (!isloc) vf.modTime else 0, if (!isloc) vf.size else -1,
@@ -103,12 +101,14 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         val taskListLocal = MyTask<Unit> {
             updateTit("Find local file")
             subfolder.subfolders.forEach {
+                logger.debug("tasklistlocal: subfolder=$it")
                 local!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
         val taskListRemote = MyTask<Unit> {
             updateTit("Find remote file")
             subfolder.subfolders.forEach {
+                logger.debug("tasklistremote: subfolder=$it")
                 remote!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } }
             }
         }
@@ -145,8 +145,8 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         // compare entries
         updateProgr(76, 100, "comparing...")
         sw.restart()
-        logger.info("*********************** compare sync entrie")
-        val haveChanges = Comparison.compareSyncEntries(cache, isSingleFileSync)
+        logger.info("*********************** compare sync entries")
+        val haveChanges = Comparison.compareSyncEntries(cache, useNewFiles)
         logger.debug("havechanges1: $haveChanges")
 
         logger.debug("sw: comparing: " + sw.getTimeRestart())
@@ -191,7 +191,6 @@ class Profile(private val server: Server, private val sync: Sync, private val su
             }
 
             try {
-                if (Helpers.failat == 5) throw UnsupportedOperationException("fail 5")
                 when (se.action) {
                     A_MERGE -> throw UnsupportedOperationException("Merge not implemented yet!")
                     A_RMLOCAL -> {

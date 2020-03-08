@@ -133,10 +133,13 @@ class MainView : View("SSyncBrowser") {
                             openNewWindow(BrowserView(server, "", ""))
                         } }
                         button("Remove server") { action {
-                            // TODO: confirm, also check for existing file/cache/normal syncs!
-                            val iter = server.syncs.iterator()
-                            while (iter.hasNext()) server.removeSync(iter.next())
-                            SettingsStore.servers.remove(server)
+                            if (server.syncs.isNotEmpty()) {
+                                error("Remove server", "Syncs not empty, remove them first!")
+                            } else {
+                                confirm("Remove server", "Really remove server $server?") {
+                                    SettingsStore.servers.remove(server)
+                                }
+                            }
                         } }
                         button("Close connection") { action {
                             server.closeConnection()
@@ -199,7 +202,7 @@ class MainView : View("SSyncBrowser") {
         override val root = Form()
         init {
             with(root) {
-                if (sync.type in setOf(SyncType.NORMAL, SyncType.CACHED)) fieldset("Sync") {
+                if (sync.type in setOf(SyncType.NORMAL, SyncType.TEMP)) fieldset("Sync") {
                     field("Name and type") {
                         textfield(sync.title)
                         label(sync.type.name)
@@ -250,8 +253,9 @@ class MainView : View("SSyncBrowser") {
                             }
                         } }
                         button("Remove sync") { action {
-                            // TODO confirm, check for cache <> local modification
-                            sync.server.removeSync(sync)
+                            confirm("Remove sync", "Really remove sync [$sync] of server [${sync.server}]?\nAll local temporary files are removed!") {
+                                sync.server.removeSync(sync)
+                            }
                         } }
                     }
                 } else fieldset("File sync") {
@@ -268,7 +272,9 @@ class MainView : View("SSyncBrowser") {
                     }
                     field {
                         button("Remove sync") { action {
-                            sync.server.removeSync(sync)
+                            confirm("Remove sync", "Really remove file sync [$sync] of server [${sync.server}]?\nAll local temporary files are removed!") {
+                                sync.server.removeSync(sync)
+                            }
                         } }
                     }
                 }
@@ -278,11 +284,6 @@ class MainView : View("SSyncBrowser") {
 
     class SubsetSettingsPane(subset: SubSet): View() {
         override val root = Form()
-        companion object {
-            fun compSync(subset: SubSet) {
-                openNewWindow(SyncView(subset.sync.server, subset.sync, subset))
-            }
-        }
         init {
             val lvFolders = listview(subset.subfolders).apply {
                 isEditable = true
@@ -386,9 +387,8 @@ class MainView : View("SSyncBrowser") {
                         if (what.type == SyncType.FILE) button("Sync file") { addClass(Styles.thinbutton) }.setOnAction {
                             compSyncFile(what) {}
                         } else if (!what.disableFullSync.value) button("Compare & sync all") { addClass(Styles.thinbutton) }.setOnAction {
-                            val allsubset = SubSet(SSP("<all>"), SSP(""), sync = what)
-                            allsubset.subfolders += ""
-                            SubsetSettingsPane.compSync(allsubset)
+                            val allsubset = SubSet.all(what)
+                            compSync(allsubset)
                         }
                         button("Reveal local") { addClass(Styles.thinbutton) }.setOnAction {
                             revealFile(MFile(what.localfolder.value))
@@ -401,12 +401,11 @@ class MainView : View("SSyncBrowser") {
                     }
                     is SubSet -> {
                         button("Compare & sync") { addClass(Styles.thinbutton) }.setOnAction {
-                            SubsetSettingsPane.compSync(what)
+                            compSync(what)
                         }
                         label(what.status)
                     }
                 }
-
             }
         }
         root.isExpanded = true
@@ -483,9 +482,15 @@ class MainView : View("SSyncBrowser") {
     }
 
     companion object {
+        fun compSync(subset: SubSet) {
+            openNewWindow(SyncView(subset.sync.server, subset.sync, subset))
+        }
+        fun compSyncTemp(sync: Sync) {
+            openNewWindow(SyncView.syncViewTempIniSync(sync))
+        }
         fun compSyncFile(sync: Sync, successfulSyncCallback: () -> Unit) {
             sync.fileWatcher?.stop()
-            openNewWindow(SyncView(sync.server, sync, successfulSyncCallback))
+            openNewWindow(SyncView.syncViewSingleFile(sync, successfulSyncCallback))
             if (sync.auto.value) {
                 sync.fileWatcher = FileWatcher(MFile(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value)).watch {
                     runLater { compSyncFile(sync, successfulSyncCallback) }

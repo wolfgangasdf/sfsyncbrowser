@@ -30,7 +30,7 @@ object Actions {
 
 object Comparison {
     // compare, update database entries only.
-    fun compareSyncEntries(cache: Cache, isSingleFileSync: Boolean = false): Boolean {
+    fun compareSyncEntries(cache: Cache, useNewFiles: Boolean = false): Boolean {
         logger.debug("compare sync entries...")
         val swse = StopWatch()
         // q contains all entries to be checked
@@ -51,7 +51,7 @@ object Comparison {
                     if (tmpf == "") doit = false
                 }
                 se.hasCachedParent = haveCachedParentDir
-                se.compareSetAction(newcache = !haveCachedParentDir) // compare
+                se.compareSetAction(useNewFiles = haveCachedParentDir || useNewFiles) // compare
             }
         }
         logger.debug("TTT a took = " + swse.getTimeRestart())
@@ -60,7 +60,7 @@ object Comparison {
         cache.cache.iterate { _, _, se ->
             if (se.relevant && se.isDir && se.cSize != -1L) {
                 se.hasCachedParent = true
-                se.compareSetAction(newcache = false) // compare
+                se.compareSetAction(useNewFiles = true) // compare
             }
         }
         logger.debug("TTT b took = " + swse.getTimeRestart())
@@ -70,13 +70,13 @@ object Comparison {
             if (se.relevant && !se.isDir) {
                 if (se.cSize == -1L) { // only get parent folder for unknown files, faster!
                     val parent = getParentFolder(path)
-                    if (cache.cache[parent]?.hasCachedParent != true && !isSingleFileSync) {
-                        se.compareSetAction(newcache = true)
+                    if (cache.cache[parent]?.hasCachedParent != true && !useNewFiles) {
+                        se.compareSetAction(useNewFiles = false)
                     } else {
-                        se.compareSetAction(newcache = false)
+                        se.compareSetAction(useNewFiles = true)
                     }
                 } else {
-                    se.compareSetAction(newcache = false)
+                    se.compareSetAction(useNewFiles = true)
                 }
             }
         }
