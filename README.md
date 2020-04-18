@@ -13,7 +13,7 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
 * Define "permanent syncs" for backup and synchronization
   * Works also well with Android devices via ssh also without root (SSHelper etc) where the file attributes (time etc) sometimes can't be set.
   * It keeps a local database to keep track of changes (remote / local) without the need for full syncs.
-  * You can define subsets for partial syncs (faster), while the same cache database is used.
+  * You can define subsets for partial syncs (faster); the same cache database is used.
 
 
 ### More information
@@ -23,7 +23,7 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
 
 
 ### Status ###
-Works currently only on Mac/Linux!
+I use it on mac daily, and less often on windows.
 
 File synchronization is a delicate thing. However, if you keep the Files list-view on the default setting "changes",
 you can review everything before pressing `Synchronize`.
@@ -36,11 +36,9 @@ This will result in nice synchronization errors, no data loss will happen.
 
 ### How to use ###
 
-* Get the latest [Java JRE 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html). Don't forget to untick the [crapware](https://www.google.com/search?q=java+crapware) installer, and/or [disable it permanently](https://www.java.com/en/download/faq/disable_offers.xml)!
-* [Download the zip](https://github.com/wolfgangasdf/ssyncbrowser-test/releases) for Mac or (Windows, Linux), extract it somewhere and double-click the app (Mac) or
-  jar file (Windows, Linux).
+* [Download the zip](https://github.com/wolfgangasdf/ssyncbrowser/releases), extract it somewhere and run it. It is not signed, google for "open unsigned mac/win".
 * Everything should be self-explanatory (watch out for tooltips).
-* Remote file browser keyboard shortcuts
+* Remote file browser keyboard shortcuts:
 
     * right: enter folder
     * left: go to parent
@@ -49,19 +47,18 @@ This will result in nice synchronization errors, no data loss will happen.
 
 ### How to develop, compile & package ###
 
-* Get Oracle JDK 8
-* I use the free community version of [IntelliJ IDEA](https://www.jetbrains.com/idea/download/), just import the project to get started.
+* Get Java 14 from https://jdk.java.net
+* Clone the repository
+* I use the free community version of [IntelliJ IDEA](https://www.jetbrains.com/idea/download/) 
 * Package for all platforms: `./gradlew clean dist`.
-* There is no native code, cross-platform only based on java.
 
 ### Used frameworks ###
 
 * [Kotlin](https://kotlinlang.org/) and [Gradle](https://gradle.org/)
 * [TornadoFX](https://github.com/edvin/tornadofx)
-* [Shadow](https://github.com/johnrengelman/shadow) to package
-* [Gradle-macappbundle](https://github.com/crotwell/gradle-macappbundle) to make mac app bundle
 * [SSHJ](https://github.com/hierynomus/sshj)
 * [Directory-watcher](https://github.com/gmethvin/directory-watcher) to watch local files for changes
+* [Beryx runtime](https://github.com/beryx/badass-runtime-plugin) to make runtimes with JRE
 
 ### License ###
 [MIT](http://opensource.org/licenses/MIT)

@@ -31,7 +31,7 @@ fun main(args: Array<String>) {
     System.setProperty(org.slf4j.simple.SimpleLogger.DATE_TIME_FORMAT_KEY, "yyyy-MM-dd HH:mm:ss:SSS")
     System.setProperty(org.slf4j.simple.SimpleLogger.LOG_FILE_KEY, "System.out") // and use intellij "grep console" plugin
 
-    val logfile = MFile.createTempFile("reftool5log",".txt")
+    val logfile = MFile.createTempFile("ssyncbrowserlog",".txt")
     logps = FileOutputStream(logfile.file)
 
     val logger = KotlinLogging.logger {} // after set properties!
