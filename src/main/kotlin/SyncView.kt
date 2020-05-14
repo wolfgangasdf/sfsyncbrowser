@@ -3,6 +3,7 @@ import diffmatchpatch.diff_match_patch
 import javafx.scene.control.Alert
 import javafx.scene.control.Button
 import javafx.scene.control.TableView
+import javafx.scene.layout.Priority
 import javafx.scene.paint.Color
 import mu.KotlinLogging
 import store.Server
@@ -236,6 +237,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
         selectionModel.selectedItems.onChange {
             updateActionButtons()
         }
+        vgrow = Priority.ALWAYS
     }
 
     private val mbAdvanced = menubutton("Advanced...") {
