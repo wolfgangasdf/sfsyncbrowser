@@ -38,12 +38,13 @@ This will result in nice synchronization errors, no data loss will happen.
 
 * [Download the zip](https://github.com/wolfgangasdf/sfsyncbrowser/releases), extract it somewhere and run it. It is not signed, google for "open unsigned mac/win".
 * Everything should be self-explanatory (watch out for tooltips).
-* Remote file browser keyboard shortcuts:
+* Remote file browser keyboard shortcuts not in context menu:
 
     * right: enter folder
     * left: go to parent
     * space: quicklook (on mac)
     * meta-w: close
+    * alphanumeric keys search through file list
 
 ### How to develop, compile & package ###
 

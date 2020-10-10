@@ -61,7 +61,7 @@ object DBSettings {
 
     fun getLock(): Boolean = lockFile.createNewFile()
 
-    fun releaseLock(): Boolean = lockFile.delete()
+    fun releaseLock(): Boolean = lockFile.deletePlain()
 
     fun getCacheFilePath(cacheid: String) = "$dbdir/$cacheid-cache.txt"
 

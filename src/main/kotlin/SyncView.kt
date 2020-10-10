@@ -92,9 +92,10 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             runCompareAndSync = true
             afterSuccessfulSyncCallback = successfulSyncCallback
         }
-        fun syncViewTempIniSync(sync: Sync) = SyncView(sync.server, sync, SubSet.all(sync)).apply {
+        fun syncViewTempIniSync(sync: Sync, successfulSyncCallback: () -> Unit = {}) = SyncView(sync.server, sync, SubSet.all(sync)).apply {
             useNewFiles = true
             runCompareAndSync = true
+            afterSuccessfulSyncCallback = successfulSyncCallback
         }
     }
 

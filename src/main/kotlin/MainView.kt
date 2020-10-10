@@ -489,8 +489,8 @@ class MainView : View("SFSyncBrowser") {
         fun compSync(subset: SubSet) {
             openNewWindow(SyncView(subset.sync.server, subset.sync, subset))
         }
-        fun compSyncTemp(sync: Sync) {
-            openNewWindow(SyncView.syncViewTempIniSync(sync))
+        fun compSyncTemp(sync: Sync, successfulSyncCallback: () -> Unit = {}) {
+            openNewWindow(SyncView.syncViewTempIniSync(sync, successfulSyncCallback))
         }
         fun compSyncFile(sync: Sync, successfulSyncCallback: () -> Unit) {
             sync.fileWatcher?.stop()

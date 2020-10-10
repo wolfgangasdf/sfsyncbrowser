@@ -90,6 +90,18 @@ object Helpers {
         }
     }
 
+    // true if succeeded
+    fun trashFile(file: MFile): Boolean {
+        if (Desktop.isDesktopSupported() && file.internalPath != "") {
+            val desktop = Desktop.getDesktop()
+            if (desktop.isSupported(Desktop.Action.MOVE_TO_TRASH)) {
+                desktop.moveToTrash(file.file)
+                return true
+            }
+        }
+        return false
+    }
+
     fun openURL(url: String) {
         if (Desktop.isDesktopSupported() && url != "") {
             val desktop = Desktop.getDesktop()

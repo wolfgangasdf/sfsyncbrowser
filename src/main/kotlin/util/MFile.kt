@@ -134,9 +134,10 @@ class MFile(val internalPath: String) {
     fun newDirectoryStreamList() = Files.newDirectoryStream(asPath()).use { dir -> dir.map { MFile(it) } }
     fun setPosixFilePermissions(perms: Set<PosixFilePermission>) { Files.setPosixFilePermissions(asPath(), perms) }
     fun getPosixFilePermissions(): MutableSet<PosixFilePermission> = Files.getPosixFilePermissions(asPath())
-    fun delete() = file.delete()
-    fun deleteRecursively() = file.deleteRecursively()
-    fun deleteThrow() { Files.delete(asPath()) } // this throws exception if failed
+    fun deletePlain() = file.delete()
+    fun delete() { if (!Helpers.trashFile(this)) file.delete() }
+    fun deleteRecursively() { if (!Helpers.trashFile(this)) file.deleteRecursively() }
+    fun deleteThrow() { if (!Helpers.trashFile(this)) Files.delete(asPath()) } // this throws exception if failed
     fun setLastModifiedTime(mtime: Long) { Files.setLastModifiedTime(asPath(), FileTime.fromMillis(mtime)) }
     fun getLastModifiedTime() = Files.getLastModifiedTime(asPath()).toMillis()
     fun isDirectory(vararg options: LinkOption) = Files.isDirectory(asPath(), *options)

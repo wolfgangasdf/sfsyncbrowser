@@ -20,6 +20,7 @@ import util.Helpers.dialogOkCancel
 import util.Helpers.dialogYesNoCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
+import util.Helpers.isMac
 import util.Helpers.openFile
 import util.Helpers.runUIwait
 import util.Helpers.toThousandsCommas
@@ -276,26 +277,30 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 split(";").map { cs -> cs.split(":").let { Pair(it[0].toInt(), it[1].toBoolean()) } }
         colo.forEach { col ->
             when (col.first) {
-                1 -> column("Name", VirtualFile::getFileNameBrowser).remainingWidth().apply { sortType = TableColumn.SortType.ASCENDING }
-                2 -> column("Size", VirtualFile::size).apply { cellFormat { text = tokMGTPE(it) } }
-                3 -> column("Perms", VirtualFile::getPermString)
-                4 -> column("Modtime", VirtualFile::modTime).apply {
+                1 -> column("Size", VirtualFile::size).apply { cellFormat { text = tokMGTPE(it) } ; minWidth = 75.0 }
+                2 -> column("Perms", VirtualFile::getPermString).apply { minWidth = 80.0 }
+                3 -> column("Modtime", VirtualFile::modTime).apply {
                     cellFormat { text = Helpers.dformat().format(it) }
                     minWidth = 150.0
+                }
+                4 -> column("Name", VirtualFile::getFileNameBrowser).remainingWidth().apply {
+                    sortType = TableColumn.SortType.ASCENDING
+                    minWidth = 2500.0
                 }
                 else -> { error("Unknown column number ${col.first}") ; null }
             }?.let {
                 it.userData = col.first
-                if (!col.second && col.first != 1) {
+                if (!col.second && col.first != 4) {
                     it.isVisible = false
                     it.maxWidth = 0.0 // bug
                 }
             }
         }
         vgrow = Priority.ALWAYS
-        columnResizePolicy = SmartResize.POLICY
+//        columnResizePolicy = SmartResize.POLICY
+        setColumnResizePolicy { true } // TODO still not ideal: they should auto size, but that's hard.
     }.apply {
-        columns.find { it.userData == 1 }?.let { sortOrder.add(it) }
+        columns.find { it.userData == 4 }?.let { sortOrder.add(it) }
         isTableMenuButtonVisible = true
         multiSelect(true)
 
@@ -318,7 +323,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             this += miDelete
         }
 
-        setOnKeyReleased { ke ->
+        setOnKeyPressed { ke ->
             if (ke.code == KeyCode.SPACE) { // quicklook
                 if (selectedItem?.isFile() == true && selectedItem != lastpreviewvf) {
                     lastpreviewvf = selectedItem
@@ -328,6 +333,22 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 if (selectedItem?.isDir() == true) currentPath.set(selectedItem!!.path)
             } else if (ke.code == KeyCode.LEFT) {
                 currentPath.set(Helpers.getParentFolder(currentPath.value))
+            } else if (ke.code == KeyCode.ESCAPE) {
+                contextMenu.hide()
+            } else if (!ke.isMetaDown && !ke.isControlDown && !ke.isShiftDown && !ke.isAltDown && selectedItem != null &&
+                    (ke.code.isDigitKey || ke.code.isLetterKey)) { // search in file list by alphanumeric keys
+                val idx0 = selectionModel.focusedIndex
+                var idx1 = idx0
+                while (true) {
+                    idx1 += 1
+                    if (idx1 == files.size) idx1 = 0 // at end, loop
+                    if (idx1 == idx0) break // back to beginning, stop
+                    if (files[idx1].getFileName().startsWith(ke.text)) {
+                        selectionModel.clearAndSelect(idx1)
+                        scrollTo(selectedItem)
+                        break
+                    }
+                }
             }
         }
         // empty tableview doesn't show placeholder-rows, so have to do these two https://stackoverflow.com/questions/16992631
@@ -371,7 +392,11 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 val content = ClipboardContent()
                 content[dataFormatVFs] = selectionModel.selectedItems.toList()
                 db.setContent(content)
-            } else { // external drag
+            } else { // drag out of sfsb
+                if (isMac() && selectionModel.selectedItems.size > 1) { // TODO crashes on mac, wait for bug https://bugs-stage.openjdk.java.net/browse/JDK-8233955
+                    dialogMessage(Alert.AlertType.ERROR, "Error", "Can't drop more than one file on mac", "https://bugs-stage.openjdk.java.net/browse/JDK-8233955")
+                    return@setOnDragDetected
+                }
                 val remoteBase = selectionModel.selectedItems.first().getParent()
                 val tempfolder = MFile.createTempDirectory("sfsyncbrowsertemp")
 
@@ -493,7 +518,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         server.syncs += newSync
         MainView.compSyncFile(newSync) {
             when (op) {
-                SfsOp.NONE -> {}
+                SfsOp.NONE -> openFile(MFile(newSync.localfolder.value))
                 SfsOp.OPEN -> openFile(MFile("${newSync.localfolder.value}/${newSync.title.value}"))
                 SfsOp.EDIT -> if (SettingsStore.ssbSettings.editor.value != "")
                     editFile(MFile("${newSync.localfolder.value}/${newSync.title.value}"))
@@ -535,15 +560,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miAddTempSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
-        val sname = dialogInputString("New temporary sync", "Enter sync name:", "")
-        val newSync = Sync(SyncType.TEMP, SSP(sname?:"syname"),
+        val sname = dialogInputString("New temporary sync", "Enter sync name:", "")?:"tempsync"
+        val newSync = Sync(SyncType.TEMP, SSP(sname),
                 SSP("not synced"), SSP(""),
                 SSP(fileTableView.selectedItem!!.path), server=server).apply {
+            cacheid.set(sname + "-" + cacheid.value)
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(false)
         }
         server.syncs += newSync
-        MainView.compSyncTemp(newSync)
+        MainView.compSyncTemp(newSync) { openFile(MFile(newSync.localfolder.value)) }
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miRename: MyMenuitem = MyMenuitem("Rename...", KeyCodeCombination(KeyCode.R, KeyCombination.META_DOWN)) {
