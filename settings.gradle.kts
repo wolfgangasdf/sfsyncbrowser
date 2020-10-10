@@ -1,2 +1,2 @@
-rootProject.name = "ssyncbrowser"
+rootProject.name = "sfsyncbrowser"
 

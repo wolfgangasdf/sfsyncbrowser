@@ -31,7 +31,7 @@ fun main(args: Array<String>) {
     System.setProperty(org.slf4j.simple.SimpleLogger.DATE_TIME_FORMAT_KEY, "yyyy-MM-dd HH:mm:ss:SSS")
     System.setProperty(org.slf4j.simple.SimpleLogger.LOG_FILE_KEY, "System.out") // and use intellij "grep console" plugin
 
-    val logfile = MFile.createTempFile("ssyncbrowserlog",".txt")
+    val logfile = MFile.createTempFile("sfsyncbrowserlog",".txt")
     logps = FileOutputStream(logfile.file)
 
     val logger = KotlinLogging.logger {} // after set properties!
@@ -42,7 +42,7 @@ fun main(args: Array<String>) {
     logger.debug("debug")
     logger.trace("trace")
 
-    logger.info("SSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
+    logger.info("SFSyncBrowser built ${Helpers.getClassBuildTime().toString()}")
     logger.info("Log file: ${logfile.getOSPath()}")
     DBSettings.logFile = logfile
 

@@ -1,7 +1,7 @@
 
 # Introduction
 
-SSyncBrowser is a file synchronization and remote file browsing program. It supports sftp and local mounts.
+SFSyncBrowser is a file synchronization and remote file browsing program. It supports sftp and local mounts.
 It is by far not as complete as cyberduck or winsftp, but it is fast (and not much code), with solid synchronization,
 supports multiple bookmarks per server, and multiple protocols per server (like sftp/local mount).
 
@@ -36,7 +36,7 @@ This will result in nice synchronization errors, no data loss will happen.
 
 ### How to use ###
 
-* [Download the zip](https://github.com/wolfgangasdf/ssyncbrowser/releases), extract it somewhere and run it. It is not signed, google for "open unsigned mac/win".
+* [Download the zip](https://github.com/wolfgangasdf/sfsyncbrowser/releases), extract it somewhere and run it. It is not signed, google for "open unsigned mac/win".
 * Everything should be self-explanatory (watch out for tooltips).
 * Remote file browser keyboard shortcuts:
 

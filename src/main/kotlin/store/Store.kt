@@ -37,9 +37,9 @@ object DBSettings {
 
     init {
         settpath = MFile.fromOSPath(when {
-            Helpers.isMac() -> System.getProperty("user.home") + "/Library/Application Support/SSyncBrowser"
-            Helpers.isLinux() -> System.getProperty("user.home") + "/.ssyncbrowser"
-            Helpers.isWin() -> Helpers.toJavaPathSeparator(System.getenv("APPDATA")) + "\\SSyncBrowser"
+            Helpers.isMac() -> System.getProperty("user.home") + "/Library/Application Support/SFSyncBrowser"
+            Helpers.isLinux() -> System.getProperty("user.home") + "/.sfsyncbrowser"
+            Helpers.isWin() -> Helpers.toJavaPathSeparator(System.getenv("APPDATA")) + "\\SFSyncBrowser"
             else -> throw Exception("operating system not found")
         }).internalPath
         dbdir = "$settpath/cache"
@@ -57,7 +57,7 @@ object DBSettings {
         knownHostsFile.createNewFile()
     }
 
-    fun getSettingFile(): MFile = MFile("$settpath/ssyncbrowser.properties")
+    fun getSettingFile(): MFile = MFile("$settpath/sfsyncbrowser.properties")
 
     fun getLock(): Boolean = lockFile.createNewFile()
 
@@ -136,15 +136,17 @@ class BrowserBookmark(val server: Server, val path: StringProperty) {
 class Server(val title: StringProperty, val status: StringProperty, val currentProtocol: IntegerProperty,
              val protocols: ObservableList<Protocol> = getSortedFilteredList(), val syncs: ObservableList<Sync> = getSortedFilteredList(),
              val bookmarks: ObservableList<BrowserBookmark> = getSortedFilteredList()) {
-    val proto = SimpleObjectProperty<Protocol>().apply {
-        onChange { closeConnection() ; currentProtocol.set(protocols.indexOf(it)) }
+    val protoUI = SimpleObjectProperty<Protocol>().apply {
+        onChange {
+            closeConnection() ; currentProtocol.set(protocols.indexOf(it))
+        }
     }
     private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"
     fun getConnection(remoteFolder: String): GeneralConnection {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, might open dialogs)")
         if (connection?.isAlive() != true) {
-            val proto = protocols[currentProtocol.value]
+            val proto = getProtocol()
             logger.info("opening new connection to $proto")
             connection = when {
                 proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
@@ -257,7 +259,7 @@ object SettingsStore {
                     for (idx2 in 0 until props.getOrDefault("se.$idx.bookmarks", "0").toInt()) {
                         server.bookmarks += BrowserBookmark(server, p2sp("sb.$idx.$idx2.path"))
                     }
-                    if (server.currentProtocol.value > -1) server.proto.set(server.protocols[server.currentProtocol.value])
+                    if (server.currentProtocol.value > -1) server.protoUI.set(server.getProtocol())
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
                                 SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.excludeFilter"), p2sp("sy.$idx.$idx2.cacheid"), server,

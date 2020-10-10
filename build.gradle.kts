@@ -4,9 +4,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 
-val kotlinversion = "1.3.70"
+val kotlinversion = "1.4.10"
 
-group = "com.wolle.ssyncbrowser"
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac") // compile for these platforms. "mac", "linux", "win"
 
@@ -21,12 +20,12 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "1.3.70"
+    kotlin("jvm") version "1.4.10"
     id("idea")
     application
-    id("org.openjfx.javafxplugin") version "0.0.8"
-    id("com.github.ben-manes.versions") version "0.28.0"
-    id("org.beryx.runtime") version "1.8.0"
+    id("org.openjfx.javafxplugin") version "0.0.9"
+    id("com.github.ben-manes.versions") version "0.33.0"
+    id("org.beryx.runtime") version "1.11.4"
 }
 
 application {
@@ -42,7 +41,7 @@ repositories {
 }
 
 javafx {
-    version = "13"
+    version = "14"
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"
@@ -52,13 +51,13 @@ val javaFXOptions = the<JavaFXOptions>()
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    implementation("io.github.microutils:kotlin-logging:1.7.8")
+    implementation("io.github.microutils:kotlin-logging:2.0.3")
     implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT")
-    implementation("com.hierynomus:sshj:0.27.0")
-    implementation("io.methvin:directory-watcher:0.9.9")
-    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.64")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.64")
+    implementation("com.hierynomus:sshj:0.30.0")
+    implementation("io.methvin:directory-watcher:0.10.1")
+    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.66")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.66")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
@@ -81,8 +80,8 @@ runtime {
 }
 
 open class CrossPackage : DefaultTask() {
-    @org.gradle.api.tasks.Input var execfilename = "execfilename"
-    @org.gradle.api.tasks.Input var macicnspath = "macicnspath"
+    @Input var execfilename = "execfilename"
+    @Input var macicnspath = "macicnspath"
 
     @TaskAction
     fun crossPackage() {
@@ -173,7 +172,7 @@ open class CrossPackage : DefaultTask() {
 
 tasks.register<CrossPackage>("crosspackage") {
     dependsOn("runtime")
-    execfilename = "SSyncBrowser"
+    execfilename = "SFSyncBrowser"
     macicnspath = "./icon.icns"
 }
 

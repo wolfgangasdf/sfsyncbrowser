@@ -42,7 +42,7 @@ class Styles : Stylesheet() {
     }
 }
 
-class MainView : View("SSyncBrowser") {
+class MainView : View("SFSyncBrowser") {
 
     class SettingsViewPlaceholder: View() {
         override val root = Form()
@@ -56,7 +56,7 @@ class MainView : View("SSyncBrowser") {
                 fieldset("About") {
                     field("Build time") { textfield(Helpers.getClassBuildTime().toString()) { isDisable = true } }
                     button("Open homepage...").setOnAction {
-                        Helpers.openURL("https://github.com/wolfgangasdf/ssyncbrowser-test")
+                        Helpers.openURL("https://github.com/wolfgangasdf/sfsyncbrowser")
                     }
                     DBSettings.logFile?.let {f ->
                         field("Log file") {
@@ -103,21 +103,21 @@ class MainView : View("SSyncBrowser") {
                 fieldset("Server") {
                     field("Name") { textfield(server.title) }
                     field("Protocol") {
-                        combobox<Protocol>(server.proto, server.protocols)
+                        combobox<Protocol>(server.protoUI, server.protocols)
                         button("Edit") { action {
-                            openNewWindow(ProtocolView(server.proto.value), Modality.APPLICATION_MODAL)
+                            if (server.protoUI.value != null) openNewWindow(ProtocolView(server.protoUI.value), Modality.APPLICATION_MODAL)
                         }}
                         button("Add") { action {
-                            Protocol(server, SSP("<name>"), SSP("sftp://user@server:/folder/"), SBP(false),
+                            Protocol(server, SSP("<name>"), SSP("sftp://user@server"), SBP(false),
                                     SSP(""), SBP(false),
-                                    SSP(""), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
+                                    SSP("/"), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
                                 server.protocols += it
-                                if (server.proto.value == null) server.proto.set(it)
-                                selectItem(it)
+                                server.protoUI.set(it)
                             }
                         } }
                         button("Remove") { action {
-                            server.protocols.remove(server.proto.value)
+                            server.protocols.remove(server.protoUI.value)
+                            server.protoUI.set(server.protocols.firstOrNull())
                         } }
                     }
                     field {
@@ -152,7 +152,11 @@ class MainView : View("SSyncBrowser") {
 
     class ProtocolView(private val proto: Protocol): MyView() {
         override val root = Form()
-        override fun doBeforeClose() { proto.server.protocols.invalidate() }
+        private val oldidx: Int = proto.server.currentProtocol.value
+        override fun doBeforeClose() {
+            proto.server.protocols[oldidx] = proto
+            proto.server.protoUI.set(proto)
+        }
         init {
             with(root) {
                 prefWidth = 600.0

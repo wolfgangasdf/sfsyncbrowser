@@ -19,7 +19,6 @@ import store.SettingsStore
 import synchro.GeneralConnection
 import synchro.VirtualFile
 import tornadofx.*
-import util.MyWorker.setOnCloseRequest
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
@@ -27,7 +26,6 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.nio.charset.Charset
 import java.util.*
-import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 import java.util.jar.JarFile
 import kotlin.math.floor
@@ -173,7 +171,7 @@ object Helpers {
     // If it hangs, most likely a GUI thread hangs which made a thread which called this
     fun <T>runUIwait( f: () -> T) : T {
         return if (!Platform.isFxApplicationThread()) {
-            val query = FutureTask(Callable { f() })
+            val query = FutureTask { f() }
             Platform.runLater(query)
             query.get()
         } else {

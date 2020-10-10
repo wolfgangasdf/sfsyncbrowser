@@ -373,7 +373,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 db.setContent(content)
             } else { // external drag
                 val remoteBase = selectionModel.selectedItems.first().getParent()
-                val tempfolder = MFile.createTempDirectory("ssyncbrowsertemp")
+                val tempfolder = MFile.createTempDirectory("sfsyncbrowsertemp")
 
                 val taskGetFile = MyTask<Unit> {
                     updateTit("Downloading files for drag and drop...")
@@ -451,7 +451,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 if (it2.path != currentPath.value &&
                         (SettingsStore.ssbSettings.showHiddenfiles.value || !it2.getFileName().startsWith("."))) tmpl.add(it2)
             }
-            tmpl.sortWith( Comparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) })
+            tmpl.sortWith { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) }
             tmpl
         }
         taskListLocal.setOnSucceeded {
@@ -577,7 +577,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
 
     private val miNewFile: MyMenuitem = MyMenuitem("New file...", KeyCodeCombination(KeyCode.N, KeyCombination.META_DOWN)) {
         dialogInputString("Create new file", "Enter file name:", "", "")?.let {
-            val tempfolder = MFile.createTempDirectory("ssyncbrowsertemp")
+            val tempfolder = MFile.createTempDirectory("sfsyncbrowsertemp")
             val f = MFile("${tempfolder.internalPath}/$it")
             if (!f.createNewFile()) throw Exception("Error creating file $f")
             MyWorker.runTaskWithConn({ updateBrowser() }, "New file", server, basePath) { c -> c.putfile("", f.asVFPath, f.lastModified(), "${currentPath.value}${f.name}") }

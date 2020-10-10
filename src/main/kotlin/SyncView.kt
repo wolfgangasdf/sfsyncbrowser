@@ -162,7 +162,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
         val taskSynchronize = profile.taskSynchronize()
         taskSynchronize.setOnSucceeded {
             logger.info("Synchronization finished!")
-            showNotification("Ssyncbrowser: successfully synchronized", "Server: ${server.title.value}",
+            showNotification("SFSyncBrowser: successfully synchronized", "Server: ${server.title.value}",
                     if (subset.isSingleFile) sync.title.value else "Sync: ${sync.title.value} Subset: ${subset.title.value}")
             if (subset.isAll || subset.isSingleFile)
                 sync.status.set("synchronized ${dformat().format(Date())}")
@@ -273,7 +273,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                 fileTableView.refresh()
             }
             // advance
-            fileTableView.selectionModel.clearAndSelect(fileTableView.selectionModel.selectedIndices.max()?:0 + 1)
+            fileTableView.selectionModel.clearAndSelect(fileTableView.selectionModel.selectedIndices.maxOrNull() ?:0 + 1)
             updateSyncButton()
         }
         return b

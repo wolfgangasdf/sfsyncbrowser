@@ -10,6 +10,7 @@ import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.common.StreamCopier.Listener
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
+import net.schmizz.sshj.connection.channel.direct.Parameters
 import net.schmizz.sshj.sftp.FileAttributes
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
@@ -556,7 +557,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
             private var forwarder: LocalPortForwarder? = null
             override fun run() {
-                val params = LocalPortForwarder.Parameters("127.0.0.1", localSocket.localPort,
+                val params = Parameters("127.0.0.1", localSocket.localPort,
                         remoteAddress.hostName, remoteAddress.port)
                 forwarder = sshClient.newLocalPortForwarder(params, localSocket)
                 try {
