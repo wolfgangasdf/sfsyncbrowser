@@ -4,13 +4,14 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 
-val kotlinversion = "1.4.10"
+val kotlinversion = "1.4.21"
+val javaversion = 15
 
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac") // compile for these platforms. "mac", "linux", "win"
 
 println("Current Java version: ${JavaVersion.current()}")
-if (JavaVersion.current().majorVersion.toInt() < 14) throw GradleException("Use Java >= 14")
+if (JavaVersion.current().majorVersion.toInt() < javaversion) throw GradleException("Use Java >= $javaversion")
 
 buildscript {
     repositories {
@@ -24,24 +25,26 @@ plugins {
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.9"
-    id("com.github.ben-manes.versions") version "0.33.0"
-    id("org.beryx.runtime") version "1.11.4"
+    id("com.github.ben-manes.versions") version "0.36.0"
+    id("org.beryx.runtime") version "1.12.1"
 }
 
 application {
-    mainClassName = "MainKt"
+    mainClass.set("MainKt")
     applicationDefaultJvmArgs = listOf("-Dprism.verbose=true", "-Dprism.order=sw", // use software renderer
             "--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED") // javafx 13 tornadofx bug: https://github.com/edvin/tornadofx/issues/899#issuecomment-569709223
 }
 
 repositories {
     mavenCentral()
-    jcenter()
-    maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") } // tornadofx snapshots
+    maven {
+        setUrl("https://oss.sonatype.org/content/repositories/snapshots")
+        content { includeModule("no.tornado", "tornadofx") } // tornadofx snapshots
+    }
 }
 
 javafx {
-    version = "14"
+    version = "$javaversion"
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"
@@ -51,13 +54,13 @@ val javaFXOptions = the<JavaFXOptions>()
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    implementation("io.github.microutils:kotlin-logging:2.0.3")
+    implementation("io.github.microutils:kotlin-logging:2.0.4")
     implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
-    implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT")
+    implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") { exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8") }
     implementation("com.hierynomus:sshj:0.30.0")
-    implementation("io.methvin:directory-watcher:0.10.1")
-    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.66")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.66")
+    implementation("io.methvin:directory-watcher:0.11.0")
+    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.68")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.68")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
@@ -158,7 +161,7 @@ open class CrossPackage : DefaultTask() {
                     pf.writeText("""
                         set JLINK_VM_OPTIONS="${project.application.applicationDefaultJvmArgs.joinToString(" ")}"
                         set DIR=%~dp0
-                        start "" "%DIR%\bin\javaw" %JLINK_VM_OPTIONS% -classpath "%DIR%/lib/*" ${project.application.mainClassName} 
+                        start "" "%DIR%\bin\javaw" %JLINK_VM_OPTIONS% -classpath "%DIR%/lib/*" ${project.application.mainClass.get()}  
                     """.trimIndent())
                     zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-win.zip"), File(imgdir))
                 }
