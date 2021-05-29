@@ -1,6 +1,7 @@
 
 import javafx.scene.Node
 import javafx.scene.Scene
+import javafx.scene.control.Alert
 import javafx.scene.image.Image
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
@@ -11,10 +12,7 @@ import mu.KotlinLogging
 import store.DBSettings
 import store.SettingsStore
 import store.SyncType
-import tornadofx.App
-import tornadofx.View
-import tornadofx.addStageIcon
-import tornadofx.reloadStylesheetsOnFocus
+import tornadofx.*
 import util.Helpers
 import util.Helpers.dialogOkCancel
 import javax.imageio.ImageIO
@@ -57,6 +55,15 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
     }
 
     override fun start(stage: Stage) {
+        // tornadofx default handler doesn't show stacktrace properly
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            run {
+                logger.error("uncaught exception: $e")
+                e.printStackTrace()
+                Helpers.dialogMessage(Alert.AlertType.ERROR, "Exception", e.message?:"no message", "logfile:${DBSettings.logFile}\n" + e.stackTraceToString())
+            }
+        }
+        FX.installErrorHandler()
         stage.setOnCloseRequest {
             val filesyncs = SettingsStore.servers.map { s -> s.syncs.filter { sy -> sy.type == SyncType.FILE } }.flatten()
             if (filesyncs.isNotEmpty()) {

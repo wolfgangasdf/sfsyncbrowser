@@ -411,6 +411,7 @@ object MyWorker: Dialog<ButtonType>() {
                 } else {
                     iii += 1
                 }
+                // TODO: sleep?
             }
             if (taskList.isEmpty()) {
                 this@MyWorker.close()

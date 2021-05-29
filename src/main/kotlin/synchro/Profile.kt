@@ -284,7 +284,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
                 se.action = when (se.action) {
                     A_RMLOCAL -> A_USELOCAL
                     A_USEREMOTE -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
-                    A_UNKNOWN -> if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
+                    A_UNKNOWN -> if (se.lSize < 0 && se.rSize < 0) A_CACHEONLY else if (se.lSize > -1) A_USELOCAL else A_RMREMOTE
                     else -> se.action
                 }
             }

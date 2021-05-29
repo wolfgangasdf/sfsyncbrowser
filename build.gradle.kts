@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 
-val kotlinversion = "1.4.21"
+val kotlinversion = "1.4.31"
 val javaversion = 15
 
 version = "1.0-SNAPSHOT"
@@ -21,12 +21,12 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "1.4.10"
+    kotlin("jvm") version "1.4.31"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.9"
-    id("com.github.ben-manes.versions") version "0.36.0"
-    id("org.beryx.runtime") version "1.12.1"
+    id("com.github.ben-manes.versions") version "0.38.0"
+    id("org.beryx.runtime") version "1.12.2"
 }
 
 application {
@@ -54,11 +54,11 @@ val javaFXOptions = the<JavaFXOptions>()
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    implementation("io.github.microutils:kotlin-logging:2.0.4")
+    implementation("io.github.microutils:kotlin-logging:2.0.6")
     implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") { exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8") }
-    implementation("com.hierynomus:sshj:0.30.0")
-    implementation("io.methvin:directory-watcher:0.11.0")
+    implementation("com.hierynomus:sshj:0.31.0")
+    implementation("io.methvin:directory-watcher:0.15.0")
     runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.68")
     runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.68")
 
