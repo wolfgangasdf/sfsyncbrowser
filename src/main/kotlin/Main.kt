@@ -49,5 +49,5 @@ fun main(args: Array<String>) {
     // Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
     Security.setProperty("crypto.policy", "unlimited")
 
-    launch<SSBApp>(*args)
+    launch<SSBApp>(args)
 }

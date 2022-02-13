@@ -44,7 +44,7 @@ fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
     return view
 }
 
-class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
+class SSBApp : App() {
 
     override fun stop() {
         logger.info("*************** stop app")
@@ -55,6 +55,30 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
     }
 
     override fun start(stage: Stage) {
+        logger.debug("*************** start app: start")
+        importStylesheet(Styles::class)
+        FX.setPrimaryStage(stage = stage)
+
+        // check lock before init MainView
+        if (!DBSettings.getLock()) {
+            logger.error("can't get lockfile!")
+            Helpers.runUIwait {
+                if (!dialogOkCancel("SFSync Error", "Lock file exists",
+                        "If you are sure that no other Sfsync instance is running, press OK to remove the lockfile, " +
+                                "otherwise cancel!\nLockfile: " + DBSettings.lockFile))
+                    exitProcess(1)
+            }
+        }
+
+        // init
+        Checks.checkComparedFile()
+        SettingsStore
+
+        // load & show MainView
+        stage.scene = createPrimaryScene(MainView())
+        stage.scene.stylesheets.add(Styles().externalForm)
+        stage.show()
+
         // tornadofx default handler doesn't show stacktrace properly
         Thread.setDefaultUncaughtExceptionHandler { _, e ->
             run {
@@ -91,30 +115,15 @@ class SSBApp : App(MainView::class, Styles::class) { // or Workspace?
                 }
             }
         }
-        super.start(stage)
         // Dock icon
         if (Helpers.isMac()) java.awt.Taskbar.getTaskbar().iconImage = ImageIO.read(this::class.java.getResource("/icons/icon_256x256.png"))
-
     }
 
     init {
+        logger.debug("*************** start app: init")
         reloadStylesheetsOnFocus() // works only if run in debug mode! remove in production?
-        if (!DBSettings.getLock()) {
-            Helpers.runUIwait {
-                if (!dialogOkCancel("SFSync Error", "Lock file exists",
-                        "If you are sure that no other Sfsync instance is running, press OK to remove the lockfile, " +
-                                "otherwise cancel!\nLockfile: " + DBSettings.lockFile))
-                    exitProcess(1)
-            }
-        }
         addStageIcon(Image(resources["/icons/icon_16x16.png"]))
         addStageIcon(Image(resources["/icons/icon_32x32.png"]))
         addStageIcon(Image(resources["/icons/icon_256x256.png"]))
-        initit()
     }
-}
-
-fun initit() {
-    Checks.checkComparedFile()
-    SettingsStore
 }
