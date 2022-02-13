@@ -33,7 +33,7 @@ class MFile(val internalPath: String) {
     val name: String = file.name
 
     companion object {
-        private val isWin = System.getProperty("os.name").toLowerCase().contains("win")
+        private val isWin = System.getProperty("os.name").lowercase().contains("win")
         private val reWinPath = """(.):\\(.*)""".toRegex()
         private val reWinUNC = """\\\\.*\\.*""".toRegex()
         fun createTempFile(prefix: String, suffix: String) = MFile(Files.createTempFile(prefix, suffix).toFile())

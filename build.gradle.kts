@@ -4,11 +4,11 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 
-val kotlinversion = "1.4.31"
-val javaversion = 15
+val kotlinversion = "1.6.10"
+val javaversion = 17
 
 version = "1.0-SNAPSHOT"
-val cPlatforms = listOf("mac") // compile for these platforms. "mac", "linux", "win"
+val cPlatforms = listOf("mac", "linux", "win") // compile for these platforms. "mac", "linux", "win"
 
 println("Current Java version: ${JavaVersion.current()}")
 if (JavaVersion.current().majorVersion.toInt() < javaversion) throw GradleException("Use Java >= $javaversion")
@@ -16,17 +16,16 @@ if (JavaVersion.current().majorVersion.toInt() < javaversion) throw GradleExcept
 buildscript {
     repositories {
         mavenCentral()
-        jcenter()
     }
 }
 
 plugins {
-    kotlin("jvm") version "1.4.31"
+    kotlin("jvm") version "1.6.10"
     id("idea")
     application
-    id("org.openjfx.javafxplugin") version "0.0.9"
-    id("com.github.ben-manes.versions") version "0.38.0"
-    id("org.beryx.runtime") version "1.12.2"
+    id("org.openjfx.javafxplugin") version "0.0.11"
+    id("com.github.ben-manes.versions") version "0.42.0"
+    id("org.beryx.runtime") version "1.12.7"
 }
 
 application {
@@ -54,13 +53,13 @@ val javaFXOptions = the<JavaFXOptions>()
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    implementation("io.github.microutils:kotlin-logging:2.0.6")
+    implementation("io.github.microutils:kotlin-logging:2.1.21")
     implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") { exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8") }
-    implementation("com.hierynomus:sshj:0.31.0")
+    implementation("com.hierynomus:sshj:0.32.0")
     implementation("io.methvin:directory-watcher:0.15.0")
-    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.68")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.68")
+    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.70")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.70")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
@@ -200,7 +199,7 @@ tasks["runtime"].doLast {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
 }
 
 

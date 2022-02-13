@@ -26,6 +26,7 @@ import util.Helpers.runUIwait
 import util.Helpers.toThousandsCommas
 import util.Helpers.tokMGTPE
 import java.nio.file.attribute.PosixFilePermission
+import java.util.*
 
 private val logger = KotlinLogging.logger {}
 
@@ -476,7 +477,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 if (it2.path != currentPath.value &&
                         (SettingsStore.ssbSettings.showHiddenfiles.value || !it2.getFileName().startsWith("."))) tmpl.add(it2)
             }
-            tmpl.sortWith { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) }
+            tmpl.sortWith { o1, o2 -> o1.toString().uppercase().compareTo(o2.toString().uppercase()) }
             tmpl
         }
         taskListLocal.setOnSucceeded {

@@ -40,9 +40,9 @@ typealias SBP = SimpleBooleanProperty
 typealias SIP = SimpleIntegerProperty
 
 object Helpers {
-    fun isMac() = System.getProperty("os.name").toLowerCase().contains("mac")
-    fun isLinux() = System.getProperty("os.name").toLowerCase().matches("(.*nix)|(.*nux)".toRegex())
-    fun isWin() = System.getProperty("os.name").toLowerCase().contains("win")
+    fun isMac() = System.getProperty("os.name").lowercase().contains("mac")
+    fun isLinux() = System.getProperty("os.name").lowercase().matches("(.*nix)|(.*nux)".toRegex())
+    fun isWin() = System.getProperty("os.name").lowercase().contains("win")
 
     fun defaultOSexcludeFilter() = when {
         isMac() -> "(\\.DS_Store)|(\\._.*)"
@@ -264,7 +264,7 @@ object Helpers {
 
     fun <T> getSortedFilteredList(): SortedFilteredList<T> {
         val res = SortedFilteredList<T>()
-        res.sortedItems.setComparator { o1, o2 -> o1.toString().toUpperCase().compareTo(o2.toString().toUpperCase()) }
+        res.sortedItems.setComparator { o1, o2 -> o1.toString().uppercase().compareTo(o2.toString().uppercase()) }
         return res
     }
 

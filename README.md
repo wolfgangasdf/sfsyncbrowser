@@ -48,7 +48,7 @@ This will result in nice synchronization errors, no data loss will happen.
 
 ### How to develop, compile & package ###
 
-* Get Java 14 from https://jdk.java.net
+* Get Java from https://jdk.java.net
 * Clone the repository
 * I use the free community version of [IntelliJ IDEA](https://www.jetbrains.com/idea/download/) 
 * Package for all platforms: `./gradlew clean dist`.
