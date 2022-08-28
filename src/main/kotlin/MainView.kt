@@ -163,10 +163,10 @@ class MainView : View("SFSyncBrowser") {
                 fieldset("Protocol") {
                     field("Name") { textfield(proto.name) }
                     field("URI and password") {
-                        valitextfield(proto.protocoluri, uriRegex, "Regex: $uriRegex") { tooltip("'sftp://user@host[:port]' or 'file://") }
+                        valitextfield(proto.protocoluri, uriRegex, "Regex: $uriRegex") { tooltip("'sftp://user@host[:port]' or 'file://'") }
                         passwordfield(proto.password) { tooltip("Leave empty for public key authentification")}
                     }
-                    field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder'") { } }
+                    field("Remote basefolder") { valitextfield(proto.baseFolder, absPathRegex, "Absolute path like '/folder/'") { } }
                     field("Set permissions") {
                         checkbox("", proto.doSetPermissions) { tooltip("Set permissions on files/directories on remote server?") }
                         valitextfield(proto.perms, permissionsRegex, "Regex: $permissionsRegex") { tooltip(ttPerms) }

@@ -274,7 +274,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                 fileTableView.refresh()
             }
             // advance
-            fileTableView.selectionModel.clearAndSelect(fileTableView.selectionModel.selectedIndices.maxOrNull() ?:0 + 1)
+            fileTableView.selectionModel.clearAndSelect((fileTableView.selectionModel.selectedIndices.maxOrNull() ?:0) + 1)
             updateSyncButton()
         }
         return b

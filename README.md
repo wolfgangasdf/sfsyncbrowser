@@ -15,6 +15,8 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
   * It keeps a local database to keep track of changes (remote / local) without the need for full syncs.
   * You can define subsets for partial syncs (faster); the same cache database is used.
 
+* SFSB does not use a proper disk-backed database which would allow an unlimited number of files, databases are slower than java's ConcurrentSkipListMap.
+  1 GB RAM is enough for around a million files.
 
 ### More information
 

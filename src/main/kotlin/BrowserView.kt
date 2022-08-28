@@ -26,7 +26,7 @@ import util.Helpers.runUIwait
 import util.Helpers.toThousandsCommas
 import util.Helpers.tokMGTPE
 import java.nio.file.attribute.PosixFilePermission
-import java.util.*
+import kotlin.math.round
 
 private val logger = KotlinLogging.logger {}
 
@@ -118,16 +118,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
         init {
             val haveDir = vfs.firstOrNull { it.isDir() } != null
             val dotri = haveDir || vfs.size > 1
-            val permips = PosixFilePermission.values().map {
-                it to if (dotri) SIP(-1) else {
+            val permips = PosixFilePermission.values().associateWith {
+                if (dotri) SIP(-1) else {
                     SIP(if (vfs.first().permissions.contains(it)) 1 else 0)
                 }
-            }.toMap()
+            }
             with(root) {
                 fieldset("Info") {
                     field("Path") { label(if (vfs.size > 1) "multiple..." else vfs.first().path) }
                     field("Size") {
-                        label(toThousandsCommas(vfs.map { it.size }.sum()))
+                        label(toThousandsCommas(vfs.sumOf { it.size }))
                         button("Calculate...") {
                             isDisable = !haveDir
                             setOnAction {
@@ -232,13 +232,17 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 logger.info("successfully uploaded files!")
                 updateBrowser()
             }, "Uploading", server, "") { c ->
-                fff.forEach { f ->
-                    updateTit("Uploading file $f")
+                var bytescopied = 0L
+                val bytesTotal = fff.sumOf { m -> m.getSize() }
+                fff.forEachIndexed { idx, f ->
+                    updateTit("Uploading file ($idx/${fff.size}, ${round(100.0*bytescopied/bytesTotal)}%)  $f")
+                    updateMsg("")
                     val rp = "$onto${f.internalPath.removePrefix(localBase)}"
                     val doit = if (c.listSingleFile(rp) == null) 1 else
                         runUIwait { dialogYesNoCancel("Drop files...", "Remote file existing, overwrite?", c.remoteBasePath + rp) }
                     if (doit == 1) c.putfile("", f.asVFPath, f.lastModified(), rp)
                     else if (doit == -1) return@runTaskWithConn
+                    bytescopied += f.getSize()
                 }
             }
         } else if (de.dragboard.hasContent(dataFormatVFs)) { // remote -> remote drop
@@ -250,11 +254,11 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 updateBrowser()
             }, "Uploading", server, "") { c ->
                 if (dc is List<*>) {
-                    dc.forEach { f ->
+                    dc.forEachIndexed { idx, f ->
                         if (f is VirtualFile) {
                             val rp = onto + f.getFileName()
                             logger.debug("moving file $f to $rp ...")
-                            updateTit("Renaming file $f to $rp ...")
+                            updateTit("Renaming file ($idx/${dc.size}) $f to $rp ...")
                             val doit = if (c.listSingleFile(onto + f.getFileName()) == null) 1 else {
                                 val doit2 = runUIwait { dialogYesNoCancel("Drop files...", "Remote file existing, overwrite/delete it?", c.remoteBasePath + rp) }
                                 if ( doit2 == 1) c.deletefile(rp)
@@ -394,8 +398,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 content[dataFormatVFs] = selectionModel.selectedItems.toList()
                 db.setContent(content)
             } else { // drag out of sfsb
-                if (isMac() && selectionModel.selectedItems.size > 1) { // TODO crashes on mac, wait for bug https://bugs-stage.openjdk.java.net/browse/JDK-8233955
-                    dialogMessage(Alert.AlertType.ERROR, "Error", "Can't drop more than one file on mac", "https://bugs-stage.openjdk.java.net/browse/JDK-8233955")
+                if (isMac() && selectionModel.selectedItems.size > 1) { // TODO crashes on mac, wait for bug https://bugs.openjdk.org/browse/JDK-8233955
+                    dialogMessage(Alert.AlertType.ERROR, "Error", "Can't drop more than one file on mac", "https://bugs.openjdk.org/browse/JDK-8233955")
                     return@setOnDragDetected
                 }
                 val remoteBase = selectionModel.selectedItems.first().getParent()
@@ -404,12 +408,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 val taskGetFile = MyTask<Unit> {
                     updateTit("Downloading files for drag and drop...")
                     val fff = server.getConnection("").listRecursively(selectionModel.selectedItems.toList())
-                    fff.forEach { vf ->
-                        updateMsg("Downloading file $vf...")
+                    var bytescopied = 0L
+                    val bytesTotal = fff.sumOf { m -> m.size }
+                    fff.forEachIndexed { idx, vf ->
+                        updateMsg("Downloading file ($idx/${fff.size}, ${round(100.0*bytescopied/bytesTotal)}%)  $vf")
                         logger.debug("rb=$remoteBase vfpath=${vf.path}")
                         val lf = "${tempfolder.internalPath}/${vf.path.removePrefix(remoteBase)}"
                         logger.debug("downloading $vf to $lf...")
                         server.getConnection("").getfile("", vf.path, vf.modTime, lf)
+                        bytescopied += vf.size
                     }
                 }.apply {
                     setOnSucceeded {
@@ -615,12 +622,13 @@ class BrowserView(private val server: Server, private val basePath: String, path
         MyWorker.runTaskWithConn({
             updateBrowser()
         }, "Delete files...", server, basePath) { c ->
-            updateMsg("Searching for files...")
+            updateTit("Delete: searching for files...")
             val fff = c.listRecursively(fileTableView.selectionModel.selectedItems.toList()).reversed() // reversed delete!
-            updateMsg("Confirm...")
             if (runUIwait { dialogOkCancel("Delete files", "Really delete these files?", fff.joinToString("\n") { it.path })}) {
-                updateMsg("Delete...")
-                fff.forEach { c.deletefile(it.path) }
+                fff.forEachIndexed { idx, vf ->
+                    updateTit("Delete ($idx/${fff.size}) $vf...")
+                    c.deletefile(vf.path)
+                }
             }
         }
     }.withEnableOnSelectionChanged { isNormal() && it.isNotEmpty() }

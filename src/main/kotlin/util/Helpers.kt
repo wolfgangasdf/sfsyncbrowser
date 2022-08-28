@@ -75,7 +75,7 @@ object Helpers {
     fun revealFile(file: MFile, gointo: Boolean = false) {
         when {
             isMac() -> Runtime.getRuntime().exec(arrayOf("open", if (gointo) "" else "-R", file.getOSPath()))
-            isWin() -> Runtime.getRuntime().exec("explorer.exe /select,${file.getOSPath()}")
+            isWin() -> Runtime.getRuntime().exec(arrayOf("explorer.exe", "/select,${file.getOSPath()}"))
             isLinux() -> error("not supported OS, tell me how to do it!")
             else -> error("not supported OS, tell me how to do it!")
         }
@@ -411,7 +411,6 @@ object MyWorker: Dialog<ButtonType>() {
                 } else {
                     iii += 1
                 }
-                // TODO: sleep?
             }
             if (taskList.isEmpty()) {
                 this@MyWorker.close()
