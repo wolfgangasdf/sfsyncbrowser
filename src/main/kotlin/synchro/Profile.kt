@@ -102,14 +102,14 @@ class Profile(private val server: Server, private val sync: Sync, private val su
             updateTit("Find local file")
             subfolder.subfolders.forEach {
                 logger.debug("tasklistlocal: subfolder=$it")
-                local!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } }
+                local!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } ; !isCancelled }
             }
         }
         val taskListRemote = MyTask<Unit> {
             updateTit("Find remote file")
             subfolder.subfolders.forEach {
                 logger.debug("tasklistremote: subfolder=$it")
-                remote!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } }
+                remote!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, false) { vf2 -> updateMsg("found ${vf2.path}") } ; !isCancelled }
             }
         }
 

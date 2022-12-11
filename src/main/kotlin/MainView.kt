@@ -244,7 +244,7 @@ class MainView : View("SFSyncBrowser") {
                         }
                     }
                     field("Exclude filter") {
-                        textfield(sync.excludeFilter) { tooltip("Regular expression like (\\.DS_Store)|(\\._.*)") }
+                        textfield(sync.excludeFilter) { tooltip("Regular expression on full path like (.*\\.DS_Store)|(.*\\._.*)") }
                         button("Reset to OS default").setOnAction {
                             sync.excludeFilter.set( Helpers.defaultOSexcludeFilter() )
                         }

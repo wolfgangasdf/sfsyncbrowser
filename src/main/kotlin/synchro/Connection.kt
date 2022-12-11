@@ -86,7 +86,7 @@ class VirtualFile(path: String, var modTime: Long, var size: Long, var permissio
     fun getParent(): String = MFile.getIPFileParent(path)?.let { if (it.endsWith("/")) it else "$it/" } ?: "/"
     fun getFileNameBrowser(): String = MFile.getIPFileName(path) + if (isDir()) "/" else ""
     fun getFileExtension(): String = MFile.getIPFileExt(path)
-    fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && getFileName().matches(filterregexp.toRegex()))
+    fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && path.matches(filterregexp.toRegex()))
 
     override fun toString(): String = "[$path]:$modTime,$size"
 
@@ -119,7 +119,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String = ""): Long
     abstract fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean = false)
     abstract fun deletefile(what: String)
-    abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit)
+    abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) // action->false: interrupt!
     abstract fun listSingleFile(remotePath: String): VirtualFile?
     abstract fun isAlive(): Boolean
 
@@ -149,7 +149,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
         val fff = arrayListOf<VirtualFile>()
         what.forEach { selvf ->
             if (selvf.isDir())
-                list(selvf.path, "", recursive = true, resolveSymlinks = true) { fff += it }
+                list(selvf.path, "", recursive = true, resolveSymlinks = true) { fff += it ; true } // TODO max interruptible
             else fff += selvf
         }
         return fff
@@ -231,7 +231,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     private fun stripPath(full: String) = if (full == remoteBasePath.dropLast(1)) "" else full.substring(remoteBasePath.length)
 
     // include the subfolder but root "/" is not allowed!
-    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
+    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) {
         logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
         fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
@@ -242,7 +242,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
                         cc.getPosixFilePermissions())
                 if (vf.isNotFiltered(filterregexp)) {
                     if (debugslow) Thread.sleep(500)
-                    action(vf)
+                    if (!action(vf)) throw InterruptedException("recursive listing interrupted!")
                     if (cc.isDirectory(*linkOptions) && goDeeper) {
                         val dir = cc.newDirectoryStreamList()
                         for (cc1 in dir) parseContent(cc1, goDeeper = recursive)
@@ -444,7 +444,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         return resls
     }
 
-    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Unit) {
+    override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) {
         logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive fil=$filterregexp) in thread ${Thread.currentThread().id}")
 
         fun doaction(rripath: String, rriattributesini: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
@@ -476,7 +476,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                     if (path == "/") path = ""
                 }
                 if (vf.isNotFiltered(filterregexp)) {
-                    action(vf)
+                    if (!action(vf)) throw InterruptedException("recursive listing interrupted!")
                     if (vf.isDir() && (recursive || parsealways)) parseContentFun(rripath)
                 }
             }

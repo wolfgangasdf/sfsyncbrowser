@@ -138,6 +138,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                                     vfs.forEach { vf ->
                                         c.list(vf.path, "", recursive = true, resolveSymlinks = true) { vflist ->
                                             size += vflist.size
+                                            !isCancelled
                                         }
                                     }
                                 }
@@ -195,6 +196,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                                     if (vf.isDir() && recursively.value) {
                                         c.list(vf.path, "", recursive = true, resolveSymlinks = true) { vflist ->
                                             addFileUpdatePerms(vflist)
+                                            !isCancelled
                                         }
                                     }
                                 }
@@ -483,6 +485,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             server.getConnection(basePath).list(currentPath.value, "", recursive = false, resolveSymlinks = true) { it2 ->
                 if (it2.path != currentPath.value &&
                         (SettingsStore.ssbSettings.showHiddenfiles.value || !it2.getFileName().startsWith("."))) tmpl.add(it2)
+                !isCancelled
             }
             tmpl.sortWith { o1, o2 -> o1.toString().uppercase().compareTo(o2.toString().uppercase()) }
             tmpl
