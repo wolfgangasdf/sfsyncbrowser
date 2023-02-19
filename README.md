@@ -20,7 +20,7 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
 
 ### More information
 
-* sftp: use publickey or password-based authentification (password stored in settings file)
+* sftp: use publickey or password-based authentication (password stored in settings file)
 * Symbolic link (symlink) handling: browser follows symlinks, synchronization ignores symlinks (but accepts symlinked paths in basefolders etc).
 
 

@@ -119,7 +119,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
     private fun runCompare(runSyncIfPossible: Boolean = false) {
         logger.info("runCompare: server=$server sync=$sync subset=$subset")
         btSync.isDisable = true
-        val ctask = MyTask<Unit> {
+        val ctask = MyTask {
             updateTit("A Compare files")
             updateProgr(0, 100, "Initialize local and remote...")
             val taskIni = profile.taskIni()

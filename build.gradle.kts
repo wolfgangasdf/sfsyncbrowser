@@ -3,8 +3,9 @@ import org.gradle.kotlin.dsl.support.zipTo
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
+import java.util.*
 
-val kotlinversion = "1.6.21"
+val kotlinversion = "1.8.10"
 val javaversion = 18
 
 version = "1.0-SNAPSHOT"
@@ -20,12 +21,16 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "1.6.21"
+    kotlin("jvm") version "1.8.10"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.13"
-    id("com.github.ben-manes.versions") version "0.42.0"
-    id("org.beryx.runtime") version "1.12.7"
+    id("com.github.ben-manes.versions") version "0.45.0"
+    id("org.beryx.runtime") version "1.13.0"
+}
+
+kotlin {
+    jvmToolchain(javaversion)
 }
 
 application {
@@ -46,20 +51,25 @@ javafx {
     version = "$javaversion"
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
-    configuration = if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) "compileOnly" else "implementation"
+    if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) {
+        configuration = "compileOnly"
+    }
 }
 val javaFXOptions = the<JavaFXOptions>()
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
-    implementation("io.github.microutils:kotlin-logging:2.1.23")
-    implementation("org.slf4j:slf4j-simple:1.8.0-beta4") // no colors, everything stderr
-    implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") { exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8") }
-    implementation("com.hierynomus:sshj:0.33.0")
-    implementation("io.methvin:directory-watcher:0.15.1")
-    runtimeOnly("org.bouncycastle:bcprov-jdk15on:1.70")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk15on:1.70")
+    implementation("io.github.microutils:kotlin-logging:3.0.5")
+    implementation("org.slf4j:slf4j-simple:2.0.6") // no colors, everything stderr
+    implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") {
+        exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
+        exclude("org.openjfx")
+    }
+    implementation("com.hierynomus:sshj:0.35.0")
+    implementation("io.methvin:directory-watcher:0.18.0")
+    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.72")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.72")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
@@ -199,9 +209,8 @@ tasks["runtime"].doLast {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "18"
+    kotlinOptions.jvmTarget = "$javaversion"
 }
-
 
 task("dist") {
     dependsOn("crosspackage")
@@ -210,4 +219,17 @@ task("dist") {
         project.delete(project.runtime.imageDir.get(), project.runtime.jreDir.get(), "${project.buildDir.path}/install")
         println("Created zips in build/crosspackage")
     }
+}
+
+fun isNonStable(version: String): Boolean {
+    val stableKeyword = listOf("RELEASE", "FINAL", "GA").any { version.uppercase(Locale.getDefault()).contains(it) }
+    val regex = "^[0-9,.v-]+(-r)?$".toRegex()
+    val isStable = stableKeyword || regex.matches(version)
+    return isStable.not()
+}
+tasks.withType<com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask> {
+    rejectVersionIf {
+        isNonStable(candidate.version)
+    }
+    gradleReleaseChannel = "current"
 }

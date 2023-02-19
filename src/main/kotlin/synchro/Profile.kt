@@ -30,7 +30,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
     private val uiUpdateInterval = 0.5
     var profileInitialized = false
 
-    fun taskIni() = MyTask<Unit> {
+    fun taskIni() = MyTask {
         updateTit("Initialize connections...")
         cache.loadCache()
 
@@ -52,7 +52,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
     }
 
 
-    fun taskCompFiles(useNewFiles: Boolean = false) = MyTask<Boolean> {
+    fun taskCompFiles(useNewFiles: Boolean = false) = MyTask {
         logger.info("taskCompFiles: usenewfiles=$useNewFiles server=$server sync=$sync subfolder=$subfolder")
         updateTit("CompareFiles...")
         val sw = StopWatch() // for timing meas
@@ -98,14 +98,14 @@ class Profile(private val server: Server, private val sync: Sync, private val su
             }
         }
 
-        val taskListLocal = MyTask<Unit> {
+        val taskListLocal = MyTask {
             updateTit("Find local file")
             subfolder.subfolders.forEach {
                 logger.debug("tasklistlocal: subfolder=$it")
                 local!!.list(it, sync.excludeFilter.valueSafe, recursive = true, resolveSymlinks = false) { vf -> acLocRem(vf, true) { vf2 -> updateMsg("found ${vf2.path}") } ; !isCancelled }
             }
         }
-        val taskListRemote = MyTask<Unit> {
+        val taskListRemote = MyTask {
             updateTit("Find remote file")
             subfolder.subfolders.forEach {
                 logger.debug("tasklistremote: subfolder=$it")
@@ -154,7 +154,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         haveChanges
     }
 
-    fun taskSynchronize() = MyTask<Unit> {
+    fun taskSynchronize() = MyTask {
         logger.info("*********************** synchronize")
         updateTit("Synchronize")
         updateProgr(0, 100, "startup...")
@@ -292,7 +292,7 @@ class Profile(private val server: Server, private val sync: Sync, private val su
     }
 
     // cleanup (transfers must be stopped before, connection is kept alive here.)
-    fun taskCleanup() = MyTask<Unit> {
+    fun taskCleanup() = MyTask {
         updateTit("Cleanup profile...")
         updateProgr(1, 100, "Save cache...")
         cache.saveCache()

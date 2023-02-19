@@ -407,7 +407,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 val remoteBase = selectionModel.selectedItems.first().getParent()
                 val tempfolder = MFile.createTempDirectory("sfsyncbrowsertemp")
 
-                val taskGetFile = MyTask<Unit> {
+                val taskGetFile = MyTask {
                     updateTit("Downloading files for drag and drop...")
                     val fff = server.getConnection("").listRecursively(selectionModel.selectedItems.toList())
                     var bytescopied = 0L
@@ -473,7 +473,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }
 
     private fun updateBrowser() {
-        val taskListLocal = MyTask<MutableList<VirtualFile>> {
+        val taskListLocal = MyTask {
             updateTit("Initialize connection...")
             // do here because needs to be done in background thread
             canRename = server.getConnection(basePath).canRename()

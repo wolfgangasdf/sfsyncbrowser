@@ -83,7 +83,7 @@ class VirtualFile(path: String, var modTime: Long, var size: Long, var permissio
 
     fun getFileName(): String = MFile.getIPFileName(path) // gets file/folder name, "" if "/" or "", without trailing "/" for dirs!
     fun getPermString(): String = PosixFilePermissions.toString(permissions)
-    fun getParent(): String = MFile.getIPFileParent(path)?.let { if (it.endsWith("/")) it else "$it/" } ?: "/"
+    fun getParent(): String = MFile.getIPFileParent(path).let { if (it.endsWith("/")) it else "$it/" }
     fun getFileNameBrowser(): String = MFile.getIPFileName(path) + if (isDir()) "/" else ""
     fun getFileExtension(): String = MFile.getIPFileExt(path)
     fun isNotFiltered(filterregexp: String) = !(filterregexp.isNotEmpty() && path.matches(filterregexp.toRegex()))

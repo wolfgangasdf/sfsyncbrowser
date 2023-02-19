@@ -128,7 +128,7 @@ object Helpers {
     }
 
     fun getFileIntoTempAndDo(server: Server, vf: VirtualFile, action: (f: MFile) -> Unit) {
-        val taskGetFile = MyTask<MFile> {
+        val taskGetFile = MyTask {
             updateTit("Downloading file $vf...")
             val rf = MFile.createTempFile(vf.getFileName(), ".${vf.getFileExtension()}")
             logger.debug("downloading into ${rf.internalPath}...")
@@ -435,7 +435,7 @@ object MyWorker: Dialog<ButtonType>() {
     }
 
     fun runTaskWithConn(onsucc: () -> Unit, msg: String, server: Server, basePath: String, callfun: MyTask<Unit>.(connection: GeneralConnection) -> Unit) {
-        val t = MyTask<Unit> {
+        val t = MyTask {
             updateTit("Initializing connection...")
             val conn = server.getConnection(basePath)
             updateTit("")

@@ -74,7 +74,7 @@ class MFile(val internalPath: String) {
         // helper functions for internalpaths, without calling anything os-specific
         fun getIPFileName(ip: String): String = ip.removeSuffix("/").substringAfterLast("/")
         fun getIPFileExt(ip: String) = getIPFileName(ip).substringAfterLast(".")
-        fun getIPFileParent(ip: String): String? = ip.removeSuffix("/").substringBeforeLast("/")
+        fun getIPFileParent(ip: String): String = ip.removeSuffix("/").substringBeforeLast("/")
         fun getIPrelativeTo(ip: String, ipbase: String) = ip.removePrefix(ipbase)
 
         fun testit() {
