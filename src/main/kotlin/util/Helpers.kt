@@ -95,8 +95,7 @@ object Helpers {
         if (Desktop.isDesktopSupported() && file.internalPath != "") {
             val desktop = Desktop.getDesktop()
             if (desktop.isSupported(Desktop.Action.MOVE_TO_TRASH)) {
-                desktop.moveToTrash(file.file)
-                return true
+                return desktop.moveToTrash(file.file)
             }
         }
         return false

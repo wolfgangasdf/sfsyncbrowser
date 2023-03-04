@@ -5,14 +5,12 @@ import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
 import java.util.*
 
-val kotlinversion = "1.8.10"
-val javaversion = 18
-
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac", "linux", "win") // compile for these platforms. "mac", "linux", "win"
-
+val kotlinVersion = "1.8.10"
+val javaVersion = 18
 println("Current Java version: ${JavaVersion.current()}")
-if (JavaVersion.current().majorVersion.toInt() < javaversion) throw GradleException("Use Java >= $javaversion")
+if (JavaVersion.current().majorVersion.toInt() != javaVersion) throw GradleException("Use Java $javaVersion")
 
 buildscript {
     repositories {
@@ -25,12 +23,12 @@ plugins {
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.13"
-    id("com.github.ben-manes.versions") version "0.45.0"
+    id("com.github.ben-manes.versions") version "0.44.0"
     id("org.beryx.runtime") version "1.13.0"
 }
 
 kotlin {
-    jvmToolchain(javaversion)
+    jvmToolchain(javaVersion)
 }
 
 application {
@@ -48,7 +46,7 @@ repositories {
 }
 
 javafx {
-    version = "$javaversion"
+    version = "$javaVersion"
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) {
@@ -58,8 +56,8 @@ javafx {
 val javaFXOptions = the<JavaFXOptions>()
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinversion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinversion")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
     implementation("org.slf4j:slf4j-simple:2.0.6") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") {
@@ -209,7 +207,8 @@ tasks["runtime"].doLast {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "$javaversion"
+    kotlinOptions.jvmTarget = "$javaVersion"
+    kotlinOptions.freeCompilerArgs = listOf("-Xjsr305=warn")
 }
 
 task("dist") {

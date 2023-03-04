@@ -36,7 +36,13 @@ class MFile(val internalPath: String) {
         private val isWin = System.getProperty("os.name").lowercase().contains("win")
         private val reWinPath = """(.):\\(.*)""".toRegex()
         private val reWinUNC = """\\\\.*\\.*""".toRegex()
-        fun createTempFile(prefix: String, suffix: String) = MFile(Files.createTempFile(prefix, suffix).toFile())
+        fun createTempFile(prefix: String, suffix: String): MFile {
+            val tag = System.currentTimeMillis().toString()
+            var dir = System.getProperty("java.io.tmpdir")
+            if (Helpers.isLinux() || Helpers.isMac()) if (MFile("/tmp").isDirectory())
+                dir = "/tmp"
+            return MFile("$dir/$prefix-$tag$suffix")
+        }
         fun createTempDirectory(prefix: String) = MFile(Files.createTempDirectory(prefix))
         fun fromOSPath(p: String) = MFile(File(p))
         fun normalizePath(p: String) = java.text.Normalizer.normalize(p, java.text.Normalizer.Form.NFC)!! // make sure it's in canonical UTF8 form

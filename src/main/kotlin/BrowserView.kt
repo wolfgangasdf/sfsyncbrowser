@@ -341,7 +341,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
             } else if (ke.code == KeyCode.LEFT) {
                 currentPath.set(Helpers.getParentFolder(currentPath.value))
             } else if (ke.code == KeyCode.ESCAPE) {
-                contextMenu.hide()
+                contextMenu?.hide() ?: close()
             } else if (!ke.isMetaDown && !ke.isControlDown && !ke.isShiftDown && !ke.isAltDown && selectedItem != null &&
                     (ke.code.isDigitKey || ke.code.isLetterKey)) { // search in file list by alphanumeric keys
                 val idx0 = selectionModel.focusedIndex
