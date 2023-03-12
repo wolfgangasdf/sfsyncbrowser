@@ -8,7 +8,7 @@ import java.util.*
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac", "linux", "win") // compile for these platforms. "mac", "linux", "win"
 val kotlinVersion = "1.8.10"
-val javaVersion = 18
+val javaVersion = 19
 println("Current Java version: ${JavaVersion.current()}")
 if (JavaVersion.current().majorVersion.toInt() != javaVersion) throw GradleException("Use Java $javaVersion")
 
