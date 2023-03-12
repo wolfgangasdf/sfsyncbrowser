@@ -232,7 +232,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     // include the subfolder but root "/" is not allowed!
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) {
-        logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
+        logger.debug("listrec(rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().threadId()}")
         fun parseContent(cc: MFile, goDeeper: Boolean, forceFollowSymlinks: Boolean = false) {
             val linkOptions = if (resolveSymlinks || forceFollowSymlinks) arrayOf() else arrayOf(LinkOption.NOFOLLOW_LINKS)
             var strippedPath: String = stripPath(cc.internalPath)
@@ -255,7 +255,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         if (sp.exists()) {
             parseContent(sp, goDeeper = true, forceFollowSymlinks = true)
         }
-        logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().id}")
+        logger.debug("listrec DONE (rbp=$remoteBasePath sf=$subfolder rec=$recursive) in thread ${Thread.currentThread().threadId()}")
     }
 
     override fun listSingleFile(remotePath: String): VirtualFile? {
@@ -445,7 +445,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) {
-        logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive fil=$filterregexp) in thread ${Thread.currentThread().id}")
+        logger.debug("listrecsftp(rbp=$remoteBasePath sf=$subfolder rec=$recursive fil=$filterregexp) in thread ${Thread.currentThread().threadId()}")
 
         fun doaction(rripath: String, rriattributesini: FileAttributes, parsealways: Boolean = false, parseContentFun: (String) -> Unit) {
 

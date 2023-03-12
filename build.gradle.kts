@@ -95,7 +95,7 @@ runtime {
         if (oss == platf) {
             targetPlatform(platf, javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.parentFile.parentFile.absolutePath)
         } else { // https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
-            targetPlatform(platf) {
+            targetPlatform(jfxplatformname) {
                 val ddir = "${if (os.isWindows) "c:/" else "/"}tmp/jdk$javaVersion-$platf"
                 println("downloading jdks to or using jdk from $ddir, delete folder to update jdk!")
                 @Suppress("INACCESSIBLE_TYPE")
