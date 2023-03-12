@@ -84,9 +84,33 @@ runtime {
     modules.set(listOf("java.desktop", "java.logging", "java.prefs", "java.xml", "jdk.unsupported", "jdk.jfr", "jdk.jsobject", "jdk.xml.dom",
             "jdk.crypto.cryptoki","jdk.crypto.ec")) // needed?
 
-    if (cPlatforms.contains("mac")) targetPlatform("mac", System.getenv("JDK_MAC_HOME"))
-    if (cPlatforms.contains("win")) targetPlatform("win", System.getenv("JDK_WIN_HOME"))
-    if (cPlatforms.contains("linux")) targetPlatform("linux", System.getenv("JDK_LINUX_HOME"))
+    // sets targetPlatform JDK for host os from toolchain, for others (cross-package) from adoptium / jdkDownload
+    // https://github.com/beryx/badass-runtime-plugin/issues/99
+    // if https://github.com/gradle/gradle/issues/18817 is solved: use toolchain
+    fun setTargetPlatform(jfxplatformname: String) {
+        val platf = if (jfxplatformname == "win") "windows" else jfxplatformname // jfx expects "win" but adoptium needs "windows"
+        val os = org.gradle.internal.os.OperatingSystem.current()
+        val oss = if (os.isLinux) "linux" else if (os.isWindows) "windows" else if (os.isMacOsX) "mac" else ""
+        if (oss == "") throw GradleException("unsupported os")
+        if (oss == platf) {
+            targetPlatform(platf, javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.parentFile.parentFile.absolutePath)
+        } else { // https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
+            targetPlatform(platf) {
+                val ddir = "${if (os.isWindows) "c:/" else "/"}tmp/jdk$javaVersion-$platf"
+                println("downloading jdks to or using jdk from $ddir, delete folder to update jdk!")
+                @Suppress("INACCESSIBLE_TYPE")
+                setJdkHome(
+                    jdkDownload("https://api.adoptium.net/v3/binary/latest/$javaVersion/ga/$platf/x64/jdk/hotspot/normal/eclipse?project=jdk",
+                        closureOf<org.beryx.runtime.util.JdkUtil.JdkDownloadOptions> {
+                            downloadDir = ddir // put jdks here so different projects can use them!
+                            archiveExtension = if (platf == "windows") "zip" else "tar.gz"
+                        }
+                    )
+                )
+            }
+        }
+    }
+    cPlatforms.forEach { setTargetPlatform(it) }
 }
 
 open class CrossPackage : DefaultTask() {
