@@ -93,7 +93,7 @@ runtime {
         val oss = if (os.isLinux) "linux" else if (os.isWindows) "windows" else if (os.isMacOsX) "mac" else ""
         if (oss == "") throw GradleException("unsupported os")
         if (oss == platf) {
-            targetPlatform(platf, javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.parentFile.parentFile.absolutePath)
+            targetPlatform(jfxplatformname, javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.parentFile.parentFile.absolutePath)
         } else { // https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
             targetPlatform(jfxplatformname) {
                 val ddir = "${if (os.isWindows) "c:/" else "/"}tmp/jdk$javaVersion-$platf"
