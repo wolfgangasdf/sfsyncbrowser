@@ -44,7 +44,9 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.security.PublicKey
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
+
 
 // DON'T call stuff here from UI thread, can lock!
 
@@ -109,6 +111,8 @@ class VirtualFile(path: String, var modTime: Long, var size: Long, var permissio
 
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
+    val NEXT_ID = AtomicLong(0)
+    val id = NEXT_ID.getAndIncrement()
     var remoteBasePath: String = protocol.baseFolder.value
     var permsOverride: String = ""
     protected val debugslow = false
@@ -590,11 +594,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 throw IllegalStateException("Could not find a single free port in the range [$startFrom-$maxPort]...")
             }
 
-//            @Synchronized
-//            fun returnPort(socket: ServerSocket) {
-//                portsHandedOut.remove(socket.localPort)
-//            }
-
             private fun isLeased(port: Int) = portsHandedOut.contains(port)
 
             private fun tryBind(localPort: Int): ServerSocket? {
@@ -680,7 +679,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         fun close() {
             try {
                 logger.debug("sshc.isal=${sshClient.connection.keepAlive.isAlive}")
-                session.close()
                 if (forwarderThread != null) forwarderThread!!.close()
                 if (sshClient.isConnected) sshClient.disconnect()
             } catch (e: Exception) {
@@ -693,11 +691,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         private val portManager = TunnelPortManager()
 
         val sshClient = connect()
-        private val session = sshClient.startSession()!!
-        private val sftpClient = sshClient.newSFTPClient()!!
-        init {
-            sftpClient.sftpEngine.timeoutMs = timeoutms
-        }
     }
 
     private val pfsftp = PortForwardedSftp(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
@@ -705,7 +698,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     private val sftpt = sftpc.fileTransfer
 
     init {
-        logger.debug("ini sftp connection remoteBasePath=$remoteBasePath")
+        logger.debug("sftpconnection: init id=$id remoteBasePath=$remoteBasePath")
         sftpc.sftpEngine.timeoutMs = timeoutms
         transferListener = MyTransferListener()
         sftpt.transferListener = transferListener
@@ -715,6 +708,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun isAlive() = pfsftp.sshClient.isConnected
 
     override fun cleanUp() {
+        logger.debug("sftpconnection.cleanup id=$id remoteBasePath=$remoteBasePath")
         pfsftp.close()
     }
 

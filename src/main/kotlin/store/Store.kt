@@ -145,9 +145,9 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
     override fun toString() = "[Server] ${title.value}"
     fun getConnection(remoteFolder: String): GeneralConnection {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, might open dialogs)")
-        if (connection?.isAlive() != true) {
+        if (connection?.isAlive() != true) { // TODO sftp connection can't be reused...
             val proto = getProtocol()
-            logger.info("opening new connection to $proto")
+            logger.info("server.getconnection: opening new connection to $proto")
             connection = when {
                 proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
                 proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)

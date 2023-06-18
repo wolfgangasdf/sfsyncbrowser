@@ -496,7 +496,15 @@ class BrowserView(private val server: Server, private val basePath: String, path
             fileTableView.sort()
             fileTableView.requestResize() ; fileTableView.requestResize() // bug
             // select last folder or first
-            files.find { f -> f.path == oldPath }?.let { f -> fileTableView.selectionModel.select(f) } ?: fileTableView.selectFirst()
+            if (files.isEmpty()) { // hack to trigger onchange update of mi*
+                files.add(VirtualFile("", 0, 0))
+                fileTableView.selectionModel.selectFirst()
+                files.removeAt(0)
+                fileTableView.selectionModel.clearSelection()
+            } else {
+                files.find { f -> f.path == oldPath }?.let { f -> fileTableView.selectionModel.select(f) }
+                    ?: fileTableView.selectFirst()
+            }
             fileTableView.scrollTo(fileTableView.selectedItem)
             oldPath = currentPath.value
             fileTableView.requestFocus()
