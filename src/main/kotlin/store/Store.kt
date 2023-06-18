@@ -141,27 +141,25 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
             closeConnection() ; currentProtocol.set(protocols.indexOf(it))
         }
     }
-    private var connection: GeneralConnection? = null
     override fun toString() = "[Server] ${title.value}"
     fun getConnection(remoteFolder: String): GeneralConnection {
         if (Platform.isFxApplicationThread()) throw Exception("must not be called from JFX thread (blocks, might open dialogs)")
-        if (connection?.isAlive() != true) { // TODO sftp connection can't be reused...
-            val proto = getProtocol()
-            logger.info("server.getconnection: opening new connection to $proto")
-            connection = when {
-                proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
-                proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
-                else -> throw java.lang.Exception("unknown connection type")
-            }
+        val proto = getProtocol()
+        logger.info("server.getconnection: opening new connection to $proto")
+        val connection = when {
+            proto.protocoluri.value.startsWith("sftp") -> SftpConnection(proto)
+            proto.protocoluri.value.startsWith("file") -> LocalConnection(proto)
+            else -> throw java.lang.Exception("unknown connection type")
         }
-        connection!!.assignRemoteBasePath(remoteFolder)
-        connection!!.interrupted.set(false)
-        return connection!!
+        connection.assignRemoteBasePath(remoteFolder)
+        connection.interrupted.set(false)
+        return connection
     }
     fun closeConnection() {
         syncs.forEach { it.fileWatcher?.stop() }
-        connection?.cleanUp()
-        connection = null
+        // TODO how to cleanup connections?
+//        connection?.cleanUp()
+//        connection = null
     }
     fun getProtocol(): Protocol = protocols[currentProtocol.value]
     fun removeSync(sync: Sync) {

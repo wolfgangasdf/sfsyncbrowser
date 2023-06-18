@@ -106,6 +106,7 @@ class VirtualFile(path: String, var modTime: Long, var size: Long, var permissio
     override fun compareTo(other: VirtualFile): Int = path.compareTo(other.path)
 }
 
+// open one connection for each (remotebasepath, onprogress,..)
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
     private val _nextid = AtomicLong(0) // to have unique id of object
@@ -132,11 +133,11 @@ abstract class GeneralConnection(val protocol: Protocol) {
     open fun extChmod(path: String, newPerms: Set<PosixFilePermission>) { throw Exception("Can't chmod") }
     open fun extDuplicate(oldPath: String, newPath: String) { throw Exception("Can't duplicate") }
 
-    fun assignRemoteBasePath(remoteFolder: String) { // TODO this is not thread safe...
+    fun assignRemoteBasePath(remoteFolder: String) {
         remoteBasePath = protocol.baseFolder.value + remoteFolder
     }
 
-    var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> } // TODO this is not thread safe...
+    var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> }
 
     // return dir (most likely NOT absolute path but subfolder!) without trailing /
     fun checkIsDir(path: String): Pair<String, Boolean> {
@@ -150,7 +151,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
         val fff = arrayListOf<VirtualFile>()
         what.forEach { selvf ->
             if (selvf.isDir())
-                list(selvf.path, "", recursive = true, resolveSymlinks = true) { fff += it ; true } // TODO max interruptible
+                list(selvf.path, "", recursive = true, resolveSymlinks = true) { fff += it ; true } // TODO make interruptible
             else fff += selvf
         }
         return fff
@@ -275,8 +276,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
 class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
-    val timeoutms = 10000
-    val ctimeoutms = 15000
 
     override fun canRename(): Boolean = true
     override fun canChmod(): Boolean = true
@@ -536,176 +535,12 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         return fp.mapNotNull {posix2filePermissions[it] }.toMutableSet()
     }
 
-    // see ConsoleKnownHostsVerifier
-    class MyHostKeyVerifier : OpenSSHKnownHosts(DBSettings.knownHostsFile.file) {
-        override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
-            return if (runUIwait { dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
-                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK to connect and add to SFSync's known_hosts.") }) {
-                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
-                write()
-                true
-            } else false
-        }
-
-        override fun hostKeyChangedAction(hostname: String?, key: PublicKey?): Boolean {
-            return if (runUIwait { dialogOkCancel("SFTP server verification", "Host key of server $hostname has changed!",
-                                "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK if you are 100% sure if this change was intended.") }) {
-                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
-                write()
-                true
-            } else false
-        }
-    }
-
-    // https://stackoverflow.com/a/16023513
-    inner class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int, private val hosttunnel: String, private val porttunnel: Int, private val tunnelmode: Int,
-                            private val username: String, private val password: String) {
-
-        private val startPort = 2222
-
-        inner class PortForwarder(private val sshClient: SSHClient, private val remoteAddress: InetSocketAddress, private val localSocket: ServerSocket) : Thread(), Closeable {
-            val latch = CountDownLatch(1)
-
-            private var forwarder: LocalPortForwarder? = null
-            override fun run() {
-                val params = Parameters("127.0.0.1", localSocket.localPort,
-                        remoteAddress.hostName, remoteAddress.port)
-                forwarder = sshClient.newLocalPortForwarder(params, localSocket)
-                try {
-                    latch.countDown()
-                    forwarder!!.listen()
-                } catch (ignore: IOException) {} /* OK. */
-            }
-
-            override fun close() {
-                localSocket.close()
-                forwarder!!.close()
-            }
-        }
-
-        inner class TunnelPortManager {
-            private val maxPort = 65536
-            private val portsHandedOut = HashSet<Int>()
-
-            fun leaseNewPort(startFrom: Int): ServerSocket {
-                for (port in startFrom..maxPort) {
-                    if (isLeased(port)) continue
-
-                    val socket = tryBind (port)
-                    if (socket != null) {
-                        portsHandedOut.add(port)
-                        logger.info("handing out port $port for local binding")
-                        return socket
-                    }
-                }
-                throw IllegalStateException("Could not find a single free port in the range [$startFrom-$maxPort]...")
-            }
-
-            private fun isLeased(port: Int) = portsHandedOut.contains(port)
-
-            private fun tryBind(localPort: Int): ServerSocket? {
-                return try {
-                    val ss = ServerSocket()
-                    ss.reuseAddress = true
-                    ss.bind(InetSocketAddress("localhost", localPort))
-                    ss
-                } catch (e: IOException) {
-                    null
-                }
-            }
-        }
-
-        private fun startForwarder(forwarderThread: PortForwarder): PortForwarder {
-            forwarderThread.start()
-            try {
-                forwarderThread.latch.await()
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            return forwarderThread
-        }
-
-
-        private fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
-            val defaultConfig = DefaultConfig()
-            defaultConfig.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
-            val ssh = SSHClient(defaultConfig)
-            ssh.addHostKeyVerifier(MyHostKeyVerifier())
-            ssh.timeout = timeoutms
-            ssh.connectTimeout = ctimeoutms
-            ssh.connect(hostname, port)
-            ssh.connection.keepAlive.keepAliveInterval = 2 // KeepaliveRunner makes 5 retries...
-            try {
-                ssh.authPublickey(username)
-            } catch (e: UserAuthException) {
-                logger.info("Public key auth failed: $e")
-                logger.info("auth methods: " + ssh.userAuth.allowedMethods.joinToString(","))
-                // under win7 this doesn't work, try password in any case
-                //      if (ssh.getUserAuth.getAllowedMethods.exists(s => s == "keyboard-interactive" || s == "password" )) {
-                if (pw != "") {
-                    ssh.authPassword(username, pw)
-                } else {
-                    runUIwait { dialogMessage(Alert.AlertType.ERROR, "SSH", "Public key auth failed, require password.", "") }
-                    throw UserAuthException("No password")
-                }
-            }
-            if (!ssh.isAuthenticated) {
-                throw UserAuthException("Not authenticated!")
-            } else logger.info("Authenticated!")
-            return ssh
-        }
-
-        private fun connect(): SSHClient {
-            var usetunnel = tunnelmode == 1
-            if (tunnelmode == 2) {
-                try {
-                    val addr = InetAddress.getByName(hostsftp)
-                    usetunnel = !addr.isReachable(500)
-                } catch (e: UnknownHostException) { logger.info("unknown host, assume not reachable!")}
-            }
-
-            return if (usetunnel) {
-                if (hosttunnel.isEmpty()) throw Exception("tunnel host must not be empty!")
-                logger.info("making initial connection to $hosttunnel")
-                val sshClient = getSSHClient(username, password, hosttunnel, porttunnel)
-                logger.info("creating connection to $hostsftp")
-                val ss = portManager.leaseNewPort(startPort)
-
-                val sftpAddress = InetSocketAddress(hostsftp, portsftp)
-
-                forwarderThread = PortForwarder(sshClient, sftpAddress, ss)
-                forwarderThread = startForwarder(forwarderThread!!)
-                getSSHClient(username, password, "127.0.0.1", ss.localPort)
-            } else {
-                logger.info("creating direct connection to $hostsftp")
-                getSSHClient(username, password, hostsftp, portsftp)
-            }
-
-        }
-
-        fun close() {
-            try {
-                logger.debug("sshc.isal=${sshClient.connection.keepAlive.isAlive}")
-                if (forwarderThread != null) forwarderThread!!.close()
-                if (sshClient.isConnected) sshClient.disconnect()
-            } catch (e: Exception) {
-                logger.info("Exception during PFSftp close, ignored! " + e.message)
-            }
-            logger.info("Sftp closed!")
-        }
-
-        private var forwarderThread: PortForwarder? = null
-        private val portManager = TunnelPortManager()
-
-        val sshClient = connect()
-    }
-
-    private val pfsftp = PortForwardedSftp(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
-    private val sftpc = pfsftp.sshClient.newSFTPClient()
+    private val sftphysc = SftpConnectionPool.getPortForwardedSftpClient(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
+    private val sftpc = sftphysc.sftpc
+    private val pfsftp = sftphysc.pfsftp
 
     init {
         logger.debug("sftpconnection: init id=$id remoteBasePath=$remoteBasePath")
-        sftpc.sftpEngine.timeoutMs = timeoutms
     }
 
     override fun isAlive() = pfsftp.sshClient.isConnected
@@ -719,6 +554,196 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         logger.debug("sftp mkdirrec $absolutePath")
         sftpc.mkdirs(if (addRemoteBasePath) "$remoteBasePath$absolutePath" else absolutePath)
     }
+}
+
+class PhysicalSftConnection(var pfsftp: PortForwardedSftp, var sftpc: SFTPClient)
+
+object SftpConnectionPool {
+    const val timeoutms = 10000
+    const val ctimeoutms = 15000
+
+    private val sftpconnections = HashMap<String, PhysicalSftConnection> ()
+
+    // see ConsoleKnownHostsVerifier
+    class MyHostKeyVerifier : OpenSSHKnownHosts(DBSettings.knownHostsFile.file) {
+        override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
+            return if (runUIwait { dialogOkCancel("SFTP server verification", "Can't verify public key of server $hostname",
+                    "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK to connect and add to SFSync's known_hosts.") }) {
+                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
+                write()
+                true
+            } else false
+        }
+
+        override fun hostKeyChangedAction(hostname: String?, key: PublicKey?): Boolean {
+            return if (runUIwait { dialogOkCancel("SFTP server verification", "Host key of server $hostname has changed!",
+                    "Fingerprint:\n${SecurityUtils.getFingerprint(key)}\nPress OK if you are 100% sure if this change was intended.") }) {
+                entries.add(HostEntry(null, hostname, KeyType.fromKey(key), key))
+                write()
+                true
+            } else false
+        }
+    }
+
+    // gets connection from pool or new.
+    fun getPortForwardedSftpClient(hostsftp: String, portsftp: Int, hosttunnel: String, porttunnel: Int, tunnelmode: Int,
+                            username: String, password: String): PhysicalSftConnection {
+        val key = "$hostsftp-$portsftp-$hosttunnel-$porttunnel-$tunnelmode-$username-$password"
+        if (!sftpconnections.contains(key)) {
+            logger.debug("getPortForwardedSftpClient: key not found, open new connection...")
+            val pfsftp = PortForwardedSftp(hostsftp, portsftp, hosttunnel, porttunnel, tunnelmode, username, password)
+            val sftpc = pfsftp.sshClient.newSFTPClient()
+            sftpc.sftpEngine.timeoutMs = timeoutms
+            sftpconnections[key] = PhysicalSftConnection(pfsftp, sftpc)
+        } else { logger.debug("getPortForwardedSftpClient: key found!") }
+        logger.debug("getPortForwardedSftpClient!")
+        return sftpconnections[key]!!
+    }
+
+
+}
+
+// https://stackoverflow.com/a/16023513
+class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int, private val hosttunnel: String, private val porttunnel: Int, private val tunnelmode: Int,
+                        private val username: String, private val password: String) {
+
+    private val startPort = 2222
+
+    inner class PortForwarder(private val sshClient: SSHClient, private val remoteAddress: InetSocketAddress, private val localSocket: ServerSocket) : Thread(), Closeable {
+        val latch = CountDownLatch(1)
+
+        private var forwarder: LocalPortForwarder? = null
+        override fun run() {
+            val params = Parameters("127.0.0.1", localSocket.localPort,
+                remoteAddress.hostName, remoteAddress.port)
+            forwarder = sshClient.newLocalPortForwarder(params, localSocket)
+            try {
+                latch.countDown()
+                forwarder!!.listen()
+            } catch (ignore: IOException) {} /* OK. */
+        }
+
+        override fun close() {
+            localSocket.close()
+            forwarder!!.close()
+        }
+    }
+
+    inner class TunnelPortManager {
+        private val maxPort = 65536
+        private val portsHandedOut = HashSet<Int>()
+
+        fun leaseNewPort(startFrom: Int): ServerSocket {
+            for (port in startFrom..maxPort) {
+                if (isLeased(port)) continue
+
+                val socket = tryBind (port)
+                if (socket != null) {
+                    portsHandedOut.add(port)
+                    logger.info("handing out port $port for local binding")
+                    return socket
+                }
+            }
+            throw IllegalStateException("Could not find a single free port in the range [$startFrom-$maxPort]...")
+        }
+
+        private fun isLeased(port: Int) = portsHandedOut.contains(port)
+
+        private fun tryBind(localPort: Int): ServerSocket? {
+            return try {
+                val ss = ServerSocket()
+                ss.reuseAddress = true
+                ss.bind(InetSocketAddress("localhost", localPort))
+                ss
+            } catch (e: IOException) {
+                null
+            }
+        }
+    }
+
+    private fun startForwarder(forwarderThread: PortForwarder): PortForwarder {
+        forwarderThread.start()
+        try {
+            forwarderThread.latch.await()
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+        return forwarderThread
+    }
+
+
+    private fun getSSHClient(username: String, pw: String, hostname: String, port: Int): SSHClient {
+        val defaultConfig = DefaultConfig()
+        defaultConfig.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
+        val ssh = SSHClient(defaultConfig)
+        ssh.addHostKeyVerifier(SftpConnectionPool.MyHostKeyVerifier())
+        ssh.timeout = SftpConnectionPool.timeoutms
+        ssh.connectTimeout = SftpConnectionPool.ctimeoutms
+        ssh.connect(hostname, port)
+        ssh.connection.keepAlive.keepAliveInterval = 2 // KeepaliveRunner makes 5 retries...
+        try {
+            ssh.authPublickey(username)
+        } catch (e: UserAuthException) {
+            logger.info("Public key auth failed: $e")
+            logger.info("auth methods: " + ssh.userAuth.allowedMethods.joinToString(","))
+            // under win7 this doesn't work, try password in any case
+            //      if (ssh.getUserAuth.getAllowedMethods.exists(s => s == "keyboard-interactive" || s == "password" )) {
+            if (pw != "") {
+                ssh.authPassword(username, pw)
+            } else {
+                runUIwait { dialogMessage(Alert.AlertType.ERROR, "SSH", "Public key auth failed, require password.", "") }
+                throw UserAuthException("No password")
+            }
+        }
+        if (!ssh.isAuthenticated) {
+            throw UserAuthException("Not authenticated!")
+        } else logger.info("Authenticated!")
+        return ssh
+    }
+
+    private fun connect(): SSHClient {
+        var usetunnel = tunnelmode == 1
+        if (tunnelmode == 2) {
+            try {
+                val addr = InetAddress.getByName(hostsftp)
+                usetunnel = !addr.isReachable(500)
+            } catch (e: UnknownHostException) { logger.info("unknown host, assume not reachable!")}
+        }
+
+        return if (usetunnel) {
+            if (hosttunnel.isEmpty()) throw Exception("tunnel host must not be empty!")
+            logger.info("making initial connection to $hosttunnel")
+            val sshClient = getSSHClient(username, password, hosttunnel, porttunnel)
+            logger.info("creating connection to $hostsftp")
+            val ss = portManager.leaseNewPort(startPort)
+
+            val sftpAddress = InetSocketAddress(hostsftp, portsftp)
+
+            forwarderThread = PortForwarder(sshClient, sftpAddress, ss)
+            forwarderThread = startForwarder(forwarderThread!!)
+            getSSHClient(username, password, "127.0.0.1", ss.localPort)
+        } else {
+            logger.info("creating direct connection to $hostsftp")
+            getSSHClient(username, password, hostsftp, portsftp)
+        }
+
+    }
+
+    fun close() {
+        try {
+            logger.debug("sshc.isal=${sshClient.connection.keepAlive.isAlive}")
+            if (forwarderThread != null) forwarderThread!!.close()
+            if (sshClient.isConnected) sshClient.disconnect()
+        } catch (e: Exception) {
+            logger.info("Exception during PFSftp close, ignored! " + e.message)
+        }
+        logger.info("Sftp closed!")
+    }
+
+    private var forwarderThread: PortForwarder? = null
+    private val portManager = TunnelPortManager()
+
+    val sshClient = connect()
 }
 
 
