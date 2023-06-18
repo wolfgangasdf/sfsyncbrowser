@@ -11,11 +11,8 @@ import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.common.StreamCopier.Listener
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
 import net.schmizz.sshj.connection.channel.direct.Parameters
-import net.schmizz.sshj.sftp.FileAttributes
-import net.schmizz.sshj.sftp.FileMode
-import net.schmizz.sshj.sftp.RemoteResourceInfo
+import net.schmizz.sshj.sftp.*
 import net.schmizz.sshj.sftp.Response.StatusCode
-import net.schmizz.sshj.sftp.SFTPException
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.FilePermission
@@ -111,8 +108,8 @@ class VirtualFile(path: String, var modTime: Long, var size: Long, var permissio
 
 // subfolder should NOT start or end with /
 abstract class GeneralConnection(val protocol: Protocol) {
-    val NEXT_ID = AtomicLong(0)
-    val id = NEXT_ID.getAndIncrement()
+    private val _nextid = AtomicLong(0) // to have unique id of object
+    val id = _nextid.getAndIncrement()
     var remoteBasePath: String = protocol.baseFolder.value
     var permsOverride: String = ""
     protected val debugslow = false
@@ -135,11 +132,11 @@ abstract class GeneralConnection(val protocol: Protocol) {
     open fun extChmod(path: String, newPerms: Set<PosixFilePermission>) { throw Exception("Can't chmod") }
     open fun extDuplicate(oldPath: String, newPath: String) { throw Exception("Can't duplicate") }
 
-    fun assignRemoteBasePath(remoteFolder: String) {
+    fun assignRemoteBasePath(remoteFolder: String) { // TODO this is not thread safe...
         remoteBasePath = protocol.baseFolder.value + remoteFolder
     }
 
-    var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> }
+    var onProgress: (progressVal: Double, bytePerSecond: Double) -> Unit = { _, _ -> } // TODO this is not thread safe...
 
     // return dir (most likely NOT absolute path but subfolder!) without trailing /
     fun checkIsDir(path: String): Pair<String, Boolean> {
@@ -275,7 +272,6 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     override fun isAlive() = true
 }
 
-
 class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val uri = protocol.getmyuri()
@@ -325,8 +321,6 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
-    private var transferListener: MyTransferListener? = null
-
     override fun deletefile(what: String) {
         val (cp, isdir) = checkIsDir(what)
         if (isdir) {
@@ -355,7 +349,18 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         }
     }
 
+    // need to create a sftpfiletransfer & transferlisteder for each thread!
+    private fun getSftpSlowTransfer(): Pair<MyTransferListener, SFTPFileTransfer> {
+        val transferListener = MyTransferListener()
+        val sftpt = sftpc.fileTransfer
+        sftpt.preserveAttributes =
+            false // don't set permissions from local, mostly doesn't make sense! Either by user or not at all.
+        sftpt.transferListener = transferListener
+        return Pair(transferListener, sftpt)
+    }
+
     override fun putfile(localBasePath: String, from: String, mtime: Long, remotePath: String): Long {
+        val (transferListener, sftpt) = getSftpSlowTransfer()
         val (cp, isdir) = checkIsDir(from)
         val rp = if (remotePath == "") "$remoteBasePath$cp" else "$remoteBasePath$remotePath"
         logger.debug("putfile: from=$from isdir=$isdir rp=$rp")
@@ -398,14 +403,14 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                 else if (!protocol.cantSetDate.value) setAttr(false, rp)
             } catch (e: Exception) {
                 logger.debug("putfile: exception: $e")
-                if (transferListener!!.bytesTransferred > 0) { // file may be corrupted, but don't delete if nothing transferred
+                if (transferListener.bytesTransferred > 0) { // file may be corrupted, but don't delete if nothing transferred
                     // prevent delete of root-owned files if user in group admin, sftp rm seems to "override permission"
                     sftpc.rm(rp)
                 }
                 throw e
             }
-            if (transferListener!!.bytesTotal != transferListener!!.bytesTransferred)
-                throw IllegalStateException("filesize mismatch: ${transferListener!!.bytesTotal} <> ${transferListener!!.bytesTransferred}")
+            if (transferListener.bytesTotal != transferListener.bytesTransferred)
+                throw IllegalStateException("filesize mismatch: ${transferListener.bytesTotal} <> ${transferListener.bytesTransferred}")
             if (protocol.cantSetDate.value) {
                 sftpc.mtime(rp) * 1000
             } else {
@@ -415,6 +420,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun getfile(localBasePath: String, from: String, mtime: Long, to: String) {
+        val (transferListener, sftpt) = getSftpSlowTransfer()
+
         val (cp, isdir) = checkIsDir(from)
         val tof = MFile(to)
         if (isdir) {
@@ -426,8 +433,8 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
             val tmpf = MFile.createTempFile("sfsync-tempfile", ".dat")
             sftpt.download("$remoteBasePath$cp", tmpf.internalPath)
             MFile.move(tmpf.internalPath, to, StandardCopyOption.REPLACE_EXISTING)
-            if (transferListener!!.bytesTotal != transferListener!!.bytesTransferred)
-                throw IllegalStateException("filesize mismatch: ${transferListener!!.bytesTotal} <> ${transferListener!!.bytesTransferred}")
+            if (transferListener.bytesTotal != transferListener.bytesTransferred)
+                throw IllegalStateException("filesize mismatch: ${transferListener.bytesTotal} <> ${transferListener.bytesTransferred}")
             tof.setLastModifiedTime(mtime)
         }
     }
@@ -695,14 +702,10 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     private val pfsftp = PortForwardedSftp(uri.host, uri.port, protocol.tunnelHostname(), protocol.tunnelPort(), max(0, SettingsStore.tunnelModes.indexOf(protocol.tunnelMode.value)),uri.username, protocol.password.value)
     private val sftpc = pfsftp.sshClient.newSFTPClient()
-    private val sftpt = sftpc.fileTransfer
 
     init {
         logger.debug("sftpconnection: init id=$id remoteBasePath=$remoteBasePath")
         sftpc.sftpEngine.timeoutMs = timeoutms
-        transferListener = MyTransferListener()
-        sftpt.transferListener = transferListener
-        sftpt.preserveAttributes = false // don't set permissions from local, mostly doesn't make sense! Either by user or not at all.
     }
 
     override fun isAlive() = pfsftp.sshClient.isConnected
