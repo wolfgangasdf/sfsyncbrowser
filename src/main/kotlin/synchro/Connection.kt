@@ -124,6 +124,7 @@ abstract class GeneralConnection(val protocol: Protocol) {
     abstract fun list(subfolder: String, filterregexp: String, recursive: Boolean, resolveSymlinks: Boolean, action: (VirtualFile) -> Boolean) // action->false: interrupt!
     abstract fun listSingleFile(remotePath: String): VirtualFile?
     abstract fun isAlive(): Boolean
+    abstract fun cleanUp()
 
     // extended functions only for some connections
     abstract fun canRename(): Boolean
@@ -157,7 +158,6 @@ abstract class GeneralConnection(val protocol: Protocol) {
         return fff
     }
 
-    abstract fun cleanUp()
 }
 
 class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
@@ -547,7 +547,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
 
     override fun cleanUp() {
         logger.debug("sftpconnection.cleanup id=$id remoteBasePath=$remoteBasePath")
-        pfsftp.close()
+        pfsftp.close() // TODO cleanup better
     }
 
     override fun mkdirrec(absolutePath: String, addRemoteBasePath: Boolean) {
@@ -599,8 +599,6 @@ object SftpConnectionPool {
         logger.debug("getPortForwardedSftpClient!")
         return sftpconnections[key]!!
     }
-
-
 }
 
 // https://stackoverflow.com/a/16023513

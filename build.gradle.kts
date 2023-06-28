@@ -6,7 +6,7 @@ import org.openjfx.gradle.JavaFXOptions
 import java.util.*
 
 version = "1.0-SNAPSHOT"
-val cPlatforms = listOf("mac", "linux", "win") // compile for these platforms. "mac", "linux", "win"
+val cPlatforms = listOf("mac-aarch64", "linux", "win") // compile for these platforms. "mac", "mac-aarch64", "linux", "win"
 val kotlinVersion = "1.8.22"
 val javaVersion = 19
 println("Current Java version: ${JavaVersion.current()}")
@@ -33,7 +33,7 @@ kotlin {
 
 application {
     mainClass.set("MainKt")
-    applicationDefaultJvmArgs = listOf("-Dprism.verbose=true", "-Dprism.order=sw", // use software renderer
+    applicationDefaultJvmArgs = listOf("-Dprism.verbose=true",
             "--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED") // javafx 13 tornadofx bug: https://github.com/edvin/tornadofx/issues/899#issuecomment-569709223
 }
 
@@ -75,7 +75,6 @@ dependencies {
             project.dependencies.add(cfg.name,"org.openjfx:${m.artifactName}:${javaFXOptions.version}:$platform")
         }
     }
-
 }
 
 runtime {
@@ -90,8 +89,9 @@ runtime {
     fun setTargetPlatform(jfxplatformname: String) {
         val platf = if (jfxplatformname == "win") "windows" else jfxplatformname // jfx expects "win" but adoptium needs "windows"
         val os = org.gradle.internal.os.OperatingSystem.current()
-        val oss = if (os.isLinux) "linux" else if (os.isWindows) "windows" else if (os.isMacOsX) "mac" else ""
+        var oss = if (os.isLinux) "linux" else if (os.isWindows) "windows" else if (os.isMacOsX) "mac" else ""
         if (oss == "") throw GradleException("unsupported os")
+        if (System.getProperty("os.arch") == "aarch64") oss += "-aarch64"// https://github.com/openjfx/javafx-gradle-plugin#4-cross-platform-projects-and-libraries
         if (oss == platf) {
             targetPlatform(jfxplatformname, javaToolchains.launcherFor(java.toolchain).get().executablePath.asFile.parentFile.parentFile.absolutePath)
         } else { // https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
@@ -123,10 +123,10 @@ open class CrossPackage : DefaultTask() {
         project.runtime.targetPlatforms.get().forEach { (t, _) ->
             println("targetplatform: $t")
             val imgdir = "${project.runtime.imageDir.get()}/${project.name}-$t"
-            println("imagedir: $imgdir")
-            when(t) {
-                "mac" -> {
-                    val appp = File(project.buildDir.path + "/crosspackage/mac/$execfilename.app").path
+            println("imagedir=$imgdir targetplatform=$t")
+            when {
+                t.startsWith("mac") -> {
+                    val appp = File(project.buildDir.path + "/crosspackage/$t/$execfilename.app").path
                     project.delete(appp)
                     project.copy {
                         into(appp)
@@ -184,9 +184,9 @@ open class CrossPackage : DefaultTask() {
                     // touch folder to update Finder
                     File(appp).setLastModified(System.currentTimeMillis())
                     // zip it
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-mac.zip"), File("${project.buildDir.path}/crosspackage/mac"))
+                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File("${project.buildDir.path}/crosspackage/$t"))
                 }
-                "win" -> {
+                t == "win" -> {
                     File("$imgdir/bin/$execfilename.bat").delete() // from runtime, not nice
                     val pf = File("$imgdir/$execfilename.bat")
                     pf.writeText("""
@@ -194,10 +194,10 @@ open class CrossPackage : DefaultTask() {
                         set DIR=%~dp0
                         start "" "%DIR%\bin\javaw" %JLINK_VM_OPTIONS% -classpath "%DIR%/lib/*" ${project.application.mainClass.get()}  
                     """.trimIndent())
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-win.zip"), File(imgdir))
+                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
                 }
-                "linux" -> {
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-linux.zip"), File(imgdir))
+                t.startsWith("linux") -> {
+                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
                 }
             }
         }
@@ -216,7 +216,7 @@ tasks.withType(CreateStartScripts::class).forEach {script ->
     }
 }
 
-// copy jmods for each platform
+// copy jmods for each platform. note that the build host jmods are still around, not worth removing them.
 tasks["runtime"].doLast {
     cPlatforms.forEach { platform ->
         println("Copy jmods for platform $platform")
