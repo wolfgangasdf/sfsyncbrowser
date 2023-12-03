@@ -7,8 +7,8 @@ import java.util.*
 
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac-aarch64", "linux", "win") // compile for these platforms. "mac", "mac-aarch64", "linux", "win"
-val kotlinVersion = "1.8.22"
-val javaVersion = 19
+val kotlinVersion = "1.9.21"
+val javaVersion = 21
 println("Current Java version: ${JavaVersion.current()}")
 if (JavaVersion.current().majorVersion.toInt() != javaVersion) throw GradleException("Use Java $javaVersion")
 
@@ -19,11 +19,11 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "1.8.22"
+    kotlin("jvm") version "1.9.21"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.14"
-    id("com.github.ben-manes.versions") version "0.47.0"
+    id("com.github.ben-manes.versions") version "0.50.0"
     id("org.beryx.runtime") version "1.13.0"
 }
 
@@ -46,7 +46,7 @@ repositories {
 }
 
 javafx {
-    version = "$javaVersion"
+    version = "21" //"$javaVersion"
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) {
@@ -59,15 +59,15 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
-    implementation("org.slf4j:slf4j-simple:2.0.7") // no colors, everything stderr
+    implementation("org.slf4j:slf4j-simple:2.0.9") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
         exclude("org.openjfx")
     }
-    implementation("com.hierynomus:sshj:0.35.0")
+    implementation("com.hierynomus:sshj:0.37.0")
     implementation("io.methvin:directory-watcher:0.18.0")
-    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.74")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.74")
+    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.77")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.77")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")

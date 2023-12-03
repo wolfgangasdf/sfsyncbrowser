@@ -118,7 +118,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         init {
             val haveDir = vfs.firstOrNull { it.isDir() } != null
             val dotri = haveDir || vfs.size > 1
-            val permips = PosixFilePermission.values().associateWith {
+            val permips = PosixFilePermission.entries.associateWith {
                 if (dotri) SIP(-1) else {
                     SIP(if (vfs.first().permissions.contains(it)) 1 else 0)
                 }
@@ -400,10 +400,6 @@ class BrowserView(private val server: Server, private val basePath: String, path
                 content[dataFormatVFs] = selectionModel.selectedItems.toList()
                 db.setContent(content)
             } else { // drag out of sfsb
-                if (isMac() && selectionModel.selectedItems.size > 1) { // TODO crashes on mac, wait for bug https://bugs.openjdk.org/browse/JDK-8233955
-                    dialogMessage(Alert.AlertType.ERROR, "Error", "Can't drop more than one file on mac", "https://bugs.openjdk.org/browse/JDK-8233955")
-                    return@setOnDragDetected
-                }
                 val remoteBase = selectionModel.selectedItems.first().getParent()
                 val tempfolder = MFile.createTempDirectory("sfsyncbrowsertemp")
 

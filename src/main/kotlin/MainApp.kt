@@ -1,4 +1,5 @@
 
+import javafx.application.Platform
 import javafx.scene.Node
 import javafx.scene.Scene
 import javafx.scene.control.Alert
@@ -35,7 +36,7 @@ fun <T: MyView> openNewWindow(view: T, m: Modality = Modality.NONE): T {
         newstage.x = Random.nextDouble(0.1, 0.3) * it.width
         newstage.y = Random.nextDouble(0.1, 0.3) * it.height
     }
-    newstage.setOnShown { view.doAfterShown() }
+    newstage.setOnShown { Platform.runLater { view.doAfterShown() } }
     newstage.setOnHiding { view.doBeforeClose() }
     newstage.show()
     newstage.addEventFilter(KeyEvent.KEY_RELEASED) {

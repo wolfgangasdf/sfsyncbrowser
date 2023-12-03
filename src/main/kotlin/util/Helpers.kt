@@ -431,6 +431,7 @@ object MyWorker: Dialog<ButtonType>() {
         val th = Thread(atask)
         th.isDaemon = true
         th.start()
+        toFront()
     }
 
     fun runTaskWithConn(onsucc: () -> Unit, msg: String, server: Server, basePath: String, callfun: MyTask<Unit>.(connection: GeneralConnection) -> Unit) {
