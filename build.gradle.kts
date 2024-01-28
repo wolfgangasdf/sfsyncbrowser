@@ -27,6 +27,13 @@ plugins {
     id("org.beryx.runtime") version "1.13.0"
 }
 
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+    }
+}
+
 kotlin {
     jvmToolchain(javaVersion)
 }

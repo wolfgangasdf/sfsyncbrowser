@@ -156,7 +156,11 @@ class Server(val title: StringProperty, val status: StringProperty, val currentP
         return connection
     }
     fun closeConnection() {
-        syncs.forEach { it.fileWatcher?.stop() } // TODO: really?
+        logger.debug("close connection server $title")
+        syncs.forEach {
+            logger.debug("stopping watching ${it.fileWatcher?.file}")
+            it.fileWatcher?.stop()
+        }
         // TODO how to cleanup connections?
 //        connection?.cleanUp()
 //        connection = null

@@ -1,6 +1,7 @@
 package util
 
 import io.methvin.watcher.DirectoryWatcher
+import io.methvin.watcher.hashing.FileHasher
 import javafx.application.Platform
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
@@ -454,30 +455,22 @@ object MyWorker: Dialog<ButtonType>() {
 
 }
 
+// TODOlater: implement also for directories, should work now.
 class FileWatcher(val file: MFile) {
     private var dw: DirectoryWatcher? = null
     private var lastmod = 0L
 
-    private fun lastMod(): Long = file.lastModified()
-
-    // this doesn't work with directories, watches file mod time to avoid double notifications.
     fun watch(callback: (MFile) -> Unit ): FileWatcher {
         logger.info("filewatcher: watching $file")
-        lastmod = lastMod()
-        dw = DirectoryWatcher.builder().path(file.asPath()).listener { dce ->
-            val newlastmod = lastMod()
-            logger.debug("filewatcher($file, $lastmod, $newlastmod): $dce")
-            if (newlastmod != lastmod) {
-                lastmod = newlastmod
-                callback(file)
-            }
-        }.fileHashing(false).build()
+        dw = DirectoryWatcher.builder().logger(logger).path(file.asPath()).listener { dce ->
+            logger.debug("filewatcher($file, $lastmod): $dce")
+            callback(file)
+        }.fileHasher(FileHasher.LAST_MODIFIED_TIME).build()
         dw?.watchAsync()
         return this
     }
 
     fun stop() {
-        logger.info("filewatcher: stop watching $file")
         dw?.close()
     }
 }

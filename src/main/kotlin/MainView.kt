@@ -494,14 +494,19 @@ class MainView : View("SFSyncBrowser") {
         fun compSyncTemp(sync: Sync, successfulSyncCallback: () -> Unit = {}) {
             openNewWindow(SyncView.syncViewTempIniSync(sync, successfulSyncCallback))
         }
-        fun compSyncFile(sync: Sync, successfulSyncCallback: () -> Unit) {
+        // synchronizes file, and possibly run filewatcher after sync.
+        fun compSyncFile(sync: Sync, successfulFirstSyncCallback: () -> Unit) {
             sync.fileWatcher?.stop()
-            openNewWindow(SyncView.syncViewSingleFile(sync, successfulSyncCallback))
-            if (sync.auto.value) {
-                sync.fileWatcher = FileWatcher(MFile(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value)).watch {
-                    runLater { compSyncFile(sync, successfulSyncCallback) }
+            val callback: () -> Unit = { // must start filewatcher after getting file!
+                if (sync.auto.value) {
+                    sync.fileWatcher = FileWatcher(MFile(DBSettings.getCacheFolder(sync.cacheid.value) + sync.title.value))
+                    sync.fileWatcher!!.watch {
+                        runLater { compSyncFile(sync) { } }
+                    }
                 }
+                successfulFirstSyncCallback()
             }
+            openNewWindow(SyncView.syncViewSingleFile(sync, callback))
         }
     }
 }
