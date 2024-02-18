@@ -8,9 +8,10 @@ import java.util.*
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac-aarch64", "linux", "win") // compile for these platforms. "mac", "mac-aarch64", "linux", "win"
 val kotlinVersion = "1.9.21"
-val javaVersion = 21
-println("Current Java version: ${JavaVersion.current()}")
-if (JavaVersion.current().majorVersion.toInt() != javaVersion) throw GradleException("Use Java $javaVersion")
+val needMajorJavaVersion = 21
+val javaVersion = System.getProperty("java.version")!!
+println("Current Java version: $javaVersion")
+if (JavaVersion.current().majorVersion.toInt() != needMajorJavaVersion) throw GradleException("Use Java $needMajorJavaVersion")
 
 buildscript {
     repositories {
@@ -35,7 +36,7 @@ idea {
 }
 
 kotlin {
-    jvmToolchain(javaVersion)
+    jvmToolchain(needMajorJavaVersion)
 }
 
 application {
@@ -53,7 +54,7 @@ repositories {
 }
 
 javafx {
-    version = "21" //"$javaVersion"
+    version = javaVersion
     modules("javafx.base", "javafx.controls")
     // set compileOnly for crosspackage to avoid packaging host javafx jmods for all target platforms
     if (project.gradle.startParameter.taskNames.intersect(listOf("crosspackage", "dist")).isNotEmpty()) {
@@ -107,7 +108,7 @@ runtime {
                 println("downloading jdks to or using jdk from $ddir, delete folder to update jdk!")
                 @Suppress("INACCESSIBLE_TYPE")
                 setJdkHome(
-                    jdkDownload("https://api.adoptium.net/v3/binary/latest/$javaVersion/ga/$platf/x64/jdk/hotspot/normal/eclipse?project=jdk",
+                    jdkDownload("https://api.adoptium.net/v3/binary/latest/$needMajorJavaVersion/ga/$platf/x64/jdk/hotspot/normal/eclipse?project=jdk",
                         closureOf<org.beryx.runtime.util.JdkUtil.JdkDownloadOptions> {
                             downloadDir = ddir // put jdks here so different projects can use them!
                             archiveExtension = if (platf == "windows") "zip" else "tar.gz"
@@ -238,7 +239,7 @@ tasks["runtime"].doLast {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "$javaVersion"
+    kotlinOptions.jvmTarget = "$needMajorJavaVersion"
     kotlinOptions.freeCompilerArgs = listOf("-Xjsr305=warn")
 }
 
