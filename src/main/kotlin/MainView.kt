@@ -1,3 +1,6 @@
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleIntegerProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ChangeListener
 import javafx.event.Event
 import javafx.geometry.Pos
@@ -108,9 +111,9 @@ class MainView : View("SFSyncBrowser") {
                             if (server.protoUI.value != null) openNewWindow(ProtocolView(server.protoUI.value), Modality.APPLICATION_MODAL)
                         }}
                         button("Add") { action {
-                            Protocol(server, SSP("<name>"), SSP("sftp://user@server"), SBP(false),
-                                    SSP(""), SBP(false),
-                                    SSP("/"), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0])).let {
+                            Protocol(server, SimpleStringProperty("<name>"), SimpleStringProperty("sftp://user@server"),
+                                SimpleBooleanProperty(false), SimpleStringProperty(""), SimpleBooleanProperty(false),
+                                    SimpleStringProperty("/"), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0])).let {
                                 server.protocols += it
                                 server.protoUI.set(it)
                             }
@@ -122,9 +125,9 @@ class MainView : View("SFSyncBrowser") {
                     }
                     field {
                         button("Add new sync") { action {
-                            Sync(SyncType.NORMAL, SSP("syname"),
-                                SSP(""), SSP("sylocalfolder"),
-                                SSP("syremotefolder"), server=server).let {
+                            Sync(SyncType.NORMAL, SimpleStringProperty("syname"),
+                                SimpleStringProperty(""), SimpleStringProperty("sylocalfolder"),
+                                SimpleStringProperty("syremotefolder"), server=server).let {
                                 server.syncs += it
                                 selectItem(it)
                             }
@@ -251,7 +254,7 @@ class MainView : View("SFSyncBrowser") {
                     }
                     field {
                         button("Add new subset") { action {
-                            SubSet(SSP("ssname"), SSP(""), sync = sync).let {
+                            SubSet(SimpleStringProperty("ssname"), SimpleStringProperty(""), sync = sync).let {
                                 sync.subsets += it
                                 selectItem(it)
                             }
@@ -436,7 +439,7 @@ class MainView : View("SFSyncBrowser") {
         this += ttv
         hbox {
             button("Add server") { action {
-                Server(SSP("name"), SSP(""), SIP(-1)).let {
+                Server(SimpleStringProperty("name"), SimpleStringProperty(""), SimpleIntegerProperty(-1)).let {
                     SettingsStore.servers += it
                     selectItem(it)
                 }

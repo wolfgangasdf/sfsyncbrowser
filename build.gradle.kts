@@ -1,5 +1,6 @@
 
 import org.gradle.kotlin.dsl.support.zipTo
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.openjfx.gradle.JavaFXModule
 import org.openjfx.gradle.JavaFXOptions
@@ -7,7 +8,7 @@ import java.util.*
 
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac-aarch64", "linux", "win") // compile for these platforms. "mac", "mac-aarch64", "linux", "win"
-val kotlinVersion = "1.9.21"
+val kotlinVersion = "2.1.10"
 val needMajorJavaVersion = 21
 val javaVersion = System.getProperty("java.version")!!
 println("Current Java version: $javaVersion")
@@ -20,12 +21,12 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "2.1.10"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.14"
-    id("com.github.ben-manes.versions") version "0.50.0"
-    id("org.beryx.runtime") version "1.13.0"
+    id("com.github.ben-manes.versions") version "0.52.0"
+    id("org.beryx.runtime") version "1.13.1"
 }
 
 idea {
@@ -67,15 +68,15 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
-    implementation("org.slf4j:slf4j-simple:2.0.9") // no colors, everything stderr
+    implementation("org.slf4j:slf4j-simple:2.0.16") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
         exclude("org.openjfx")
     }
-    implementation("com.hierynomus:sshj:0.37.0")
+    implementation("com.hierynomus:sshj:0.39.0")
     implementation("io.methvin:directory-watcher:0.18.0")
-    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.77")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.77")
+    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.80")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.80")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")
@@ -127,14 +128,14 @@ open class CrossPackage : DefaultTask() {
 
     @TaskAction
     fun crossPackage() {
-        File("${project.buildDir.path}/crosspackage/").mkdirs()
+        File("${project.layout.buildDirectory.get().asFile.path}/crosspackage/").mkdirs()
         project.runtime.targetPlatforms.get().forEach { (t, _) ->
             println("targetplatform: $t")
             val imgdir = "${project.runtime.imageDir.get()}/${project.name}-$t"
             println("imagedir=$imgdir targetplatform=$t")
             when {
                 t.startsWith("mac") -> {
-                    val appp = File(project.buildDir.path + "/crosspackage/$t/$execfilename.app").path
+                    val appp = File(project.layout.buildDirectory.get().asFile.path + "/crosspackage/$t/$execfilename.app").path
                     project.delete(appp)
                     project.copy {
                         into(appp)
@@ -192,7 +193,7 @@ open class CrossPackage : DefaultTask() {
                     // touch folder to update Finder
                     File(appp).setLastModified(System.currentTimeMillis())
                     // zip it
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File("${project.buildDir.path}/crosspackage/$t"))
+                    zipTo(File("${project.layout.buildDirectory.get().asFile.path}/crosspackage/$execfilename-$t.zip"), File("${project.layout.buildDirectory.get().asFile.path}/crosspackage/$t"))
                 }
                 t == "win" -> {
                     File("$imgdir/bin/$execfilename.bat").delete() // from runtime, not nice
@@ -202,10 +203,10 @@ open class CrossPackage : DefaultTask() {
                         set DIR=%~dp0
                         start "" "%DIR%\bin\javaw" %JLINK_VM_OPTIONS% -classpath "%DIR%/lib/*" ${project.application.mainClass.get()}  
                     """.trimIndent())
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
+                    zipTo(File("${project.layout.buildDirectory.get().asFile.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
                 }
                 t.startsWith("linux") -> {
-                    zipTo(File("${project.buildDir.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
+                    zipTo(File("${project.layout.buildDirectory.get().asFile.path}/crosspackage/$execfilename-$t.zip"), File(imgdir))
                 }
             }
         }
@@ -229,7 +230,7 @@ tasks["runtime"].doLast {
     cPlatforms.forEach { platform ->
         println("Copy jmods for platform $platform")
         val cfg = configurations["javafx_$platform"]
-        cfg.resolvedConfiguration.files.forEach { f ->
+        cfg.incoming.files.forEach { f ->
             copy {
                 from(f)
                 into("${project.runtime.imageDir.get()}/${project.name}-$platform/lib")
@@ -239,15 +240,15 @@ tasks["runtime"].doLast {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "$needMajorJavaVersion"
-    kotlinOptions.freeCompilerArgs = listOf("-Xjsr305=warn")
+    compilerOptions.jvmTarget.set(JvmTarget.fromTarget("$needMajorJavaVersion"))
+    compilerOptions.freeCompilerArgs.set(listOf("-Xjsr305=warn"))
 }
 
 task("dist") {
     dependsOn("crosspackage")
     doLast {
         println("Deleting build/[image,jre,install]")
-        project.delete(project.runtime.imageDir.get(), project.runtime.jreDir.get(), "${project.buildDir.path}/install")
+        project.delete(project.runtime.imageDir.get(), project.runtime.jreDir.get(), "${project.layout.buildDirectory.get().asFile.path}/install")
         println("Created zips in build/crosspackage")
     }
 }

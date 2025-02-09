@@ -1,5 +1,7 @@
 package synchro
 
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.concurrent.Worker
 import mu.KotlinLogging
 import store.*
@@ -34,9 +36,9 @@ class Profile(private val server: Server, private val sync: Sync, private val su
         updateTit("Initialize connections...")
         cache.loadCache()
 
-        val localproto = Protocol(server, SSP("localproto"), SSP("file://"), SBP(false),
-                SSP(""), SBP(false),
-                SSP(sync.localfolder.value), SSP(""), SSP(""), SSP(SettingsStore.tunnelModes[0]))
+        val localproto = Protocol(server, SimpleStringProperty("localproto"), SimpleStringProperty("file://"),
+            SimpleBooleanProperty(false), SimpleStringProperty(""), SimpleBooleanProperty(false),
+                SimpleStringProperty(sync.localfolder.value), SimpleStringProperty(""), SimpleStringProperty(""), SimpleStringProperty(SettingsStore.tunnelModes[0]))
         local = LocalConnection(localproto)
         local!!.assignRemoteBasePath("")
 

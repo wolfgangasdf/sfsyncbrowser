@@ -185,7 +185,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
         val fp = MFile("$remoteBasePath$cp")
         try {
             fp.deleteThrow()
-        } catch (e: DirectoryNotEmptyException) {
+        } catch (_: DirectoryNotEmptyException) {
             val dir = fp.newDirectoryStreamList()
             if (runUIwait {
                         dialogOkCancel("Warning", "Directory \n $cp \n not empty, DELETE ALL?", "Content:\n" +
@@ -261,7 +261,7 @@ class LocalConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun listSingleFile(remotePath: String): VirtualFile? {
-        logger.debug("listsinglefile: $remotePath")
+        logger.debug("lc listsinglefile: $remotePath")
         val sp = MFile(remoteBasePath + remotePath)
         return if (sp.exists()) VirtualFile(stripPath(sp.internalPath), sp.getLastModifiedTime(), sp.getSize(), sp.getPosixFilePermissions()) else null
     }
@@ -325,7 +325,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
         if (isdir) {
             try {
                 sftpc.rmdir("$remoteBasePath$cp")
-            } catch (e: IOException) { // unfortunately only "Failure" ; checking for content would be slow
+            } catch (_: IOException) { // unfortunately only "Failure" ; checking for content would be slow
                 val xx = sftpc.ls("$remoteBasePath$cp")
                 if (xx.isNotEmpty()) {
                     val tmp = mutableListOf<RemoteResourceInfo>()
@@ -470,7 +470,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
                     }
                     logger.debug("sftp: resolving symlink, next: $cp")
                     try { rriattributes = sftpc.lstat(cp) }
-                    catch (e: SFTPException) {
+                    catch (_: SFTPException) {
                         logger.debug("sftp: can't stat, skip: $cp")
                         break
                     }
@@ -511,7 +511,7 @@ class SftpConnection(protocol: Protocol) : GeneralConnection(protocol) {
     }
 
     override fun listSingleFile(remotePath: String): VirtualFile? {
-        logger.debug("listsinglefile: $remotePath")
+        logger.debug("sftp listsinglefile: $remotePath")
         val sftpsp = sftpexists(remoteBasePath + remotePath)
         return if (sftpsp == null) null else VirtualFile(remotePath.substring(remoteBasePath.length), sftpsp.mtime * 1000, sftpsp.size)
     }
@@ -618,7 +618,7 @@ class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int,
             try {
                 latch.countDown()
                 forwarder!!.listen()
-            } catch (ignore: IOException) {} /* OK. */
+            } catch (_: IOException) {} /* OK. */
         }
 
         override fun close() {
@@ -653,7 +653,7 @@ class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int,
                 ss.reuseAddress = true
                 ss.bind(InetSocketAddress("localhost", localPort))
                 ss
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 null
             }
         }
@@ -663,7 +663,7 @@ class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int,
         forwarderThread.start()
         try {
             forwarderThread.latch.await()
-        } catch (e: InterruptedException) {
+        } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
         return forwarderThread
@@ -705,7 +705,7 @@ class PortForwardedSftp(private val hostsftp: String, private val portsftp: Int,
             try {
                 val addr = InetAddress.getByName(hostsftp)
                 usetunnel = !addr.isReachable(500)
-            } catch (e: UnknownHostException) { logger.info("unknown host, assume not reachable!")}
+            } catch (_: UnknownHostException) { logger.info("unknown host, assume not reachable!")}
         }
 
         return if (usetunnel) {

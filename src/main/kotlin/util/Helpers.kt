@@ -3,9 +3,6 @@ package util
 import io.methvin.watcher.DirectoryWatcher
 import io.methvin.watcher.hashing.FileHasher
 import javafx.application.Platform
-import javafx.beans.property.SimpleBooleanProperty
-import javafx.beans.property.SimpleIntegerProperty
-import javafx.beans.property.SimpleStringProperty
 import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -35,10 +32,6 @@ import kotlin.math.pow
 
 
 private val logger = KotlinLogging.logger {}
-
-typealias SSP = SimpleStringProperty
-typealias SBP = SimpleBooleanProperty
-typealias SIP = SimpleIntegerProperty
 
 object Helpers {
     fun isMac() = System.getProperty("os.name").lowercase().contains("mac")
@@ -297,7 +290,7 @@ object Helpers {
             when(resource.protocol) {
                 "file" -> try {
                     d = Date(File(resource.toURI()).lastModified())
-                } catch (ignored: URISyntaxException) {
+                } catch (_: URISyntaxException) {
                 }
                 "jar" -> {
                     val path = resource.path
@@ -315,8 +308,8 @@ object Helpers {
                             val zeTimeDate = Date(zeTimeLong)
                             d = zeTimeDate
                         }
-                    } catch (ignored: IOException) {
-                    } catch (ignored: RuntimeException) {
+                    } catch (_: IOException) {
+                    } catch (_: RuntimeException) {
                     }
 
                 }

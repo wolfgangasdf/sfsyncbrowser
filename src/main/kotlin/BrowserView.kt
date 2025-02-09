@@ -1,5 +1,6 @@
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleIntegerProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.collections.ObservableList
 import javafx.geometry.Pos
 import javafx.scene.Scene
@@ -20,7 +21,6 @@ import util.Helpers.dialogOkCancel
 import util.Helpers.dialogYesNoCancel
 import util.Helpers.editFile
 import util.Helpers.getFileIntoTempAndDo
-import util.Helpers.isMac
 import util.Helpers.openFile
 import util.Helpers.runUIwait
 import util.Helpers.toThousandsCommas
@@ -57,7 +57,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
         private val dataFormatVFs = DataFormat("VirtualFiles")
     }
     private var oldPath = ""
-    private var currentPath = SSP(path).apply {
+    private var currentPath = SimpleStringProperty(path).apply {
         onChange { if (it != null) updateBrowser() }
     }
 
@@ -119,8 +119,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
             val haveDir = vfs.firstOrNull { it.isDir() } != null
             val dotri = haveDir || vfs.size > 1
             val permips = PosixFilePermission.entries.associateWith {
-                if (dotri) SIP(-1) else {
-                    SIP(if (vfs.first().permissions.contains(it)) 1 else 0)
+                if (dotri) SimpleIntegerProperty(-1) else {
+                    SimpleIntegerProperty(if (vfs.first().permissions.contains(it)) 1 else 0)
                 }
             }
             with(root) {
@@ -525,8 +525,8 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }
 
     private fun addFilesync(op: SfsOp) {
-        val newSync = Sync(SyncType.FILE, SSP(fileTableView.selectedItem?.getFileName()), SSP("not synced"),
-                SSP(""), SSP(fileTableView.selectedItem?.getParent()), server = server).apply {
+        val newSync = Sync(SyncType.FILE, SimpleStringProperty(fileTableView.selectedItem?.getFileName()), SimpleStringProperty("not synced"),
+                SimpleStringProperty(""), SimpleStringProperty(fileTableView.selectedItem?.getParent()), server = server).apply {
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(true)
         }
@@ -548,7 +548,7 @@ class BrowserView(private val server: Server, private val basePath: String, path
     }
 
     private val miAddBookmark: MyMenuitem = MyMenuitem("Add bookmark") {
-        server.bookmarks += BrowserBookmark(server, SSP(fileTableView.selectedItem?.path))
+        server.bookmarks += BrowserBookmark(server, SimpleStringProperty(fileTableView.selectedItem?.path))
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miAddTempSyncFile: MyMenuitem = MyMenuitem("Add temporary syncfile") {
@@ -569,16 +569,16 @@ class BrowserView(private val server: Server, private val basePath: String, path
         chooseDirectory("Select local folder")?.asMFile()?.let {
             lfolder = if (it.internalPath.endsWith("/")) it.internalPath else it.internalPath + "/"
         }
-        server.syncs += Sync(SyncType.NORMAL, SSP(sname?:"syname"),
-                SSP(""), SSP(lfolder),
-                SSP(fileTableView.selectedItem!!.path), server=server)
+        server.syncs += Sync(SyncType.NORMAL, SimpleStringProperty(sname?:"syname"),
+                SimpleStringProperty(""), SimpleStringProperty(lfolder),
+                SimpleStringProperty(fileTableView.selectedItem!!.path), server=server)
     }.withEnableOnSelectionChanged { isNormal() && it.firstOrNull()?.isDir() == true }
 
     private val miAddTempSync: MyMenuitem = MyMenuitem("Add temporary sync...") {
         val sname = dialogInputString("New temporary sync", "Enter sync name:", "")?:"tempsync"
-        val newSync = Sync(SyncType.TEMP, SSP(sname),
-                SSP("not synced"), SSP(""),
-                SSP(fileTableView.selectedItem!!.path), server=server).apply {
+        val newSync = Sync(SyncType.TEMP, SimpleStringProperty(sname),
+                SimpleStringProperty("not synced"), SimpleStringProperty(""),
+                SimpleStringProperty(fileTableView.selectedItem!!.path), server=server).apply {
             cacheid.set(sname + "-" + cacheid.value)
             localfolder.set(DBSettings.getCacheFolder(cacheid.value))
             auto.set(false)

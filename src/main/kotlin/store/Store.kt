@@ -5,7 +5,10 @@ import SortedProperties
 import javafx.application.Platform
 import javafx.beans.property.BooleanProperty
 import javafx.beans.property.IntegerProperty
+import javafx.beans.property.SimpleBooleanProperty
+import javafx.beans.property.SimpleIntegerProperty
 import javafx.beans.property.SimpleObjectProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.beans.property.StringProperty
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
@@ -79,21 +82,21 @@ object DBSettings {
 
 ///////////////////////// settings
 
-class SSBSettings(val editor: StringProperty = SSP(""),
-                  val browsercols: StringProperty = SSP(""),
-                  val onExitRemoveFilesyncs: BooleanProperty = SBP(false),
-                  val showHiddenfiles: BooleanProperty = SBP(false)
+class SSBSettings(val editor: StringProperty = SimpleStringProperty(""),
+                  val browsercols: StringProperty = SimpleStringProperty(""),
+                  val onExitRemoveFilesyncs: BooleanProperty = SimpleBooleanProperty(false),
+                  val showHiddenfiles: BooleanProperty = SimpleBooleanProperty(false)
 )
 
 enum class SyncType { NORMAL, FILE, TEMP }
 
 // title is filepath for file sync
 class Sync(val type: SyncType, val title: StringProperty, val status: StringProperty, val localfolder: StringProperty, val remoteFolder: StringProperty,
-           val excludeFilter: StringProperty = SSP(Helpers.defaultOSexcludeFilter()),
-           val cacheid: StringProperty = SSP(Date().time.toString()), val server: Server,
+           val excludeFilter: StringProperty = SimpleStringProperty(Helpers.defaultOSexcludeFilter()),
+           val cacheid: StringProperty = SimpleStringProperty(Date().time.toString()), val server: Server,
            val subsets: ObservableList<SubSet> = getSortedFilteredList(),
-           val auto: BooleanProperty = SBP(false), val disableFullSync: BooleanProperty = SBP(false),
-           val permsOverride: StringProperty = SSP("")) {
+           val auto: BooleanProperty = SimpleBooleanProperty(false), val disableFullSync: BooleanProperty = SimpleBooleanProperty(false),
+           val permsOverride: StringProperty = SimpleStringProperty("")) {
     private fun getNiceName() = when(type) {
         SyncType.NORMAL -> "Sync"
         SyncType.FILE -> "FileSync"
@@ -119,10 +122,10 @@ class SubSet(val title: StringProperty, val status: StringProperty, // if title 
     val isAll: Boolean get() = title.value == "<all>"
     val isSingleFile: Boolean get() = title.value == "<singlefile>"
     companion object {
-        fun all(sync: Sync) = SubSet(SSP("<all>"), SSP(""), sync = sync).apply {
+        fun all(sync: Sync) = SubSet(SimpleStringProperty("<all>"), SimpleStringProperty(""), sync = sync).apply {
             subfolders += "" // this is needed for tasklist[local,remote]!
         }
-        fun singlefile(sync: Sync) = SubSet(SSP("<singlefile>"), SSP(""), sync = sync).apply {
+        fun singlefile(sync: Sync) = SubSet(SimpleStringProperty("<singlefile>"), SimpleStringProperty(""), sync = sync).apply {
             subfolders += sync.title.value // this is filepath!
         }
     }
@@ -242,9 +245,9 @@ object SettingsStore {
             propsx.load(fr)
             val props = propsx.map { (k, v) -> k.toString() to v.toString() }.toMap()
             if (props["settingsversion"] != "1") throw UnsupportedOperationException("wrong settingsversion!")
-            fun p2sp(key: String) = SSP(props.getOrDefault(key, ""))
-            fun p2bp(key: String) = SBP(props.getOrDefault(key, "0").toBoolean())
-            fun p2ip(key: String) = SIP(props.getOrDefault(key, "0").toInt())
+            fun p2sp(key: String) = SimpleStringProperty(props.getOrDefault(key, ""))
+            fun p2bp(key: String) = SimpleBooleanProperty(props.getOrDefault(key, "0").toBoolean())
+            fun p2ip(key: String) = SimpleIntegerProperty(props.getOrDefault(key, "0").toInt())
             try {
                 ssbSettings.editor.set(props.getOrDefault("ssb.editor", ""))
                 ssbSettings.browsercols.set(props.getOrDefault("ssb.browsercols", ""))
@@ -252,7 +255,7 @@ object SettingsStore {
                 ssbSettings.showHiddenfiles.set(props.getOrDefault("ssb.showHiddenfiles", "0").toBoolean())
                 for (idx in 0 until props.getOrDefault("servers", "0").toInt()) {
                     val server = Server(p2sp("se.$idx.title"),
-                            SSP(""), p2ip("se.$idx.currentProtocol"))
+                            SimpleStringProperty(""), p2ip("se.$idx.currentProtocol"))
                     for (idx2 in 0 until props.getOrDefault("se.$idx.protocols", "0").toInt()) {
                         server.protocols += Protocol(server, p2sp("sp.$idx.$idx2.name"), p2sp("sp.$idx.$idx2.uri"), p2bp("sp.$idx.$idx2.doSetPermissions"),
                                 p2sp("sp.$idx.$idx2.perms"), p2bp("sp.$idx.$idx2.cantSetDate"), p2sp("sp.$idx.$idx2.baseFolder"),
@@ -264,12 +267,12 @@ object SettingsStore {
                     if (server.currentProtocol.value > -1) server.protoUI.set(server.getProtocol())
                     for (idx2 in 0 until props.getOrDefault("se.$idx.syncs", "0").toInt()) {
                         val sync = Sync(SyncType.valueOf(props.getOrDefault("sy.$idx.$idx2.type", SyncType.NORMAL.name)), p2sp("sy.$idx.$idx2.title"),
-                                SSP(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.excludeFilter"), p2sp("sy.$idx.$idx2.cacheid"), server,
+                                SimpleStringProperty(""), p2sp("sy.$idx.$idx2.localfolder"), p2sp("sy.$idx.$idx2.remoteFolder"), p2sp("sy.$idx.$idx2.excludeFilter"), p2sp("sy.$idx.$idx2.cacheid"), server,
                                 auto = p2bp("sy.$idx.$idx2.auto"), disableFullSync = p2bp("sy.$idx.$idx2.disableFullSync"),
                                 permsOverride = p2sp("sy.$idx.$idx2.permsOverride"))
                         if (sync.auto.get()) sync.status.set("need to re-start auto sync!")
                         for (iss in 0 until props.getOrDefault("sy.$idx.$idx2.subsets", "0").toInt()) {
-                            val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), SSP(""), sync=sync)
+                            val subSet = SubSet(p2sp("ss.$idx.$idx2.$iss.title"), SimpleStringProperty(""), sync=sync)
                             for (irf in 0 until props.getValue("ss.$idx.$idx2.$iss.subfolders").toInt()) subSet.subfolders += props.getValue("sssf.$idx.$idx2.$iss.$irf")
                             sync.subsets += subSet
                         }
@@ -326,17 +329,17 @@ class SyncEntry(var action: Int,
     var hasCachedParent = false // only used for folders!
     private fun sameTime(t1: Long, t2: Long): Boolean = abs(t1 - t2) < 2000 // in milliseconds
 
-    fun status() = SSP(this, "status", CF.amap[action])
-    fun detailsLocal() = SSP(this, "detailsl",
+    fun status() = SimpleStringProperty(this, "status", CF.amap[action])
+    fun detailsLocal() = SimpleStringProperty(this, "detailsl",
             if (lSize != -1L) dformat().format(Date(lTime)) + "(" + tokMGTPE(lSize) + ")" else "none")
 
-    fun detailsRemote() = SSP(this, "detailsr",
+    fun detailsRemote() = SimpleStringProperty(this, "detailsr",
             if (rSize != -1L) dformat().format(Date(rTime)) + "(" + tokMGTPE(rSize) + ")" else "none")
 
-    fun detailsRCache() = SSP(this, "detailsrc",
+    fun detailsRCache() = SimpleStringProperty(this, "detailsrc",
             if (cSize != -1L) dformat().format(Date(rcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
-    fun detailsLCache() = SSP(this, "detailslc",
+    fun detailsLCache() = SimpleStringProperty(this, "detailslc",
             if (cSize != -1L) dformat().format(Date(lcTime)) + "(" + tokMGTPE(cSize) + ")" else "none")
 
     //  fun isDir = path.endsWith("/")
