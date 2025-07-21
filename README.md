@@ -58,7 +58,7 @@ This will result in nice synchronization errors, no data loss will happen.
 ### Used frameworks ###
 
 * [Kotlin](https://kotlinlang.org/) and [Gradle](https://gradle.org/)
-* [TornadoFX](https://github.com/edvin/tornadofx2)
+* [TornadoFX2](https://github.com/edvin/tornadofx2)
 * [SSHJ](https://github.com/hierynomus/sshj)
 * [Directory-watcher](https://github.com/gmethvin/directory-watcher) to watch local files for changes
 * [Beryx runtime](https://github.com/beryx/badass-runtime-plugin) to make runtimes with JRE

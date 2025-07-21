@@ -8,7 +8,7 @@ import java.util.*
 
 version = "1.0-SNAPSHOT"
 val cPlatforms = listOf("mac-aarch64", "linux", "win") // compile for these platforms. "mac", "mac-aarch64", "linux", "win"
-val kotlinVersion = "2.1.10"
+val kotlinVersion = "2.2.0"
 val needMajorJavaVersion = 21
 val javaVersion = System.getProperty("java.version")!!
 println("Current Java version: $javaVersion")
@@ -21,7 +21,7 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "2.1.10"
+    kotlin("jvm") version "2.2.0"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.0.14"
@@ -68,15 +68,15 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
-    implementation("org.slf4j:slf4j-simple:2.0.16") // no colors, everything stderr
+    implementation("org.slf4j:slf4j-simple:2.0.17") // no colors, everything stderr
     implementation("no.tornado:tornadofx:2.0.0-SNAPSHOT") {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
         exclude("org.openjfx")
     }
-    implementation("com.hierynomus:sshj:0.39.0")
-    implementation("io.methvin:directory-watcher:0.18.0")
-    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.80")
-    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.80")
+    implementation("com.hierynomus:sshj:0.40.0")
+    implementation("io.methvin:directory-watcher:0.19.1")
+    runtimeOnly("org.bouncycastle:bcprov-jdk18on:1.81")
+    runtimeOnly("org.bouncycastle:bcpkix-jdk18on:1.81")
 
     cPlatforms.forEach {platform ->
         val cfg = configurations.create("javafx_$platform")

@@ -449,7 +449,7 @@ class Cache(private val cacheid: String) {
     private fun iniCache() {
         cache = MyTreeMap()
         observableListSleep = true
-        observableList.clear()
+        Platform.runLater { observableList.clear() }
         observableListSleep = false
     }
 

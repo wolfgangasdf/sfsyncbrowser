@@ -229,7 +229,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             text = it
             tooltip {
                 setOnShowing {
-                    text = rowItem.toStringNice()
+                    text = if (index < items.size) rowItem.toStringNice() else "" // bug sometimes: zombie tooltips
                     style = "-fx-font-family: \"Courier New\";"
                 }
             }
