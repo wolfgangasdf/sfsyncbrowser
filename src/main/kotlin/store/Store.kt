@@ -428,14 +428,16 @@ class Cache(private val cacheid: String) {
 
     init {
         observableList.onChange { op ->
-            // automatically update treemap from UI changes
+            // automatically update treemap from UI changes.
             if (!observableListSleep) {
-                if (op.wasUpdated()) {
-                    observableList.subList(op.from, op.to).forEach { se2 ->
-                        logger.debug("changed se2: " + se2.toStringNice())
-                        cache[se2.path] = se2.se
-                    }
-                } else throw NotImplementedError("obslist wants to do something else! $op")
+                while (op.next()) {
+                    if (op.wasUpdated()) {
+                        observableList.subList(op.from, op.to).forEach { se2 ->
+                            logger.debug("changed se2: " + se2.toStringNice())
+                            cache[se2.path] = se2.se
+                        }
+                    } else throw NotImplementedError("obslist wants to do something else! $op")
+                }
             }
         }
     }

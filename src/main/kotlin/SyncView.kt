@@ -105,14 +105,14 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             dialogMessage(Alert.AlertType.ERROR, "Error", task.title, task.exception.toString())
             task.exception.printStackTrace()
             profile.cache.updateObservableBuffer()
-            btSync.isDisable = true ; btCompare.isDisable = false
+            btSync.isDisable = true
         }
     }
     private fun handleCancelled() {
         runUIwait {
             logger.info("Cancelled!")
             profile.cache.updateObservableBuffer()
-            btSync.isDisable = true ; btCompare.isDisable = false
+            btSync.isDisable = true
         }
     }
 
@@ -128,7 +128,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
                 updateProgr(50, 100, "Run comparison...")
                 taskCompFiles.setOnSucceeded {
                     val haveChanges = taskCompFiles.get()
-                    btCompare.isDisable = false
                     runUIwait { profile.cache.updateObservableBuffer() }
                     syncEnabled = true
                     val canSync = updateSyncButton()
@@ -194,18 +193,11 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
 
     private val btSync: Button = button("Sync!").apply {
         setOnAction {
-            btCompare.isDisable = true
             this.isDisable = true
             runSynchronize()
         }
         isDisable = true
     }
-
-    private val btCompare = button("Compare!") { action {
-//        btSync.isDisable = true
-//        this.isDisable = true
-        runCompare()
-    }}
 
     private val fileTableView = tableview(profile.cache.observableList) {
         isEditable = false
@@ -340,7 +332,7 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
             profile.cache.updateObservableBuffer()
         }
         profile.cache.filterActions = Filters.getFilter(Filters.changes)
-        this.setValue(Filters.changes)
+        this.value = Filters.changes
     }
 
     private val btDiff = Button("Quick diff").apply { setOnAction {
@@ -370,7 +362,6 @@ class SyncView(private val server: Server, private val sync: Sync, private val s
         prefWidth = 1200.0
         prefHeight = 600.0
         toolbar {
-            this += btCompare
             this += btSync
             button("Close") { action {
                 close()
