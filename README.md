@@ -25,7 +25,7 @@ supports multiple bookmarks per server, and multiple protocols per server (like 
 
 
 ### Status ###
-I use it on mac daily, and less often on windows.
+I use it on mac daily, windows is less tested.
 
 File synchronization is a delicate thing. However, if you keep the Files list-view on the default setting "changes",
 you can review everything before pressing `Synchronize`.

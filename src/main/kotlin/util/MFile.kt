@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.*
 import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 
 private val logger = KotlinLogging.logger {}
 
@@ -33,12 +34,11 @@ class MFile(val internalPath: String) {
     val name: String = file.name
 
     companion object {
-        private val isWin = System.getProperty("os.name").lowercase().contains("win")
         private val reWinPath = """(.):\\(.*)""".toRegex()
         private val reWinUNC = """\\\\.*\\.*""".toRegex()
         fun createTempFile(prefix: String, suffix: String): MFile {
             val tag = System.currentTimeMillis().toString()
-            var dir = System.getProperty("java.io.tmpdir")
+            var dir = ipFromFile(File(System.getProperty("java.io.tmpdir")))
             if (Helpers.isLinux() || Helpers.isMac()) if (MFile("/tmp").isDirectory())
                 dir = "/tmp"
             return MFile("$dir/$prefix-$tag$suffix")
@@ -50,7 +50,7 @@ class MFile(val internalPath: String) {
         fun ipFromFile(f: File): String {
             val ap = normalizePath(f.absolutePath)
             return when {
-                isWin -> {
+                Helpers.isWin() -> {
                     when {
                         ap.matches(reWinPath) -> reWinPath.find(ap)!!.let {
                             "/${it.groupValues[1]}/${it.groupValues[2].replace("\\", "/")}"
@@ -63,7 +63,7 @@ class MFile(val internalPath: String) {
             }
         }
         fun ospathFromIP(ip: String): String = when {
-            isWin -> when {
+            Helpers.isWin() -> when {
                 ip.matches("/./.*".toRegex()) -> "${ip[1]}:${ip.substring(2).replace("/", "\\")}"
                 ip.matches("//.*/.*".toRegex()) -> ip.replace("/","\\")
                 else -> throw Exception("Unknown internal path: $ip")
@@ -84,7 +84,7 @@ class MFile(val internalPath: String) {
         fun getIPrelativeTo(ip: String, ipbase: String) = ip.removePrefix(ipbase)
 
         fun testit() {
-            if (isWin) {
+            if (Helpers.isWin()) {
                 val files = arrayOf("d:\\asdf\\fdsa.txt", "\\\\nix\\storage\\stuff\\all-05.blend")
                 fun printit(mf: MFile) {
                     logger.info("* $mf (exists=${mf.exists()}:")
@@ -138,8 +138,11 @@ class MFile(val internalPath: String) {
     fun newFileWriter() = FileWriter(file)
     fun newFileReader() = FileReader(file)
     fun newDirectoryStreamList() = Files.newDirectoryStream(asPath()).use { dir -> dir.map { MFile(it) } }
-    fun setPosixFilePermissions(perms: Set<PosixFilePermission>) { Files.setPosixFilePermissions(asPath(), perms) }
-    fun getPosixFilePermissions(): MutableSet<PosixFilePermission> = Files.getPosixFilePermissions(asPath())
+    fun setPosixFilePermissions(perms: Set<PosixFilePermission>) {
+        if (!Helpers.isWin()) Files.setPosixFilePermissions(asPath(), perms)
+    }
+    fun getPosixFilePermissions(): MutableSet<PosixFilePermission> = if (Helpers.isWin()) mutableSetOf<PosixFilePermission>()
+        else Files.getPosixFilePermissions(asPath())
     fun deletePlain() = if (file.exists()) file.delete() else true
     fun delete() { if (file.exists()) { if (!Helpers.trashFile(this)) file.delete() } }
     fun deleteRecursively() { if (file.exists()) { if (!Helpers.trashFile(this)) file.deleteRecursively() } }
