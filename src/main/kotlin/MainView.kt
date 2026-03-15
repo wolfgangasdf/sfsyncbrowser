@@ -64,7 +64,13 @@ class MainView : View("SFSyncBrowser") {
                     DBSettings.logFile?.let {f ->
                         field("Log file") {
                             textfield(f.internalPath) { isDisable = true }
-                            button("Open log file").setOnAction { Helpers.openFile(f) }
+                            button("Open").setOnAction { Helpers.openFile(f) }
+                        }
+                    }
+                    DBSettings.getSettingFile().parent()?.let { f ->
+                        field("Settings folder") {
+                            textfield(f.internalPath) { isDisable = true }
+                            button("Open").setOnAction { Helpers.openFile(f) }
                         }
                     }
                 }
@@ -317,11 +323,16 @@ class MainView : View("SFSyncBrowser") {
                             )
                             if (dir != null) subset.subfolders += "$dir/"
                         } }
-                        button("Remove selected folder") { action {
+                        button("Reveal folder") { action {
+                            if (lvFolders.selectedItem != null) Helpers.openFile(MFile(subset.sync.localfolder.value + lvFolders.selectedItem))
+                        } }
+                        button("Remove folder") { action {
                             if (lvFolders.selectedItem != null) subset.subfolders.remove(lvFolders.selectedItem)
                         } }
                         button("Remove subset") { action {
-                            subset.sync.subsets.remove(subset)
+                            confirm("Remove subset", "Really remove whole subset?") {
+                                subset.sync.subsets.remove(subset)
+                            }
                         } }
                     }
                 }

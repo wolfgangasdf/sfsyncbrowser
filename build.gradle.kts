@@ -8,7 +8,7 @@ import java.util.*
 
 version = "1.0-SNAPSHOT"
 val crossPlatforms = listOf("mac-aarch64", "windows-x64", "linux-x64") // create apps for these platforms [linux|mac|windows] - architectures [x86|x64|aarch64], see adoptium parameters https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
-val kotlinVersion = "2.3.0"
+val kotlinVersion = "2.3.10"
 val needMajorJavaVersion = 25
 val javaVersion = System.getProperty("java.version")!!
 println("Current Java version: $javaVersion")
@@ -21,7 +21,7 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "2.3.0"
+    kotlin("jvm") version "2.3.10"
     id("idea")
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
@@ -43,7 +43,9 @@ kotlin {
 application {
     mainClass.set("Launcher")
     applicationDefaultJvmArgs = listOf("-Dprism.verbose=true",
-            "--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED") // javafx 13 tornadofx bug: https://github.com/edvin/tornadofx/issues/899#issuecomment-569709223
+//            "--add-opens=javafx.controls/javafx.scene.control=ALL-UNNAMED", "--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED", // javafx 13 tornadofx bug: https://github.com/edvin/tornadofx/issues/899#issuecomment-569709223
+            "--enable-native-access=javafx.graphics"
+    )
 }
 
 repositories {
@@ -51,7 +53,7 @@ repositories {
     maven {
         setUrl("https://jitpack.io")
         content {
-            includeModule("com.github.edvin", "tornadofx2")
+            includeModule("com.github.wolfgangasdf", "tornadofx2")
         }
     }
 }
@@ -71,7 +73,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
     implementation("org.slf4j:slf4j-simple:2.0.17") // no colors, everything stderr
-    implementation("com.github.edvin:tornadofx2:21e933fd41") {
+    implementation("com.github.wolfgangasdf:tornadofx2:4562a772c2") {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
         exclude("org.openjfx")
     }
